@@ -14,6 +14,12 @@
 .heatmap-legend .heatmap-swatch-group { display: flex; gap: 10px; }
 .heatmap-legend .heatmap-swatch-item { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 30px; }
 .heatmap-legend .sq { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+/* The swatch centers itself over the full label text by default (including
+   the trailing "+"), which visually reads as off-center since the "+" adds
+   width the eye doesn't weigh the same as the digits. Nudge just the last
+   ("10h+") swatch left so it centers over "10h" instead. Adjust the -3px if
+   it still looks off on your screen. */
+.heatmap-legend .heatmap-swatch-item:last-child .sq { position: relative; left: -3px; }
 .heatmap-legend .sq-label { font-size: 10px; color: var(--muted); white-space: nowrap; text-align: center; width: 100%; }
 
 /* NOTE: the Subject-Breakdown pie chart and the Weekly Trend line chart are

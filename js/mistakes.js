@@ -436,7 +436,7 @@ function renderAddForm() {
     wireChapterTypeahead(document.getElementById("mistake-add-chapter"));
 }
 
-function renderEntryBlock(subject, chapter, entry, isEditing) {
+function renderEntryBlock(subject, chapter, entry, isEditing, entryNumber) {
     let ek = entryKey(keyFor(subject, chapter), entry.id);
     let attachedElsewhere = entry.hasFiles && (!entry.files || entry.files.length === 0);
     let stamp = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : "";
@@ -444,7 +444,7 @@ function renderEntryBlock(subject, chapter, entry, isEditing) {
     if (!isEditing) {
         return `<div class="mc-entry-block" data-entry-id="${escapeHtml(String(entry.id))}">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                <span class="mc-entry-meta">${escapeHtml(stamp)}${entry.count > 1 ? ` · counted as ${entry.count}` : ''}</span>
+                <span class="mc-entry-meta">${entryNumber ? `#${entryNumber} · ` : ''}${escapeHtml(stamp)}${entry.count > 1 ? ` · counted as ${entry.count}` : ''}</span>
                 <div style="display:flex; gap:4px;">
                     <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Edit this entry">✏️</button>
                     <button type="button" class="mc-icon-btn" data-mc-delete-entry title="Delete this entry">🗑</button>
@@ -537,9 +537,9 @@ function renderViewList() {
             if (entries.length === 0) {
                 html += `<span class="small-note">No mistakes logged for this chapter yet.</span>`;
             } else {
-                entries.forEach(entry => {
+                entries.forEach((entry, idx) => {
                     let isEditing = !!editingEntries[entryKey(key, entry.id)];
-                    html += renderEntryBlock(activeMistakeSubject, ch, entry, isEditing);
+                    html += renderEntryBlock(activeMistakeSubject, ch, entry, isEditing, idx + 1);
                 });
                 html += `<button type="button" class="btn btn-stop btn-small" data-mc-delete-log>Clear ALL entries for this chapter</button>`;
             }

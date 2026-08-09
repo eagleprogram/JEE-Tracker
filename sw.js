@@ -5,7 +5,7 @@
 // thing that makes the activate handler below delete the old cache and let
 // the new files be fetched fresh. Forgetting this step means fixes silently
 // never reach anyone who doesn't manually hard-refresh.
-const CACHE_NAME = "jee-tracker-v2.2.0";
+const CACHE_NAME = "jee-tracker-v2.2.1";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -35,9 +35,21 @@ const APP_SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
+  // cache.addAll(urls) fetches each URL with the browser's DEFAULT cache
+  // mode, which is allowed to reuse the browser's own HTTP disk cache — so
+  // a "fresh" install under a new CACHE_NAME could still populate itself
+  // with stale files if they were disk-cached, silently defeating the
+  // whole point of bumping the version above. Requesting each file with
+  // {cache: "reload"} forces a real network round-trip, bypassing the disk
+  // cache, so the new cache is guaranteed to hold what's actually deployed.
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => Promise.all(
+        APP_SHELL.map((url) =>
+          fetch(new Request(url, { cache: "reload" }))
+            .then((res) => cache.put(url, res))
+        )
+      ))
       .then(() => self.skipWaiting())
   );
 });

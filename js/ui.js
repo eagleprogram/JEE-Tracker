@@ -23,7 +23,7 @@ import { renderMistakesTracker } from './mistakes.js';
 // Available both signed-out and signed-in — it never touches
 // localStorage/IndexedDB study data, only the PWA cache layer.
 export async function clearCacheAndReload() {
-    if (!confirm("This clears the app's cached files and reloads the page to fetch the latest version. Your study data is not affected. Continue?")) return;
+    if (!confirm("This clears the app's cached files and does a full reload to fetch the latest version. It doesn't touch your study data, but as a precaution — especially if you haven't synced in a while — consider exporting a backup or saving to cloud first. Continue?")) return;
     try {
         if ("caches" in window) {
             let keys = await caches.keys();
@@ -37,7 +37,16 @@ export async function clearCacheAndReload() {
         // Even if clearing fails partway, still force the reload below —
         // a plain reload is strictly better than doing nothing.
     }
-    location.reload();
+    // A plain location.reload() clears the SW/Cache-Storage layer above, but
+    // the *browser's own HTTP disk cache* is a separate thing it does not
+    // touch — GitHub Pages serves static files with a Cache-Control max-age,
+    // so a normal reload can still silently reuse a stale cached index.html
+    // or JS file without even asking the network. Navigating to a
+    // cache-busted URL forces this to be treated as a brand-new resource,
+    // guaranteeing a real network fetch instead of a disk-cache hit.
+    let url = new URL(location.href);
+    url.searchParams.set("_cb", Date.now().toString());
+    location.replace(url.toString());
 }
 
 // ----------------- TOASTS -----------------
