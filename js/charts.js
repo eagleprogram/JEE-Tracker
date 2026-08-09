@@ -91,7 +91,7 @@ export function renderGarden() {
         let hrs = sec / 3600;
         let isFrozen = false;
         if (!isFuture && !isToday && hrs < 10 && !freezeUsedThisWeek) { isFrozen = true; freezeUsedThisWeek = true; }
-        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"><div class="dow-label">${dowLabels[i]}${isFrozen ? '<span class="freeze-badge" title="Streak freeze used">❄️</span>' : ''}</div>${gardenPlotSVG(hrs, i)}<div class="hrs-label">${hrs.toFixed(1)}h</div></div>`;
+        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"><div class="dow-label">${isFrozen ? '<span class="freeze-badge" title="Streak freeze used">❄️</span>' : ''}${dowLabels[i]}</div>${gardenPlotSVG(hrs, i)}<div class="hrs-label">${hrs.toFixed(1)}h</div></div>`;
     }
     document.getElementById("garden-row").innerHTML = html;
     document.getElementById("streak-pill").innerText = `🔥 ${computeStreak(db)} day streak`;
@@ -122,7 +122,13 @@ export function renderHeatmap() {
         week.forEach((day, di) => {
             if (day.date > today) return;
             let x = wi * (cell + gap) + 8, y = di * (cell + gap) + 5;
-            let colorIdx = day.hrs > 10 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
+            // BUG FIX: was `day.hrs > 10`. reports.js's downloadable-report
+            // heatmap already used `hrs > 9` for this same bucket boundary —
+            // the two were inconsistent with each other. Aligning to >9 here
+            // matches reports.js and the corrected "6-9h" / "9h+" legend
+            // labels in index.html (was previously showing "6-10h" / "10h+",
+            // one hour off from where the color actually changed).
+            let colorIdx = day.hrs > 9 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
             svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${hmColors[colorIdx]}" stroke="#374357" stroke-width="1"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
         });
     });
