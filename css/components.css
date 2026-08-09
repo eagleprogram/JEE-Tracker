@@ -159,8 +159,12 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mistake-tag-chip { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--muted); user-select: none; }
 .mistake-tag-chip.selected { background: var(--primary); border-color: var(--primary); color: #04121f; font-weight: 600; }
 .mistake-summary-wrap { margin-top: 10px; }
-.mistake-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.mistake-summary .ms-pill { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px 9px; font-size: 11px; color: var(--text); }
+#mistake-tag-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+#mistake-tag-summary .ms-pill { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px 9px; font-size: 11px; color: var(--text); }
+.section-header-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.section-header-row .section-subtitle { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+.sort-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 12px; font-family: inherit; max-width: 170px; }
+.priority-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0 4px; font-size: 16px; font-family: inherit; height: 44px; width: 52px; flex-shrink: 0; text-align: center; }
 .mock-entry .entry-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .mock-entry .entry-tags span { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
 
