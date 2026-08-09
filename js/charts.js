@@ -122,13 +122,10 @@ export function renderHeatmap() {
         week.forEach((day, di) => {
             if (day.date > today) return;
             let x = wi * (cell + gap) + 8, y = di * (cell + gap) + 5;
-            // BUG FIX: was `day.hrs > 10`. reports.js's downloadable-report
-            // heatmap already used `hrs > 9` for this same bucket boundary —
-            // the two were inconsistent with each other. Aligning to >9 here
-            // matches reports.js and the corrected "6-9h" / "9h+" legend
-            // labels in index.html (was previously showing "6-10h" / "10h+",
-            // one hour off from where the color actually changed).
-            let colorIdx = day.hrs > 9 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
+            // Buckets now span the full 0-10h daily goal so the brightest
+            // color is only reached at the actual goal (10h+), not 9h —
+            // matches the updated "10h+" legend label in index.html.
+            let colorIdx = day.hrs >= 10 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
             svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${hmColors[colorIdx]}" stroke="#374357" stroke-width="1"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
         });
     });
@@ -140,7 +137,12 @@ export function renderHeatmap() {
 export function renderTrendChart() {
     let db = getDB(); let today = new Date(); today.setHours(0,0,0,0);
     let days = []; for (let i = 6; i >= 0; i--) { let d = new Date(today); d.setDate(today.getDate() - i); days.push(dateKeyFromWall(d.getTime())); }
-    let subjects = Object.keys(blankDay().subjects); let width = 1200, height = 400, padding = 60; let maxHrs = 0.5;
+    let subjects = Object.keys(blankDay().subjects); let width = 1200, height = 400, padding = 60;
+    // Fixed floor of 10h (the daily study goal) instead of 0.5h — a 0.5h
+    // ceiling made every gridline within a hair of 0 and the chart looked
+    // broken/empty even on days with real data. If actual logged hours ever
+    // exceed 10 in the last 7 days, the axis still grows to fit them.
+    let maxHrs = 10;
     days.forEach(key => { let day = db[key]; if (day) subjects.forEach(s => { maxHrs = Math.max(maxHrs, (day.subjects[s]||0)/3600); }); });
     let xStep = (width - padding * 2) / (days.length - 1);
     let svg = `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMinYMin meet">`;

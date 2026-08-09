@@ -447,7 +447,7 @@ ctx.textAlign = "left";
     ctx.textAlign = "left";
     dayData.slice(0, 35).forEach((d, i) => {
         let hrs = d.study / 3600; let colorIdx = 0;
-        if (hrs > 0) colorIdx = 1; if (hrs > 3) colorIdx = 2; if (hrs > 6) colorIdx = 3; if (hrs > 9) colorIdx = 4;
+        if (hrs > 0) colorIdx = 1; if (hrs > 3) colorIdx = 2; if (hrs > 6) colorIdx = 3; if (hrs >= 10) colorIdx = 4;
         let dayDate = new Date(d.date + "T00:00:00"); let col = dayDate.getDay(); let adjustedCol = col === 0 ? 6 : col - 1;
         let row = Math.floor(i / 7);
         let x = heatmapX + adjustedCol * (cellSize + cellGap);
