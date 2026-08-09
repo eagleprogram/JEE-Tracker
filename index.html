@@ -46,11 +46,23 @@
         <h3 style="margin:0; color:var(--primary);">Planner Tools</h3>
 
                 <div class="card" style="padding: 12px;">
-    <h4 style="margin:0 0 10px 0;">📌 Today's To-Do</h4>
-    <div style="display:flex; align-items:stretch; gap:6px;">
+    <div class="section-header-row" style="margin-top:0;">
+        <h4 class="section-subtitle">📌 Today's To-Do</h4>
+        <select id="todo-sort-select" class="sort-select" onchange="renderSidebarTools()" title="Sort tasks">
+            <option value="added">Added order</option>
+            <option value="priority-desc">High → Low</option>
+            <option value="priority-asc">Low → High</option>
+        </select>
+    </div>
+    <div style="display:flex; align-items:stretch; gap:6px; margin-top:10px;">
         <input type="text" id="todo-input" placeholder="Add something to do today..."
                onkeypress="if(event.key==='Enter') addTodo()"
                style="flex:1; margin:0;">
+        <select id="todo-priority-select" class="priority-select" title="Priority for this task">
+            <option value="high">🔴</option>
+            <option value="medium" selected>🟡</option>
+            <option value="low">🟢</option>
+        </select>
         <button class="btn btn-start" onclick="addTodo()" title="Add task" style="height:44px; width:44px; padding:0; font-size:20px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; border-radius:8px;">+</button>
     </div>
     <div id="todo-list" style="max-height: 180px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg);"></div>
@@ -238,6 +250,19 @@
                 <span>Tests: <span id="mock-total-count" style="color:var(--success);">0</span></span>
             </div>
         </div>
+        <div class="section-header-row">
+            <h4 class="section-subtitle">Mistake pattern frequency</h4>
+            <select id="mock-sort-select" class="sort-select" onchange="renderMockTestList()" title="Sort mock test entries">
+                <option value="added-desc">Sort: Newest added</option>
+                <option value="added-asc">Sort: Oldest added</option>
+                <option value="date-desc">Sort: Test date (newest)</option>
+                <option value="date-asc">Sort: Test date (oldest)</option>
+                <option value="score-desc">Sort: Score % (highest)</option>
+                <option value="score-asc">Sort: Score % (lowest)</option>
+                <option value="mistakes-desc">Sort: Most mistakes</option>
+                <option value="mistakes-asc">Sort: Least mistakes</option>
+            </select>
+        </div>
         <div class="mistake-summary-wrap" id="mistake-tag-summary"></div>
         <div id="mock-test-list" style="max-height: 520px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg);"></div>
     </div>
@@ -353,12 +378,12 @@
                 <span class="sq" style="background:#2b3852;" title="0h studied"></span>
                 <span class="sq" style="background:#0c3448;" title="Up to 3h studied"></span>
                 <span class="sq" style="background:#b2ebf2;" title="3-6h studied"></span>
-                <span class="sq" style="background:#008080;" title="6-10h studied"></span>
-                <span class="sq" style="background:#00e5ff;" title="Over 10h studied"></span>
+                <span class="sq" style="background:#008080;" title="6-9h studied"></span>
+                <span class="sq" style="background:#00e5ff;" title="Over 9h studied"></span>
             </span>
             <span>More</span>
         </div>
-        <div class="small-note" style="text-align:center; margin-top:4px;">0h &nbsp;·&nbsp; 0–3h &nbsp;·&nbsp; 3–6h &nbsp;·&nbsp; 6–10h &nbsp;·&nbsp; 10h+</div>
+        <div class="small-note" style="text-align:center; margin-top:4px;">0h &nbsp;·&nbsp; 0–3h &nbsp;·&nbsp; 3–6h &nbsp;·&nbsp; 6–9h &nbsp;·&nbsp; 9h+</div>
     </div>
 
     <div class="card" style="margin-top:20px;">
@@ -388,7 +413,7 @@
                 <button class="btn btn-yellow btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
                 <button class="btn btn-yellow btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
             </div>
-            <div class="small-note" style="margin-top:4px; color:var(--warning);">NOTE: Emails are automatically sent on Sundays and at month-ends if signed in. Use the buttons above to send manually.</div>
+            <div class="small-note" style="margin-top:4px; color:var(--warning);">Emails are automatically sent on Sundays and at month-ends if signed in. Use the buttons above to send manually.</div>
         </div>
     </div>
 
@@ -403,8 +428,8 @@
             <button class="btn btn-stop btn-compact" onclick="deleteStudyLog()">🗑 Delete Study Log</button>
             <button class="btn btn-stop btn-compact" onclick="deleteBreakLog()">🗑 Delete Break Log</button>
             <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('daily', false)">Send Daily Report (Email)</button>
-            <button class="btn btn-pause btn-compact" onclick="shareDayLog()">📤 Share Log</button>
             <button class="btn btn-pause btn-compact" onclick="downloadDayLog()">💾 Download Log</button>
+            <button class="btn btn-pause btn-compact" onclick="shareDayLog()">📤 Share Log</button>
         </div>
             <div class="grid-2" style="margin-top:15px;">
         <div>
@@ -446,11 +471,23 @@
 
 <div class="modal" id="planner-modal">
     <div class="modal-content wide">
-        <h3 style="margin-top:0;" id="planner-modal-title">Tasks</h3>
-              <div id="planner-input-row" style="display:flex; align-items:stretch; gap:6px;">
+        <div class="section-header-row" style="margin-top:0;">
+            <h3 style="margin:0;" id="planner-modal-title">Tasks</h3>
+            <select id="planner-sort-select" class="sort-select" onchange="renderPlannerTasks()" title="Sort tasks">
+                <option value="added">Added order</option>
+                <option value="priority-desc">High → Low</option>
+                <option value="priority-asc">Low → High</option>
+            </select>
+        </div>
+              <div id="planner-input-row" style="display:flex; align-items:stretch; gap:6px; margin-top:10px;">
     <input type="text" id="planner-task-input" placeholder="Add task for this day..."
            onkeypress="if(event.key==='Enter') addPlannerTask()"
            style="flex:1; margin:0;">
+    <select id="planner-priority-select" class="priority-select" title="Priority for this task">
+        <option value="high">🔴</option>
+        <option value="medium" selected>🟡</option>
+        <option value="low">🟢</option>
+    </select>
     <button class="btn btn-start" id="planner-add-btn" onclick="addPlannerTask()" title="Add task" style="height:44px; width:44px; padding:0; font-size:20px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; border-radius:8px;">+</button>
 </div>
         <div id="planner-past-note" class="field-note" style="display:none;">This date is in the past — you can view/check off tasks, but new tasks can only be added for today or future dates.</div>
