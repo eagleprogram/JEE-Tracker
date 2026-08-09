@@ -41,6 +41,7 @@ export async function addMockTestEntry() {
     // half-filled entry (e.g. no score yet) used to be allowed through,
     // making the mock-test log unreliable to trust for averages/trends.
     if (!date) { alert("Pick a date for this mock test first."); return; }
+    if (date > getTodayKey()) { alert("The date can't be in the future — pick today or an earlier date."); return; }
     if (!subject) { alert("Enter the exam/subject name first."); return; }
     if (!score) { alert("Enter your score first."); return; }
     if (!maxScore) { alert("Enter the maximum possible score (\"Out of\") first."); return; }

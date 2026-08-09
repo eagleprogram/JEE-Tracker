@@ -20,7 +20,7 @@ const FIREBASE_CONFIG = {
 
 let fbApp = null, fbDb = null, fbReady = false;
 let fbAuth = null, currentUser = null;
-let autoSyncInterval = null, autoReportInterval = null;
+let autoSyncInterval = null, autoSyncTimeout = null, autoReportInterval = null;
 let cloudUnsubscribe = null;
 
 export function getCurrentUser() { return currentUser; }
@@ -51,6 +51,7 @@ export function initFirebaseAuthIfNeeded() {
                 startCloudListener();
                 autoLoadCloudDataIfNeeded();
             } else {
+                if (autoSyncTimeout) clearTimeout(autoSyncTimeout);
                 if (autoSyncInterval) clearInterval(autoSyncInterval);
                 if (autoReportInterval) clearInterval(autoReportInterval);
                 stopCloudListener();
@@ -275,13 +276,24 @@ export function renderSyncUI() {
 
 // ----------------- AUTO SYNC & AUTO REPORTS -----------------
 export function startAutoServices() {
+    if (autoSyncTimeout) clearTimeout(autoSyncTimeout);
     if (autoSyncInterval) clearInterval(autoSyncInterval);
     if (autoReportInterval) clearInterval(autoReportInterval);
 
-    // Auto Cloud Sync every 2 hours (7,200,000 ms)
-    autoSyncInterval = setInterval(() => {
-        if (currentUser) { pushToCloud(true); }
-    }, 7200000);
+    // Auto Cloud Sync every 30 minutes, aligned to clock half-hours
+    // (12:00, 12:30, 1:00, 1:30, ...) rather than 30 min after whenever the
+    // page happened to load — so it lands on a predictable schedule as long
+    // as the site stays open in a tab, instead of drifting per session.
+    // (Previously: every 2 hours from page-load, unaligned.)
+    let now = new Date();
+    let msPastHalfHour = (now.getMinutes() % 30) * 60000 + now.getSeconds() * 1000 + now.getMilliseconds();
+    let msUntilNextHalfHour = (30 * 60000) - msPastHalfHour;
+    autoSyncTimeout = setTimeout(() => {
+        if (currentUser) pushToCloud(true);
+        autoSyncInterval = setInterval(() => {
+            if (currentUser) pushToCloud(true);
+        }, 30 * 60000);
+    }, msUntilNextHalfHour);
 
     // Auto Email Reports check every 1 minute... (original comment; the
     // actual interval below is 7,200,000ms/2hrs, matching source exactly —

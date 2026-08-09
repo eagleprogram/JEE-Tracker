@@ -135,6 +135,10 @@ async function initApp() {
     historyPicker.setAttribute("max", getTodayKey());
     loadHistoryData();
 
+    // Mock-test date picker: cap at today too — a mock test can't have been
+    // taken on a date that hasn't happened yet.
+    document.getElementById("mock-date-input").setAttribute("max", getTodayKey());
+
     // Timer: resume an in-progress session if the tab was closed mid-session.
     tryRestoreActiveSession();
     updateUIState();
