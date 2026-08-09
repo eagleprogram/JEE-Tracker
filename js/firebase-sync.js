@@ -185,7 +185,12 @@ async function restoreMistakeChapters(chapters) {
             count: cloudEntry.count || 0,
             notes: cloudEntry.notes || "",
             hasFiles: !!cloudEntry.hasFiles,
-            files: (local && local.files) ? local.files : []
+            files: (local && local.files) ? local.files : [],
+            // Keep whichever timestamp is newer so the View Mistakes
+            // "newest/oldest" sort still reflects reality after a pull —
+            // never blindly take the cloud's, since a chapter edited on
+            // this device after the last push would otherwise look stale.
+            updatedAt: Math.max(cloudEntry.updatedAt || 0, (local && local.updatedAt) || 0)
         });
     }
 }

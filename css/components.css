@@ -205,3 +205,12 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mc-file-chip img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
 .mc-file-chip.mc-file-pdf a { font-size: 11px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--primary); text-decoration: none; }
 .mc-file-chip button { position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; line-height: 1; cursor: pointer; padding: 0; }
+
+/* Add Mistake / View Mistakes sub-tabs — two equal-width (X/2) segments
+   spanning the same width as the rest of the sidebar panel, mirroring the
+   look of .syllabus-subject-tabs buttons but as a fixed 2-up segmented
+   control rather than a scrollable row. */
+.mistake-view-toggle { display: flex; gap: 6px; margin: 12px 0; }
+.mistake-view-toggle button { flex: 1 1 50%; background: var(--card); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 9px 6px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.mistake-view-toggle button.active { background: var(--primary); border-color: var(--primary); color: #04121f; }
+.mistake-search-box { margin-top: 4px; }

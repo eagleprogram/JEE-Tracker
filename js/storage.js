@@ -109,8 +109,24 @@ export const YT_HISTORY_MAX_ENTRIES = YT_HISTORY_MAX;
 // database as mock tests — one IndexedDB connection covers both, and
 // onupgradeneeded's per-store `if (!contains(...))` guards mean this never
 // touches data already in the "tests" store.
+// Bumped 3 -> 4: any browser that had already opened this DB at version 3
+// BEFORE the "mistakes" store-creation line above existed (i.e. it visited
+// between the version bump shipping and the store-creation code shipping —
+// the exact same class of incident the 1 -> 2 bump above was written to
+// fix) is permanently stuck on a version-3 database missing the "mistakes"
+// store. indexedDB.open() only fires onupgradeneeded when the requested
+// version is HIGHER than what's already recorded for that origin, so
+// reopening at version 3 forever would never re-run the creation guard for
+// those browsers — every saveMistakeEntry()/getAllMistakeChapters() call
+// then throws "NotFoundError: One of the specified object stores was not
+// found" the moment it opens a transaction, which was silently swallowed
+// (no .catch on the promise chain) and looked like "adding a mistake
+// doesn't save anything." Requesting version 4 forces onupgradeneeded to
+// run once more for every browser, and the existing per-store `if
+// (!contains(...))` guards mean this is a no-op for anyone who already has
+// the store — no data in "tests" or "mistakes" is touched.
 export const MISTAKE_STORE = "mistakes";
-const MOCK_DB_VERSION = 3;
+const MOCK_DB_VERSION = 4;
 export function openMockDB() {
     return new Promise((resolve, reject) => {
         let req = indexedDB.open(MOCK_DB_NAME, MOCK_DB_VERSION);

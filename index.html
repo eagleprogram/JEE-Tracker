@@ -40,7 +40,7 @@
             <span class="menu-icon">📚</span>
             <span class="menu-label">Syllabus</span>
         </button>
-        <button class="menu-btn" id="rail-mistakes-btn" onclick="openSidebarPanel('mistakes')" title="Mistakes Tracker">
+        <button class="menu-btn" id="rail-mistakes-btn" onclick="openSidebarPanel('mistakes')" title="Chapter Mistakes Tracker">
             <span class="menu-icon">❗</span>
             <span class="menu-label">Mistakes</span>
         </button>
@@ -279,11 +279,31 @@
     </div>
 
     <div class="sidebar-content" id="panel-mistakes">
-        <h3 style="margin:0; color:var(--primary);">❗ Mistakes Tracker</h3>
+        <h3 style="margin:0; color:var(--primary);">❗ Chapter Mistakes Tracker</h3>
         <div class="small-note">Log how many mistakes you've made in each syllabus chapter, with optional notes and attachments.</div>
-        <div class="syllabus-subject-tabs" id="mistake-subject-tabs"></div>
-        <div class="syllabus-overall" id="mistake-overall"></div>
-        <div id="mistake-chapter-list"></div>
+
+        <div class="mistake-view-toggle">
+            <button id="mistake-tab-add" class="active" onclick="setMistakesView('add')">➕ Add Mistake</button>
+            <button id="mistake-tab-view" onclick="setMistakesView('view')">📋 View Mistakes</button>
+        </div>
+
+        <div id="mistake-add-wrap"></div>
+
+        <div id="mistake-view-wrap" style="display:none;">
+            <input type="text" id="mistake-search-box" class="mistake-search-box" placeholder="🔍 Jump to chapter..." oninput="filterMistakeSearch(this.value)">
+            <div class="section-header-row" style="margin-top:10px;">
+                <span class="small-note" style="margin:0;">Sort chapters</span>
+                <select id="mistake-sort-select" class="sort-select" onchange="setMistakeSort(this.value)" title="Sort chapters">
+                    <option value="most">Most mistakes first</option>
+                    <option value="least">Least mistakes first</option>
+                    <option value="new">Newest mistakes first</option>
+                    <option value="old">Oldest mistakes first</option>
+                </select>
+            </div>
+            <div class="syllabus-subject-tabs" id="mistake-subject-tabs"></div>
+            <div class="syllabus-overall" id="mistake-overall"></div>
+            <div id="mistake-chapter-list" style="max-height: 520px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg);"></div>
+        </div>
     </div>
 </div>
 

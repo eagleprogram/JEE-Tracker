@@ -42,8 +42,8 @@ import {
 } from './syllabus.js';
 
 import {
-    setMistakesSubject, toggleMistakeChapterExpand, updateMistakeCount,
-    saveMistakeNotes, addMistakeFiles, removeMistakeFile, renderMistakesTracker
+    setMistakesView, setMistakesSubject, setMistakeSort, filterMistakeSearch,
+    onAddSubjectChange, onAddChapterChange, saveAddMistake, renderMistakesTracker
 } from './mistakes.js';
 
 import {
@@ -103,8 +103,8 @@ Object.assign(window, {
     // syllabus.js
     toggleSyllabusChapterExpand, toggleSyllabusTag, setSyllabusSubject,
     // mistakes.js
-    setMistakesSubject, toggleMistakeChapterExpand, updateMistakeCount,
-    saveMistakeNotes, addMistakeFiles, removeMistakeFile, renderMistakesTracker,
+    setMistakesView, setMistakesSubject, setMistakeSort, filterMistakeSearch,
+    onAddSubjectChange, onAddChapterChange, saveAddMistake, renderMistakesTracker,
     // mocktest.js
     toggleMistakeTag, addMockTestEntry, deleteMockTestEntry, viewMockFile,
     closeMockFileModal, renderMockTestList,
