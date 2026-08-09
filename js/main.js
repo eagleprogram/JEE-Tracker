@@ -22,7 +22,7 @@ import {
 import {
     initPlannerCalendar, addTodo, renderSidebarTools, toggleTodo, deleteTodo,
     calShiftMonth, renderPlannerCalendar, openPlannerModal, closePlannerModal,
-    addPlannerTask, togglePlannerTask, deletePlannerTask,
+    addPlannerTask, togglePlannerTask, deletePlannerTask, renderPlannerTasks,
     openDatePicker
 } from './planner.js';
 
@@ -43,7 +43,7 @@ import {
 
 import {
     renderMistakeTagPicker, toggleMistakeTag, addMockTestEntry,
-    deleteMockTestEntry, viewMockFile, closeMockFileModal
+    deleteMockTestEntry, viewMockFile, closeMockFileModal, renderMockTestList
 } from './mocktest.js';
 
 import {
@@ -61,7 +61,7 @@ import { exportDataJSON, importDataJSON } from './backup.js';
 
 import {
     signInWithGoogle, signOutOfGoogle, pushToCloud, pullFromCloud,
-    deleteCloudData, initFirebaseAuthIfNeeded, renderSyncUI
+    deleteCloudData, initFirebaseAuthIfNeeded, renderSyncUI, showPendingToastIfAny
 } from './firebase-sync.js';
 
 import {
@@ -86,7 +86,7 @@ Object.assign(window, {
     // planner.js
     addTodo, toggleTodo, deleteTodo, calShiftMonth, renderSidebarTools,
     renderPlannerCalendar, openPlannerModal, closePlannerModal,
-    addPlannerTask, togglePlannerTask, deletePlannerTask,
+    addPlannerTask, togglePlannerTask, deletePlannerTask, renderPlannerTasks,
     openDatePicker,
     // charts.js
     renderGarden, renderHeatmap, renderTrendChart,
@@ -99,7 +99,7 @@ Object.assign(window, {
     toggleSyllabusChapterExpand, toggleSyllabusTag, setSyllabusSubject,
     // mocktest.js
     toggleMistakeTag, addMockTestEntry, deleteMockTestEntry, viewMockFile,
-    closeMockFileModal,
+    closeMockFileModal, renderMockTestList,
     // youtube.js
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry,
@@ -124,6 +124,12 @@ Object.assign(window, {
 // -----------------------------------------------------------------------
 async function initApp() {
     setCurrentDayKey(getTodayKey());
+
+    // Redeem any toast that was queued right before a reload triggered by
+    // cloud auto-load or the real-time sync listener — see
+    // showPendingToastIfAny()'s own comment in firebase-sync.js for why
+    // that can't just call showToast() directly before reloading.
+    showPendingToastIfAny();
 
     // One-time migration for the just-renamed/split syllabus chapters —
     // must run before the syllabus tab could possibly be rendered.
