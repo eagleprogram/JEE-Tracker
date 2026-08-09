@@ -3,15 +3,15 @@
 .streak-pill { background: rgba(245,158,11,0.15); color: var(--warning); font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 13px; }
 .garden-row { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; }
 .garden-plot { text-align: center; min-width: 0; }
-.garden-plot .dow-label { font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+.garden-plot .dow-label { font-size: 13px; color: var(--text); font-weight: 700; margin-bottom: 4px; }
 .garden-plot .hrs-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
-.garden-plot .freeze-badge { font-size: 12px; margin-left: 3px; vertical-align: middle; }
+.garden-plot .freeze-badge { font-size: 12px; margin-right: 3px; vertical-align: middle; }
 .garden-plot.is-today svg { filter: drop-shadow(0 0 6px rgba(56,189,248,0.5)); }
 
 /* ===== 12-month heatmap ===== */
 .heatmap-scroll { overflow-x: auto; padding-bottom: 6px; display: flex; justify-content: center; }
 .heatmap-legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 8px; justify-content: center; }
-.heatmap-legend .heatmap-swatch-group { display: flex; gap: 2px; }
+.heatmap-legend .heatmap-swatch-group { display: flex; gap: 5px; }
 .heatmap-legend .sq { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
 
 /* NOTE: the Subject-Breakdown pie chart and the Weekly Trend line chart are
