@@ -91,7 +91,7 @@ export function renderGarden() {
         let hrs = sec / 3600;
         let isFrozen = false;
         if (!isFuture && !isToday && hrs < 10 && !freezeUsedThisWeek) { isFrozen = true; freezeUsedThisWeek = true; }
-        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"><div class="dow-label">${dowLabels[i]}</div>${gardenPlotSVG(hrs, i)}${isFrozen ? '<div class="freeze-badge" title="Streak freeze used">❄️</div>' : ''}<div class="hrs-label">${hrs.toFixed(1)}h</div></div>`;
+        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"><div class="dow-label">${dowLabels[i]}${isFrozen ? '<span class="freeze-badge" title="Streak freeze used">❄️</span>' : ''}</div>${gardenPlotSVG(hrs, i)}<div class="hrs-label">${hrs.toFixed(1)}h</div></div>`;
     }
     document.getElementById("garden-row").innerHTML = html;
     document.getElementById("streak-pill").innerText = `🔥 ${computeStreak(db)} day streak`;
@@ -122,7 +122,7 @@ export function renderHeatmap() {
         week.forEach((day, di) => {
             if (day.date > today) return;
             let x = wi * (cell + gap) + 8, y = di * (cell + gap) + 5;
-            let colorIdx = day.hrs > 9 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
+            let colorIdx = day.hrs > 10 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
             svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${hmColors[colorIdx]}" stroke="#374357" stroke-width="1"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
         });
     });

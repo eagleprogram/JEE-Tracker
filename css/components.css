@@ -2,8 +2,7 @@
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; min-width: 0; }
 
 .timer-box { text-align: center; margin: 15px 0; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 280px; }
-.timer-screen { font-size: 64px; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: -1px; }
-.total-counter { font-size: 16px; color: var(--success); font-weight: 700; margin-top: 5px; }
+.timer-screen { font-size: 72px; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: -1px; }
 .controls-row { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
 
 /* ===== Buttons ===== */

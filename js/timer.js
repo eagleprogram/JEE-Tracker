@@ -37,6 +37,15 @@ let currentDayKey = null;
 let carryMs = 0;
 let activeSubject = "Physics";
 let activeBreakReason = "Break";
+// Cache for updateLiveSummaryFast() (used by the tick() hot loop) — see
+// that function for why. Refreshed on segment start/commit, and self-heals
+// on the next frame if a midnight rollover makes it stale in the meantime.
+let cachedTodayDay = null;
+let cachedTodayDayKey = null;
+function refreshCachedTodayDay() {
+    cachedTodayDayKey = getTodayKey();
+    cachedTodayDay = getDB()[cachedTodayDayKey] || blankDay();
+}
 
 // currentDayKey is read here but written from ui.js (checkDayRollover) and
 // main.js (window.onload) — both live in other modules, so they call this
@@ -56,6 +65,7 @@ export function startSegment() {
     segmentStartPerf = performance.now();
     segmentStartWallMs = Date.now();
     segmentElapsedMs = 0;
+    refreshCachedTodayDay();
     persistActiveSession();
 }
 
@@ -130,6 +140,7 @@ export function commitActiveSegment() {
     }
     if (timerState === "STUDYING") sessionStudyMs += segmentElapsedMs;
     saveDB(db);
+    refreshCachedTodayDay();
 }
 
 export function flushAndRestartSegment() {
@@ -219,8 +230,34 @@ export function tick() {
     segmentElapsedMs = performance.now() - segmentStartPerf;
     if (timerState === "STUDYING") document.getElementById("session-timer").innerText = formatHMS(sessionStudyMs + segmentElapsedMs);
     else if (timerState === "BREAK") document.getElementById("session-timer").innerText = formatHMS(segmentElapsedMs);
-    updateLiveSummary();
+    updateLiveSummaryFast();
     animFrame = requestAnimationFrame(tick);
+}
+
+// Runs on every animation frame (~60/sec) while a session is active — a
+// cheap alternative to updateLiveSummary() for the hot loop specifically.
+// updateLiveSummary() re-reads and JSON.parses the entire study database
+// from localStorage every time it's called, which is fine for the
+// occasional call (button clicks, history deletes) but was pointless,
+// repeated work 60x/second here, and could be a real cost once the
+// database has months of entries. This uses the cached totals instead
+// (refreshed only when they actually change, in startSegment()/
+// commitActiveSegment()) and adds the live in-progress seconds on top —
+// same numbers, without re-parsing anything every frame. Falls back to the
+// full accurate path (and re-caches) if the cache is missing or has gone
+// stale across a midnight rollover.
+function updateLiveSummaryFast() {
+    if (!cachedTodayDay || cachedTodayDayKey !== getTodayKey()) { updateLiveSummary(); refreshCachedTodayDay(); return; }
+    let liveStudySec = (timerState === "STUDYING") ? Math.floor(segmentElapsedMs / 1000) : 0;
+    let liveBreakSec = (timerState === "BREAK") ? Math.floor(segmentElapsedMs / 1000) : 0;
+    document.getElementById("live-study-val").innerText = formatReadable(cachedTodayDay.totalStudy + liveStudySec);
+    document.getElementById("live-break-val").innerText = formatReadable(cachedTodayDay.totalBreak + liveBreakSec);
+    let html = "";
+    for (let [cat, sec] of Object.entries(cachedTodayDay.subjects)) {
+        let add = (timerState === "STUDYING" && activeSubject === cat) ? liveStudySec : 0;
+        html += `<div class="stat-row"><span style="color:var(--muted);">${cat}:</span><strong>${formatReadable(sec + add)}</strong></div>`;
+    }
+    document.getElementById("live-subject-list").innerHTML = html;
 }
 
 export function updateUIState() {
@@ -259,7 +296,6 @@ export function updateLiveSummary() {
     let liveBreakSec = (timerState === "BREAK") ? Math.floor(segmentElapsedMs / 1000) : 0;
     let studyTotal = day.totalStudy + liveStudySec;
     let breakTotal = day.totalBreak + liveBreakSec;
-    document.getElementById("accumulated-today").innerText = formatHMS(studyTotal * 1000);
     document.getElementById("live-study-val").innerText = formatReadable(studyTotal);
     document.getElementById("live-break-val").innerText = formatReadable(breakTotal);
     let html = "";
