@@ -1,0 +1,172 @@
+import { dateKeyFromWall, getTodayKey, mondayKeyFor, formatDateDDMMYYYY } from './utils.js';
+import { getDB, blankDay } from './storage.js';
+import { getTimerState, getSegmentElapsedMs } from './timer.js';
+
+export const SUBJECT_COLORS = {
+    "Physics": "#14b8a6",
+    "Organic Chemistry": "#dc2626",
+    "Inorganic Chemistry": "#4f46e5",
+    "Physical Chemistry": "#f59e0b",
+    "Mathematics": "#d946ef",
+    "Revision": "#84cc16",
+    "Mock Test / Analysis": "#0ea5e9"
+};
+
+export function gardenPlotSVG(hours, idx) {
+    let step = Math.min(hours / 10, 1);
+    let hitGoal = hours >= 10;
+    let bonus = hours > 12;
+    // Realistic tree shape with trunk, branches, and layered leaf clusters
+    let trunkH = 8 + step * 14;
+    let canopyR = 6 + step * 20;
+    let canopyColor = bonus ? "#facc15" : (hitGoal ? "#10b981" : "#65a30d");
+    let gradientColor = bonus ? "#fef08a" : (hitGoal ? "#86efac" : "#a3e635");
+    let sparkles = "";
+    if (hitGoal) {
+        let count = Math.min(3 + Math.floor((hours - 10) / 2), 8);
+        let positions = [];
+        for (let i = 0; i < count; i++) {
+            let angle = Math.random() * 2 * Math.PI;
+            let dist = 0.3 + Math.random() * 0.6;
+            let x = 28 + Math.cos(angle) * dist * 28;
+            let y = 20 + Math.sin(angle) * dist * 25;
+            positions.push({x, y});
+        }
+        sparkles = positions.map((p, i) =>
+            `<text x="${p.x}" y="${p.y}" font-size="12" fill="#facc15" text-anchor="middle" filter="drop-shadow(0 0 2px #facc15)">✨</text>`
+        ).join('');
+    }
+    return `<svg width="100%" height="66" viewBox="0 0 56 66" style="max-width:56px;">
+        <defs>
+            <radialGradient id="grad${idx}" cx="30%" cy="30%" r="70%">
+                <stop offset="0%" stop-color="${gradientColor}" />
+                <stop offset="100%" stop-color="${canopyColor}" />
+            </radialGradient>
+            <filter id="glow${idx}" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="2.5" result="b"/>
+                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+        </defs>
+        <!-- Shadow -->
+        <ellipse cx="28" cy="60" rx="20" ry="4" fill="#1e293b"/>
+        <!-- Main trunk -->
+        <rect x="24" y="${60 - trunkH}" width="8" height="${trunkH}" rx="3" fill="#78350f" />
+        <!-- Branches and leaf clusters -->
+        <ellipse cx="28" cy="${60 - trunkH - canopyR * 0.6}" rx="${canopyR * 0.8}" ry="${canopyR * 0.5}" fill="url(#grad${idx})" ${hitGoal ? `filter="url(#glow${idx})"` : ''}/>
+        <ellipse cx="${28 - canopyR * 0.4}" cy="${60 - trunkH - canopyR * 0.3}" rx="${canopyR * 0.6}" ry="${canopyR * 0.4}" fill="url(#grad${idx})" ${hitGoal ? `filter="url(#glow${idx})"` : ''}/>
+        <ellipse cx="${28 + canopyR * 0.4}" cy="${60 - trunkH - canopyR * 0.3}" rx="${canopyR * 0.6}" ry="${canopyR * 0.4}" fill="url(#grad${idx})" ${hitGoal ? `filter="url(#glow${idx})"` : ''}/>
+        <ellipse cx="28" cy="${60 - trunkH - canopyR * 0.8}" rx="${canopyR * 0.5}" ry="${canopyR * 0.4}" fill="url(#grad${idx})" ${hitGoal ? `filter="url(#glow${idx})"` : ''}/>
+        <!-- Sparkles when hit goal -->
+        ${sparkles}
+        ${hours > 0 && hours < 6 ? `<text x="0" y="20" font-size="10" fill="#64748b" font-weight="700">🌱</text>` : ''}
+    </svg>`;
+}
+
+export function computeStreak(db) {
+    let count = 0; let d = new Date(); let todayKey = getTodayKey();
+    let liveExtraSec = (getTimerState() === "STUDYING") ? Math.floor(getSegmentElapsedMs() / 1000) : 0;
+    let todayHrs = ((db[todayKey]?.totalStudy || 0) + liveExtraSec) / 3600;
+    if (todayHrs < 10) d.setDate(d.getDate() - 1);
+    let freezeUsedForWeek = {};
+    while (true) {
+        let key = dateKeyFromWall(d.getTime()); let hrs = (db[key]?.totalStudy || 0) / 3600;
+        if (hrs >= 10) count++;
+        else { let wk = mondayKeyFor(d); if (!freezeUsedForWeek[wk]) freezeUsedForWeek[wk] = true; else break; }
+        d.setDate(d.getDate() - 1); if (count > 3650) break;
+    }
+    return count;
+}
+
+export function renderGarden() {
+    let db = getDB(); let now = new Date(); let dow = now.getDay(); let mondayOffset = (dow === 0) ? -6 : 1 - dow;
+    let monday = new Date(now); monday.setDate(now.getDate() + mondayOffset); monday.setHours(0,0,0,0);
+    let todayKey = getTodayKey(); const dowLabels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]; let html = ""; let freezeUsedThisWeek = false;
+    for (let i = 0; i < 7; i++) {
+        let d = new Date(monday); d.setDate(monday.getDate() + i);
+        let key = dateKeyFromWall(d.getTime());
+        let isToday = key === todayKey;
+        let isFuture = d.getTime() > now.getTime() && !isToday;
+        let sec = db[key]?.totalStudy || 0;
+        if (isToday && getTimerState() === "STUDYING") sec += Math.floor(getSegmentElapsedMs() / 1000);
+        let hrs = sec / 3600;
+        let isFrozen = false;
+        if (!isFuture && !isToday && hrs < 10 && !freezeUsedThisWeek) { isFrozen = true; freezeUsedThisWeek = true; }
+        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"><div class="dow-label">${isFrozen ? '<span class="freeze-badge" title="Streak freeze used">❄️</span>' : ''}${dowLabels[i]}</div>${gardenPlotSVG(hrs, i)}<div class="hrs-label">${hrs.toFixed(1)}h</div></div>`;
+    }
+    document.getElementById("garden-row").innerHTML = html;
+    document.getElementById("streak-pill").innerText = `🔥 ${computeStreak(db)} day streak`;
+}
+
+// ---------------- HEATMAP ----------------
+export function renderHeatmap() {
+    let db = getDB(); let today = new Date(); today.setHours(0,0,0,0);
+    let start = new Date(today); start.setDate(today.getDate() - 371); start.setDate(start.getDate() - start.getDay());
+    let weeks = []; let cursor = new Date(start);
+    while (cursor <= today) {
+        let week = [];
+        for (let i = 0; i < 7; i++) {
+            let key = dateKeyFromWall(cursor.getTime());
+            let sec = db[key]?.totalStudy || 0;
+            week.push({ key, hrs: sec / 3600, date: new Date(cursor) });
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        weeks.push(week);
+    }
+    let cell = 13; let gap = 4; let width = weeks.length * (cell + gap) + 16; let height = 7 * (cell + gap) + 10; let svg = `<svg width="${width}" height="${height}">`;
+    // CHANGE: swapped indices 1 and 2. Previously ["#2b3852","#b2ebf2","#0c3448","#008080","#00e5ff"] —
+    // the 2nd bucket (#b2ebf2) was a pale, whitish tint sitting between two dark colors, so the
+    // "Less -> More" progression visually got brighter then darker then brighter again instead of
+    // ramping smoothly. Moving the dark navy to position 1 and the whitish tint to the middle fixes that.
+    const hmColors = ["#2b3852", "#0c3448", "#b2ebf2", "#008080", "#00e5ff"];
+    weeks.forEach((week, wi) => {
+        week.forEach((day, di) => {
+            if (day.date > today) return;
+            let x = wi * (cell + gap) + 8, y = di * (cell + gap) + 5;
+            // BUG FIX: was `day.hrs > 10`. reports.js's downloadable-report
+            // heatmap already used `hrs > 9` for this same bucket boundary —
+            // the two were inconsistent with each other. Aligning to >9 here
+            // matches reports.js and the corrected "6-9h" / "9h+" legend
+            // labels in index.html (was previously showing "6-10h" / "10h+",
+            // one hour off from where the color actually changed).
+            let colorIdx = day.hrs > 9 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
+            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${hmColors[colorIdx]}" stroke="#374357" stroke-width="1"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
+        });
+    });
+    svg += `</svg>`;
+    document.getElementById("heatmap-container").innerHTML = svg;
+}
+
+// ---------------- TREND CHART ----------------
+export function renderTrendChart() {
+    let db = getDB(); let today = new Date(); today.setHours(0,0,0,0);
+    let days = []; for (let i = 6; i >= 0; i--) { let d = new Date(today); d.setDate(today.getDate() - i); days.push(dateKeyFromWall(d.getTime())); }
+    let subjects = Object.keys(blankDay().subjects); let width = 1200, height = 400, padding = 60; let maxHrs = 0.5;
+    days.forEach(key => { let day = db[key]; if (day) subjects.forEach(s => { maxHrs = Math.max(maxHrs, (day.subjects[s]||0)/3600); }); });
+    let xStep = (width - padding * 2) / (days.length - 1);
+    let svg = `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMinYMin meet">`;
+    for (let g = 0; g <= 4; g++) { let y = padding + (height - padding * 2) * (g / 4); svg += `<line x1="${padding}" y1="${y}" x2="${width-padding}" y2="${y}" stroke="#232f48" stroke-width="1"/><text x="4" y="${y+4}" font-size="12" fill="#64748b">${(maxHrs*(1-g/4)).toFixed(1)}h</text>`; }
+    days.forEach((key, i) => { let x = padding + i * xStep; let lbl = new Date(key + "T00:00:00").toLocaleDateString([], { weekday: 'short' }); svg += `<text x="${x}" y="${height-8}" font-size="12" fill="#64748b" text-anchor="middle">${lbl}</text>`; });
+    let anyData = false;
+    subjects.forEach(subj => {
+        let hasAny = days.some(key => db[key] && (db[key].subjects[subj]||0) > 0);
+        if (!hasAny) return;
+        anyData = true;
+        let color = SUBJECT_COLORS[subj] || "#64748b";
+        let pts = days.map((key, i) => {
+            let day = db[key]; let hrs = day ? (day.subjects[subj]||0)/3600 : 0;
+            let x = padding + i * xStep; let y = padding + (height - padding * 2) * (1 - hrs / maxHrs);
+            return [x, y];
+        });
+        svg += `<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="${color}" stroke-width="3.5"/>`;
+        pts.forEach(([x,y]) => { svg += `<circle cx="${x}" cy="${y}" r="5" fill="${color}"/>`; });
+    });
+    svg += `</svg>`;
+    let legend = `<div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:10px;">`;
+    subjects.forEach(subj => {
+        let hasAny = days.some(key => db[key] && (db[key].subjects[subj]||0) > 0);
+        if (!hasAny) return;
+        legend += `<div style="display:flex; align-items:center; gap:6px; font-size:13px;"><span style="width:14px;height:14px;border-radius:3px;background:${SUBJECT_COLORS[subj]};display:inline-block;"></span>${subj}</div>`;
+    });
+    legend += `</div>`;
+    document.getElementById("trend-chart-container").innerHTML = anyData ? (svg + legend) : "<div class='small-note'>No study data logged in the last 7 days yet.</div>";
+}

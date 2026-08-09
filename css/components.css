@@ -1,0 +1,189 @@
+/* ===== Generic card + timer ===== */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; min-width: 0; }
+
+.timer-box { text-align: center; margin: 15px 0; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 280px; }
+.timer-screen { font-size: 72px; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: -1px; }
+.controls-row { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+
+/* ===== Buttons ===== */
+button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; }
+.btn-start { background: var(--success); color: white; }
+.btn-pause { background: var(--warning); color: white; }
+.btn-break { background: #8b5cf6; color: white; }
+.btn-export { background: var(--primary); color: #04121f; font-weight: 700; }
+.btn-stop { background: var(--danger); color: white; }
+.btn-yellow { background: #eab308; color: #1a1400; }
+.btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-small { padding: 8px 12px; font-size: 12px; }
+.btn-compact { padding: 7px 10px; font-size: 11px; }
+
+/* ===== Single-line button rows (no wrapping to a 2nd row) ===== */
+.btn-row-nowrap {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--bg);
+}
+.btn-row-nowrap .btn { flex: 0 0 auto; white-space: nowrap; }
+
+/* Single-line row that SHRINKS buttons to fit (no scrollbar, ever) —
+   used where a fixed-size nowrap row would overflow (e.g. 6 report buttons
+   in a ~1100px container). Buttons share width equally and their text may
+   wrap to 2 lines, but the row itself never wraps or scrolls. */
+.btn-row-fit {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+}
+.btn-row-fit .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    padding: 7px 6px;
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+/* ===== Form inputs ===== */
+select, input[type="text"], input[type="date"] { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin-top: 5px; box-sizing: border-box; }
+
+.date-field-wrap { position: relative; }
+.date-field-wrap input[type="date"] { padding-right: 42px; }
+.date-picker-btn {
+    position: absolute; right: 6px; top: 50%; transform: translateY(calc(-50% + 3px));
+    background: var(--primary); border: none; border-radius: 6px; width: 28px; height: 28px;
+    font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.date-picker-btn:hover { opacity: 0.85; }
+input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+input[type="date"] { color-scheme: dark; }
+input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor: not-allowed; }
+.field-note { font-size: 11px; color: var(--warning); margin-top: 6px; }
+
+/* ===== Badges (timer status) ===== */
+.badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; }
+.badge-studying { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+.badge-paused { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+.badge-break { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+.badge-idle { background: rgba(100, 116, 139, 0.2); color: var(--muted); }
+
+/* ===== Misc shared rows/lists ===== */
+.stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 14px; }
+.todo-item { display: flex; align-items: center; gap: 8px; background: var(--bg); padding: 8px; border-radius: 6px; margin-top: 6px; font-size: 13px; word-break: break-word; overflow-wrap: break-word; }
+.log-box { max-height: 200px; overflow-y: auto; background: var(--bg); border-radius: 8px; padding: 8px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+.settings-row label { flex: 1; }
+.settings-row input[type="checkbox"] { width: 18px; height: 18px; }
+.settings-sub { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.settings-sub input[type="number"] { width: 60px; margin-top: 0; padding: 6px; }
+.small-note { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.session-log-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); padding: 6px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; }
+
+.countdown-card { padding: 12px; }
+.countdown-item { background: var(--bg); border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+.countdown-item .exam-name { font-size: 12px; color: var(--primary); font-weight: 700; text-transform: uppercase; }
+.countdown-item .exam-date { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.countdown-item .exam-days { font-size: 28px; font-weight: 800; color: var(--text); }
+.countdown-item .exam-days span { font-size: 13px; color: var(--muted); font-weight: 500; }
+.countdown-item .exam-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ===== Planner calendar widget ===== */
+.planner-card { padding: 12px; }
+.cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cal-nav button { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-weight: 700; }
+.cal-nav .cal-month-label { font-weight: 700; font-size: 13px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dow { text-align: center; font-size: 10px; color: var(--muted); font-weight: 700; padding-bottom: 4px; }
+.cal-day { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; cursor: pointer; }
+.cal-day:hover { border-color: var(--primary); }
+.cal-day.empty { visibility: hidden; cursor: default; }
+.cal-day.today { border-color: var(--success); color: var(--success); font-weight: 700; }
+.cal-day .dot { position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%; background: var(--warning); }
+
+/* ===== Modals ===== */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 200; }
+.modal-content { background: var(--card); border: 1px solid var(--border); padding: 24px; border-radius: 12px; width: 320px; }
+.modal-content.wide #planner-modal-title { font-size: 22px; }
+.modal-content.wide { width: min(680px, 92vw); max-height: 85vh; display: flex; flex-direction: column; }
+.modal-content.wide #planner-task-input { font-size: 16px; padding: 14px; }
+.modal-content.wide #planner-task-list { flex: 1; max-height: none !important; }
+.task-item { display: flex; align-items: center; gap: 10px; background: var(--bg); padding: 12px; border-radius: 8px; margin-top: 8px; font-size: 15px; }
+.task-item .task-text { flex: 1; }
+.task-item .task-text.done { text-decoration: line-through; color: var(--muted); }
+.task-item button.del { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 18px; }
+button.del { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+button.del:hover { color: #fca5a5; }
+
+/* ===== Toasts ===== */
+#toast-stack { position: fixed; bottom: 16px; right: 16px; z-index: 500; display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
+.toast {
+    background: var(--card); border: 1px solid var(--primary); border-left: 4px solid var(--primary); color: var(--text);
+    padding: 12px 14px; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    animation: toast-in 0.25s ease-out;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== YouTube player + history ===== */
+.yt-player-wrap { margin-top: 8px; }
+.yt-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.yt-controls button { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.yt-controls input[type="range"] { flex: 1; }
+.yt-history-panel { margin-top: 8px; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px; display: none; }
+.yt-history-panel.open { display: block; }
+.yt-history-item { display: flex; gap: 8px; align-items: center; padding: 5px; border-radius: 6px; cursor: pointer; }
+.yt-history-item:hover { background: var(--bg); }
+.yt-history-item img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.yt-history-item .yt-history-label { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.yt-history-empty { font-size: 12px; color: var(--muted); padding: 6px; }
+
+/* ===== Sleep / Wake log ===== */
+input[type="time"] { width: 100%; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-family: inherit; box-sizing: border-box; }
+.sleep-log-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.sleep-log-row:last-child { border-bottom: none; }
+.sleep-log-row .sl-date { color: var(--muted); }
+.sleep-log-row .sl-dur { color: var(--primary); font-weight: 700; }
+
+/* ===== Mock Test & mistake tags ===== */
+.mock-entry { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; word-break: break-word; overflow-wrap: break-word; }
+.mock-entry .mock-top { display: flex; justify-content: space-between; align-items: center; }
+.mock-entry .mock-score { color: var(--success); font-weight: 800; }
+.mock-entry .mock-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mock-entry .mock-files img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
+.mock-entry .mock-files a.pdf-chip { font-size: 11px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--primary); text-decoration: none; }
+textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin-top: 5px; box-sizing: border-box; font-family: inherit; resize: vertical; min-height: 60px; overflow-wrap: break-word; word-break: break-word; }
+.mistake-tag-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.mistake-tag-chip { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--muted); user-select: none; }
+.mistake-tag-chip.selected { background: var(--primary); border-color: var(--primary); color: #04121f; font-weight: 600; }
+.mistake-summary-wrap { margin-top: 10px; }
+#mistake-tag-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+#mistake-tag-summary .ms-pill { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px 9px; font-size: 11px; color: var(--text); }
+.section-header-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.section-header-row .section-subtitle { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+.sort-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 12px; font-family: inherit; max-width: 170px; }
+.priority-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0 4px; font-size: 16px; font-family: inherit; height: 44px; width: 52px; flex-shrink: 0; text-align: center; }
+.mock-entry .entry-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.mock-entry .entry-tags span { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
+
+/* ===== Syllabus Tracker ===== */
+.syllabus-subject-tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; margin: 10px 0; padding-bottom: 8px; }
+.syllabus-subject-tabs button { background: var(--card); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
+.syllabus-subject-tabs button.active { background: var(--primary); border-color: var(--primary); color: #04121f; font-weight: 700; }
+.syllabus-overall { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.syllabus-overall .so-bar-track { background: var(--bg); border-radius: 5px; height: 8px; margin-top: 4px; overflow: hidden; }
+.syllabus-overall .so-bar-fill { background: var(--success); height: 100%; border-radius: 5px; }
+.syllabus-overall .highlight-text { color: var(--primary); font-weight: 800; font-size: 14px; }
+.syllabus-class-header { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 6px; }
+.syllabus-chapter-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.syllabus-chapter-card .sc-top { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.syllabus-chapter-card .sc-name { font-size: 13px; font-weight: 600; }
+.syllabus-chapter-card .sc-badge { font-size: 11px; color: var(--muted); white-space: nowrap; margin-left: 8px; }
+.syllabus-chapter-card .sc-bar-track { background: var(--card); border-radius: 4px; height: 5px; margin-top: 6px; overflow: hidden; }
+.syllabus-chapter-card .sc-bar-fill { background: var(--primary); height: 100%; border-radius: 4px; }
+.syllabus-tag-grid { display: none; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.syllabus-chapter-card.expanded .syllabus-tag-grid { display: flex; }
+.syllabus-tag-chip { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 4px 10px; font-size: 11px; cursor: pointer; color: var(--muted); user-select: none; }
+.syllabus-tag-chip.done { background: var(--success); border-color: var(--success); color: #04121f; font-weight: 600; }

@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JEE 2027 Study Tracker & Planner</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#070b14">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Sora:wght@700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/charts.css">
+</head>
+<body>
+
+<div id="toast-stack"></div>
+
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header-expanded">
+        <button class="sidebar-close-btn" onclick="closeSidebar()">Close</button>
+    </div>
+    <div class="rail-icons">
+        <button class="menu-btn" id="rail-planner-btn" onclick="openSidebarPanel('planner')" title="Planner Tools">
+            <span class="menu-icon">⋮</span>
+            <span class="menu-label">Menu</span>
+        </button>
+        <button class="menu-btn" id="rail-mocktest-btn" onclick="openSidebarPanel('mocktest')" title="Mock Test Score &amp; Mistake Analysis">
+            <span class="menu-icon">📝</span>
+            <span class="menu-label">Mocks</span>
+        </button>
+        <button class="menu-btn" id="rail-syllabus-btn" onclick="openSidebarPanel('syllabus')" title="Syllabus Tracker">
+            <span class="menu-icon">📚</span>
+            <span class="menu-label">Syllabus</span>
+        </button>
+    </div>
+
+    <div class="sidebar-content" id="panel-planner">
+        <h3 style="margin:0; color:var(--primary);">Planner Tools</h3>
+
+                <div class="card" style="padding: 12px;">
+    <div class="section-header-row" style="margin-top:0;">
+        <h4 class="section-subtitle">📌 Today's To-Do</h4>
+        <select id="todo-sort-select" class="sort-select" onchange="renderSidebarTools()" title="Sort tasks">
+            <option value="added">Added order</option>
+            <option value="priority-desc">High → Low</option>
+            <option value="priority-asc">Low → High</option>
+        </select>
+    </div>
+    <div style="display:flex; align-items:stretch; gap:6px; margin-top:10px;">
+        <input type="text" id="todo-input" placeholder="Add something to do today..."
+               onkeypress="if(event.key==='Enter') addTodo()"
+               style="flex:1; margin:0;">
+        <select id="todo-priority-select" class="priority-select" title="Priority for this task">
+            <option value="high">🔴</option>
+            <option value="medium" selected>🟡</option>
+            <option value="low">🟢</option>
+        </select>
+        <button class="btn btn-start" onclick="addTodo()" title="Add task" style="height:44px; width:44px; padding:0; font-size:20px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; border-radius:8px;">+</button>
+    </div>
+    <div id="todo-list" style="max-height: 180px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg);"></div>
+</div>
+
+        <div class="card" style="padding: 12px;">
+            <h4 style="margin:0 0 10px 0;">🌙 Sleep / Wake Log</h4>
+            <div style="display:flex; gap:8px;">
+                <div style="flex:1;">
+                    <label style="font-size:11px; color:var(--muted);">Woke at (AM)</label>
+                    <input type="time" id="wake-time-input">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:11px; color:var(--muted);">Slept at (PM)</label>
+                    <input type="time" id="sleep-time-input">
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="btn btn-start btn-small" style="flex:1;" onclick="saveSleepLog()">Save Log</button>
+                <button class="btn btn-break btn-small" style="flex:1;" onclick="toggleSleepHistory()">🕘 History</button>
+            </div>
+            <div id="sleep-pending-banner" style="display:none; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; padding:8px 10px; border:1px solid var(--warning); border-radius:6px; background:rgba(245,158,11,0.1); font-size:12px; color:var(--warning);"></div>
+            <div id="sleep-history-container" style="display:none; margin-top:8px; max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:6px; background:var(--bg);"></div>
+        </div>
+
+        <div class="card" style="padding: 12px;">
+            <h4 style="margin:0 0 10px 0;">🎵 Study Music (YouTube)</h4>
+            <input type="text" id="yt-link-input" placeholder="Paste a YouTube link...">
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button class="btn btn-start btn-small" style="flex:1;" onclick="loadYoutubeLink()">Load</button>
+                <button class="btn btn-break btn-small" style="flex:1;" onclick="toggleYtHistory()">🕘 History</button>
+            </div>
+            <div class="yt-history-panel" id="yt-history-panel"></div>
+            <div class="yt-player-wrap" id="yt-player-wrap" style="display:none;">
+                <div id="yt-player"></div>
+                <div class="yt-controls">
+                    <button onclick="ytTogglePlay()" id="yt-playpause-btn">▶ Play</button>
+                    <button onclick="ytToggleLoop()" id="yt-loop-btn">🔁 Loop: Off</button>
+                </div>
+                <div class="yt-controls">
+                    <span style="font-size:11px; color:var(--muted);">🔊</span>
+                    <input type="range" id="yt-volume" min="0" max="100" value="70" oninput="ytSetVolume(this.value)">
+                </div>
+                <div class="small-note">YouTube requires the player to stay visibly on screen.</div>
+            </div>
+        </div>
+
+        <div class="card planner-card">
+            <h4 style="margin:0 0 10px 0;">Planner Calendar</h4>
+            <div class="cal-nav">
+                <button onclick="calShiftMonth(-1)">‹</button>
+                <div class="cal-month-label" id="cal-month-label"></div>
+                <button onclick="calShiftMonth(1)">›</button>
+            </div>
+            <div class="cal-grid" id="cal-dow-row"></div>
+            <div class="cal-grid" id="cal-grid" style="margin-top:4px;"></div>
+            <div style="font-size:11px; color:var(--muted); margin-top:6px;">Click a date to view/add tasks.</div>
+        </div>
+
+        <div class="card" style="padding: 12px;">
+            <h4 style="margin:0 0 6px 0;">Holiday Reference</h4>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">Read-only Indian holiday calendar.</div>
+            <iframe src="https://calendar.google.com/calendar/embed?src=en.indian%23holiday%40group.v.calendar.google.com&ctz=Asia%2FKolkata"
+                    style="border: 0; width:100%; height:260px; border-radius:6px;" frameborder="0" scrolling="no"></iframe>
+        </div>
+
+        <div class="card" style="padding: 12px;">
+            <h4 style="margin:0 0 6px 0;">🔔 Notifications</h4>
+            <div id="notif-permission-status" class="small-note" style="margin-bottom: 12px;"></div>
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <button class="btn btn-start btn-small" style="flex:1;" onclick="enableNotifications()">Enable Notifications</button>
+                <button class="btn btn-pause btn-small" style="flex:1;" onclick="saveNotifSettingsFromUI()">Save Settings</button>
+            </div>
+
+            <div style="margin-top:12px;">
+                <div class="settings-row">
+                    <label>Break overrun alert</label>
+                    <input type="checkbox" id="notif-breakOverrun" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-sub">
+                    <span style="font-size:12px; color:var(--muted);">Ping after</span>
+                    <input type="number" id="notif-breakThreshold" min="5" max="240" onchange="saveNotifSettingsFromUI()">
+                    <span style="font-size:12px; color:var(--muted);">min on break</span>
+                </div>
+                <div class="settings-row">
+                    <label>Planner task reminder (every 30min from 8pm)</label>
+                    <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-row">
+                    <label>Revision reminder (9pm, once)</label>
+                    <input type="checkbox" id="notif-revisionReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-row">
+                    <label>Sleep reminder (10:30–11pm, every 5min)</label>
+                    <input type="checkbox" id="notif-sleepReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-row">
+                    <label>Send daily log to parent (10:30pm, once)</label>
+                    <input type="checkbox" id="notif-parentLogReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-row">
+                    <label>Exam milestone pings</label>
+                    <input type="checkbox" id="notif-examMilestones" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-row">
+                    <label>Idle nudge ("still there?")</label>
+                    <input type="checkbox" id="notif-idleNudge" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-sub">
+                    <span style="font-size:12px; color:var(--muted);">Nudge after</span>
+                    <input type="number" id="notif-idleThreshold" min="10" max="240" onchange="saveNotifSettingsFromUI()">
+                    <span style="font-size:12px; color:var(--muted);">min idle</span>
+                </div>
+                <div class="small-note">Info-only — never pauses/stop timer. Only works while tab is open.</div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 12px; margin-bottom: 30px;">
+            <h4 style="margin:0 0 6px 0;">☁️ Account & Sync</h4>
+            <div id="sync-setup-note" class="small-note" style="color:var(--warning); margin-bottom:8px;">Cloud sync is not configured. To enable, add your Firebase keys in the code (search `FIREBASE_CONFIG`).</div>
+                        <div id="signed-out-block">
+                <!-- TOP: Sign in (Remains untouched at the top) -->
+                <div class="small-note" style="margin-bottom:8px;">Sign in to save your data to the cloud and keep every device you use automatically in sync.</div>
+                <button class="btn btn-break btn-small" style="width:100%;" onclick="signInWithGoogle()">Sign in with Google</button>
+
+                <!-- Divider line for spacing -->
+                <div style="border-top:1px solid var(--border); margin:14px 0 10px 0;"></div>
+
+                <!-- BOTTOM: Guest Delete Button -->
+                <div class="small-note" style="color:var(--danger); margin-bottom:4px;">⚠️ Guest mode: Deletes ALL local data from this device.<br>   (Study logs, Planner, Sleep, Settings) </div>
+                <button class="btn btn-stop btn-small" style="width:100%;" onclick="resetAllData()">🔴 Delete All Local Data</button>
+            </div>
+            <div id="signed-in-block" style="display:none;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    <img id="account-avatar" src="" style="width:32px; height:32px; border-radius:50%; display:none;">
+                    <div style="font-size:13px; font-weight:700;" id="account-name"></div>
+                </div>
+                <div id="sync-last" class="small-note"></div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button class="btn btn-start btn-small" style="flex:1;" onclick="pushToCloud()">Save to Cloud ⬆</button>
+                    <button class="btn btn-pause btn-small" style="flex:1;" onclick="pullFromCloud()">Load from Cloud ⬇</button>
+                </div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button class="btn btn-stop btn-small" style="flex:1;" onclick="deleteCloudData()">🗑 Delete Cloud Data</button>
+                    <button class="btn btn-stop btn-small" style="flex:1;" onclick="resetAllData()">🔴 Reset All Data</button>
+                    <button class="btn btn-break btn-small" style="flex:1;" onclick="signOutOfGoogle()">Sign Out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar-content" id="panel-mocktest">
+        <h3 style="margin:0; color:var(--primary);">📝 Mock Test Score & Analysis</h3>
+        <div class="card" style="padding:12px;">
+            <label style="font-size:12px; color:var(--muted);">Date</label>
+            <div class="date-field-wrap">
+                <input type="date" id="mock-date-input">
+                <button type="button" class="date-picker-btn" title="Open date picker" onclick="openDatePicker('mock-date-input')">📅</button>
+            </div>
+            <label style="font-size:12px; color:var(--muted);">Exam / Subject</label>
+            <input type="text" id="mock-subject-input" placeholder="e.g. Full Syllabus Mock, Chapter Test, etc.">
+            <div style="display:flex; gap:8px;">
+                <div style="flex:1;">
+                    <label style="font-size:12px; color:var(--muted);">Score</label>
+                    <input type="number" step="any" inputmode="decimal" id="mock-score-input" placeholder="e.g. 199">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:12px; color:var(--muted);">Out of</label>
+                    <input type="number" step="any" inputmode="decimal" id="mock-maxscore-input" placeholder="e.g. 300">
+                </div>
+            </div>
+            <label style="font-size:12px; color:var(--muted);">Analysis / Notes</label>
+            <textarea class="mock-notes" id="mock-notes-input" placeholder="Mistakes, weak chapters, plan to improve..."></textarea>
+            <label style="font-size:12px; color:var(--muted);">Mistake tags (tap all that apply)</label>
+            <div class="mistake-tag-picker" id="mistake-tag-picker"></div>
+            <label style="font-size:12px; color:var(--muted);">Attach files (images / PDFs)</label>
+            <input type="file" id="mock-files-input" accept="image/*,application/pdf" multiple style="padding:6px 0;">
+            <button class="btn btn-start btn-small" style="width:100%; margin-top:8px;" onclick="addMockTestEntry()">Save Entry</button>
+            <div class="small-note">Stored in this browser's IndexedDB.</div>
+        </div>
+        <div class="card" style="padding:12px; margin-bottom:12px;">
+            <h4 style="margin:0 0 6px 0;">📊 Last 30 Days Overview</h4>
+            <div id="mock-overview-stats" style="display:flex; gap:16px; font-size:14px; font-weight:600;">
+                <span>Avg Score: <span id="mock-avg-score" style="color:var(--primary);">0</span></span>
+                <span>Tests: <span id="mock-total-count" style="color:var(--success);">0</span></span>
+            </div>
+        </div>
+        <div class="section-header-row">
+            <h4 class="section-subtitle">Mistake pattern frequency</h4>
+            <select id="mock-sort-select" class="sort-select" onchange="renderMockTestList()" title="Sort mock test entries">
+                <option value="added-desc">Sort: Newest added</option>
+                <option value="added-asc">Sort: Oldest added</option>
+                <option value="date-desc">Sort: Test date (newest)</option>
+                <option value="date-asc">Sort: Test date (oldest)</option>
+                <option value="score-desc">Sort: Score % (highest)</option>
+                <option value="score-asc">Sort: Score % (lowest)</option>
+                <option value="mistakes-desc">Sort: Most mistakes</option>
+                <option value="mistakes-asc">Sort: Least mistakes</option>
+            </select>
+        </div>
+        <div class="mistake-summary-wrap" id="mistake-tag-summary"></div>
+        <div id="mock-test-list" style="max-height: 520px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg);"></div>
+    </div>
+
+    <div class="sidebar-content" id="panel-syllabus">
+        <h3 style="margin:0; color:var(--primary);">📚 Syllabus Tracker</h3>
+        <div class="syllabus-subject-tabs" id="syllabus-subject-tabs"></div>
+        <div class="syllabus-overall" id="syllabus-overall"></div>
+        <div id="syllabus-chapter-list"></div>
+    </div>
+</div>
+
+<div class="modal" id="mock-file-modal" onclick="closeMockFileModal()">
+    <div class="modal-content" style="width:min(90vw,700px); max-height:85vh; overflow:auto; text-align:center;" onclick="event.stopPropagation()">
+        <div id="mock-file-modal-body"></div>
+        <div style="margin-top:12px;"><button class="btn btn-pause" onclick="closeMockFileModal()">Close</button></div>
+    </div>
+</div>
+
+<div class="main-wrapper">
+    <div class="header">
+        <div class="app-title-wrap">
+            <svg class="app-logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="24" r="20" stroke="#38bdf8" stroke-width="3.5"/>
+                <circle cx="24" cy="24" r="12.5" stroke="#818cf8" stroke-width="3.5"/>
+                <circle cx="24" cy="24" r="5" fill="#34d399"/>
+            </svg>
+            <div class="app-title-text">
+                <span class="app-title-main" id="app-title-main">JEE 2027 <span class="app-title-emoji">🎯</span></span>
+                <span class="app-title-sub">Study Tracker</span>
+                <select id="exam-year-select" onchange="setExamYear(this.value)" title="Exam year — shifts the countdowns and title. Dates are approximated by shifting the 2027 dates by whole years; check official JEE dates once announced for your year." style="margin-top:4px; background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:11px; padding:2px 4px;">
+                </select>
+            </div>
+        </div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end;">
+            <div class="countdown-chip" id="chip-mains1" title="JEE Main 2027 (Session 1) — 21 Jan 2027">
+                <span class="chip-label">JEE Main (Jan)</span>
+                <div class="chip-days" id="cd-mains-days">--</div>
+                <span class="chip-sub" id="cd-mains-sub">-- hrs -- min -- sec</span>
+            </div>
+            <div class="countdown-chip" id="chip-mains2" title="JEE Main 2027 (Session 2) — 2 Apr 2027">
+                <span class="chip-label">JEE Main (Apr)</span>
+                <div class="chip-days" id="cd-mains2-days">--</div>
+                <span class="chip-sub" id="cd-mains2-sub">-- hrs -- min -- sec</span>
+            </div>
+            <div class="countdown-chip" id="chip-adv" title="JEE Advanced 2027 — 17 May 2027">
+                <span class="chip-label">JEE Advanced</span>
+                <div class="chip-days" id="cd-adv-days">--</div>
+                <span class="chip-sub" id="cd-adv-sub">-- hrs -- min -- sec</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card quote-banner" id="quote-of-day"></div>
+
+    <div class="grid-2">
+        <div class="card">
+            <div id="status-badge" class="badge badge-idle">STATUS: IDLE</div>
+            <div class="timer-box">
+                <div style="font-size:13px; color:var(--muted);" id="session-label">CURRENT SESSION</div>
+                <div class="timer-screen" id="session-timer">00:00:00</div>
+                <div class="controls-row">
+                    <button class="btn btn-start" id="btn-start" onclick="openSubjectModal()">Start</button>
+                    <button class="btn btn-pause" id="btn-pause" onclick="pauseStudy()" style="display:none;">Pause</button>
+                    <button class="btn btn-break" id="btn-break" onclick="takeBreak()" style="display:none;">Break</button>
+                    <button class="btn btn-stop" id="btn-stop" onclick="endDay()" style="display:none;">End Day</button>
+                </div>
+                <div id="change-subject-box" style="display:none; margin-top:15px;">
+                    <label style="font-size:12px; color:var(--muted);">Switch Subject Mid-Session:</label>
+                    <select id="switch-subject-select" onchange="changeSubjectMidSession()">
+                        <option value="Physics">Physics</option>
+                        <option value="Organic Chemistry">Organic Chemistry</option>
+                        <option value="Inorganic Chemistry">Inorganic Chemistry</option>
+                        <option value="Physical Chemistry">Physical Chemistry</option>
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="Revision">Revision</option>
+                        <option value="Mock Test / Analysis">Mock Test / Analysis</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top:0;">Today's Live Summary</h3>
+            <div class="stat-row">
+                <span style="color:var(--muted);">Total Study:</span>
+                <strong id="live-study-val" style="color:#a78bfa;">0h 0m 0s</strong>
+            </div>
+            <div class="stat-row">
+                <span style="color:var(--muted);">Total Breaks:</span>
+                <strong id="live-break-val" style="color:#a78bfa;">0h 0m 0s</strong>
+            </div>
+            <h4 style="margin-bottom:8px; margin-top:20px;">Subjects & Categories</h4>
+            <div id="live-subject-list"></div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <div class="goal-header">
+            <h3 style="margin:0;">🌱 This Week's Garden</h3>
+            <span class="streak-pill" id="streak-pill">🔥 0 day streak</span>
+        </div>
+        <div class="small-note" style="margin-bottom:10px;">Goal: 10 hrs/day counts toward your streak.</div>
+        <div class="garden-row" id="garden-row"></div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h3 style="margin-top:0;">📅 12-Month Study Heatmap</h3>
+        <div class="heatmap-scroll"><div id="heatmap-container"></div></div>
+        <div class="heatmap-legend">
+            <span>Less</span>
+            <span class="heatmap-swatch-group">
+                <span class="sq" style="background:#2b3852;" title="0h studied"></span>
+                <span class="sq" style="background:#0c3448;" title="Up to 3h studied"></span>
+                <span class="sq" style="background:#b2ebf2;" title="3-6h studied"></span>
+                <span class="sq" style="background:#008080;" title="6-9h studied"></span>
+                <span class="sq" style="background:#00e5ff;" title="Over 9h studied"></span>
+            </span>
+            <span>More</span>
+        </div>
+        <div class="small-note" style="text-align:center; margin-top:4px;">0h &nbsp;·&nbsp; 0–3h &nbsp;·&nbsp; 3–6h &nbsp;·&nbsp; 6–9h &nbsp;·&nbsp; 9h+</div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h3 style="margin-top:0;">📈 Weekly Subject Trend (last 7 days)</h3>
+        <div id="trend-chart-container"></div>
+    </div>
+
+    <div class="card" style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h3 style="margin:0 0 4px 0;">💾 Backup & Export</h3>
+                <div class="small-note" style="margin:0;">Exports your entire history — every day, subject, break, and planner task — independent of cloud sync.</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-export" onclick="exportDataJSON()">Export Backup</button>
+                <input type="file" id="import-file-input" accept="application/json" style="display:none;" onchange="importDataJSON(this.files[0]); this.value='';">
+                <button class="btn btn-export" onclick="document.getElementById('import-file-input').click()">Import Backup</button>
+            </div>
+        </div>
+        <div style="border-top:1px solid var(--border); padding-top:10px;">
+            <h4 style="margin:0 0 4px 0;">📊 Weekly / Monthly Reports</h4>
+            <div class="btn-row-fit">
+                <button class="btn btn-break btn-compact" onclick="downloadReport('weekly')">Download Weekly Report</button>
+                <button class="btn btn-break btn-compact" onclick="downloadReport('monthly')">Download Monthly Report</button>
+                <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('weekly', false)">Send Weekly Report (Email)</button>
+                <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('monthly', false)">Send Monthly Report (Email)</button>
+                <button class="btn btn-yellow btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
+                <button class="btn btn-yellow btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
+            </div>
+            <div class="small-note" style="margin-top:4px; color:var(--warning);">Emails are automatically sent on Sundays and at month-ends if signed in. Use the buttons above to send manually.</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h3 style="margin-top:0;">Historical Records & Break Log</h3>
+        <label style="color:var(--muted); font-size:13px;">Select History Date:</label>
+        <div class="date-field-wrap">
+            <input type="date" id="history-picker" onchange="loadHistoryData()">
+            <button type="button" class="date-picker-btn" title="Open date picker" onclick="openDatePicker('history-picker')">📅</button>
+        </div>
+        <div class="btn-row-nowrap" style="margin-top:10px;">
+            <button class="btn btn-stop btn-compact" onclick="deleteStudyLog()">🗑 Delete Study Log</button>
+            <button class="btn btn-stop btn-compact" onclick="deleteBreakLog()">🗑 Delete Break Log</button>
+            <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('daily', false)">Send Daily Report (Email)</button>
+            <button class="btn btn-pause btn-compact" onclick="downloadDayLog()">💾 Download Log</button>
+            <button class="btn btn-pause btn-compact" onclick="shareDayLog()">📤 Share Log</button>
+        </div>
+            <div class="grid-2" style="margin-top:15px;">
+        <div>
+            <h4>Subject Breakdown</h4>
+            <div id="history-subject-list">Select date to load.</div>
+            <h4 style="margin-top:16px;">Individual Study Sessions</h4>
+            <div class="log-box" id="history-session-list" style="padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg);">No sessions recorded.</div>
+        </div>
+        <div>
+            <h4>Logged Breaks</h4>
+            <div class="log-box" id="history-break-list" style="padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg);">No break logs recorded.</div>
+        </div>
+    </div>
+    </div>
+
+    <div style="text-align:center; margin-top:24px; padding-bottom:14px; color:var(--muted); font-size:16px;">
+        Made with ❤️ by <strong style="color:var(--primary); font-size:20px;">@ẞhì</strong>
+    </div>
+</div>
+
+<div class="modal" id="subject-modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">Select Subject</h3>
+        <select id="modal-subject-select">
+            <option value="Physics">Physics</option>
+            <option value="Organic Chemistry">Organic Chemistry</option>
+            <option value="Inorganic Chemistry">Inorganic Chemistry</option>
+            <option value="Physical Chemistry">Physical Chemistry</option>
+            <option value="Mathematics">Mathematics</option>
+            <option value="Revision">Revision</option>
+            <option value="Mock Test / Analysis">Mock Test / Analysis</option>
+        </select>
+        <div style="margin-top:15px; display:flex; justify-content:flex-end; gap:12px; align-items:center;">
+            <button class="btn btn-start" onclick="confirmStartStudy()">Begin Session</button>
+            <button class="btn btn-stop btn-small" onclick="cancelSubjectModal()">Back</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="planner-modal">
+    <div class="modal-content wide">
+        <div class="section-header-row" style="margin-top:0;">
+            <h3 style="margin:0;" id="planner-modal-title">Tasks</h3>
+            <select id="planner-sort-select" class="sort-select" onchange="renderPlannerTasks()" title="Sort tasks">
+                <option value="added">Added order</option>
+                <option value="priority-desc">High → Low</option>
+                <option value="priority-asc">Low → High</option>
+            </select>
+        </div>
+              <div id="planner-input-row" style="display:flex; align-items:stretch; gap:6px; margin-top:10px;">
+    <input type="text" id="planner-task-input" placeholder="Add task for this day..."
+           onkeypress="if(event.key==='Enter') addPlannerTask()"
+           style="flex:1; margin:0;">
+    <select id="planner-priority-select" class="priority-select" title="Priority for this task">
+        <option value="high">🔴</option>
+        <option value="medium" selected>🟡</option>
+        <option value="low">🟢</option>
+    </select>
+    <button class="btn btn-start" id="planner-add-btn" onclick="addPlannerTask()" title="Add task" style="height:44px; width:44px; padding:0; font-size:20px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; border-radius:8px;">+</button>
+</div>
+        <div id="planner-past-note" class="field-note" style="display:none;">This date is in the past — you can view/check off tasks, but new tasks can only be added for today or future dates.</div>
+        <div id="planner-task-list" style="max-height:220px; overflow-y:auto;"></div>
+        <div style="margin-top:15px; text-align:right;">
+            <button class="btn btn-pause" onclick="closePlannerModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+<script type="module" src="js/main.js"></script>
+    <!-- Persistent Alarm Modal -->
+<div class="modal" id="alarm-modal" style="z-index: 999;">
+    <div class="modal-content" style="text-align: center; padding: 40px 30px; border: 2px solid var(--danger);">
+        <div style="font-size: 64px; margin-bottom: 10px;">🔔</div>
+        <h3 style="color: var(--text); margin: 0 0 8px 0; font-size: 24px;">ALARM RINGING!</h3>
+        <p style="color: var(--muted); margin: 0 0 24px 0; font-size: 14px;">A critical notification requires your attention. Tap below to silence it.</p>
+        <button class="btn btn-stop" onclick="stopAlarmLoop()" style="font-size: 18px; padding: 14px 20px; width: 100%; border-radius: 10px;">STOP ALARM</button>
+    </div>
+</div>
+</body>
+</html>

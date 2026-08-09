@@ -1,0 +1,11 @@
+:root {
+    --bg: #070b14;
+    --card: #131b2b;
+    --border: #26324a;
+    --primary: #38bdf8;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text: #f1f5f9;
+    --muted: #64748b;
+}

@@ -1,0 +1,369 @@
+import { formatHMS, formatReadable, dateKeyFromWall, getTodayKey, generateId } from './utils.js';
+import { getDB, saveDB, blankDay, ensureDayShape, initToday, saveActiveSessionRaw, readActiveSessionRaw, clearActiveSessionRaw } from './storage.js';
+// Forward references to modules landing in later steps — safe because these
+// are only invoked inside function bodies, after the full module graph
+// (wired together in main.js, Step 7) has loaded.
+import { loadHistoryData } from './history.js';
+import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
+
+// ----------------- TIMER ENGINE -----------------
+let timerState = "IDLE";
+window.addEventListener("beforeunload", (e) => {
+    if (timerState === "STUDYING" || timerState === "BREAK") {
+        e.preventDefault();
+        e.returnValue = "A study session is still running. Are you sure you want to leave and stop it?";
+        return e.returnValue;
+    }
+});
+let segmentStartPerf = 0;
+let segmentStartWallMs = 0;
+let segmentElapsedMs = 0;
+// BUG FIX: this used to be sessionStudyMs, a raw-millisecond accumulator
+// (`sessionStudyMs += segmentElapsedMs` on every commit). The blue
+// "CURRENT SESSION" timer built its committed base from that full-precision
+// ms total, while the Total Study / subject rows in Today's Live Summary
+// are built from cachedTodayDay.totalStudy — a whole-SECONDS integer that
+// commitActiveSegment() produces by flooring each chunk and deferring the
+// leftover fraction into carryMs for the next commit (see that function's
+// comment). Those are two different units of the same underlying time, so
+// on every frame the blue timer would float up to ~1s ahead of the panel
+// the moment any carryMs fraction had piled up — a small, real,
+// deterministic rounding gap, not actual async timing drift. Tracking the
+// session total in whole seconds instead, incremented by the exact same
+// chunkSec values that land in the DB, guarantees both displays floor to
+// the identical number every single frame.
+let sessionStudySec = 0;
+let animFrame = null;
+let autosaveInterval = null;
+let currentSegmentId = 0;
+let openEntryRefs = {};
+let currentDayKey = null;
+// BUG FIX: commitActiveSegment() converts each chunk's elapsed ms to whole
+// seconds with Math.floor() before storing, and used to just discard the
+// leftover fraction (up to 999ms) every single time it ran. It runs on
+// every pause, resume, break, subject switch, tab-hide, pagehide, and every
+// 20s autosave tick — so on a long study session those sub-second losses
+// compound into real, systematic missing minutes (this is exactly what the
+// stress test's "Sum of Study Session Durations" / "Total Study Time"
+// mismatches were catching). carryMs banks the leftover fraction from each
+// commit and folds it into the next one instead of dropping it, so no time
+// is ever permanently lost — only ever deferred to the next chunk.
+let carryMs = 0;
+let activeSubject = "Physics";
+let activeBreakReason = "Break";
+// Cache for updateLiveSummaryFast() (used by the tick() hot loop) — see
+// that function for why. Refreshed on segment start/commit, and self-heals
+// on the next frame if a midnight rollover makes it stale in the meantime.
+let cachedTodayDay = null;
+let cachedTodayDayKey = null;
+function refreshCachedTodayDay() {
+    cachedTodayDayKey = getTodayKey();
+    cachedTodayDay = getDB()[cachedTodayDayKey] || blankDay();
+}
+
+// currentDayKey is read here but written from ui.js (checkDayRollover) and
+// main.js (window.onload) — both live in other modules, so they call this
+// setter rather than reassigning an imported binding (ES module imports are
+// read-only in the importing module).
+export function setCurrentDayKey(key) { currentDayKey = key; }
+export function getCurrentDayKey() { return currentDayKey; }
+export function getTimerState() { return timerState; }
+export function getActiveSubject() { return activeSubject; }
+export function getSegmentElapsedMs() { return segmentElapsedMs; }
+// history.js's per-entry delete functions clear this after splicing an
+// array (matches original: `openEntryRefs = {};` inline). Exposed as a
+// setter since openEntryRefs is private to this module.
+export function resetOpenEntryRefs() { openEntryRefs = {}; }
+
+export function startSegment() {
+    segmentStartPerf = performance.now();
+    segmentStartWallMs = Date.now();
+    segmentElapsedMs = 0;
+    refreshCachedTodayDay();
+    persistActiveSession();
+}
+
+export function commitActiveSegment() {
+    // BUG FIX: this used to run unconditionally, even when timerState was
+    // "PAUSED" or "IDLE". takeBreak() is reachable directly from PAUSED (the
+    // Break button stays visible while paused — see index.html), and it
+    // calls commitActiveSegment() before switching state to BREAK. Because
+    // pauseStudy() never resets segmentStartPerf, that stale call computed
+    // elapsed time going all the way back to the ORIGINAL study start (study
+    // time + the entire paused gap), not just the pause duration. The state
+    // check below correctly stopped that bogus total from being written to
+    // any subject/day (PAUSED matches neither the STUDYING nor BREAK branch)
+    // — but the carryMs fractional-second remainder from that bogus
+    // calculation was still being kept and would leak up to ~999ms of
+    // phantom time into the next *real* segment's commit. Bailing out here
+    // whenever we're not actually STUDYING or on a BREAK stops that leak at
+    // the source, and also skips a wasted loop + saveDB() call.
+    if (timerState !== "STUDYING" && timerState !== "BREAK") return;
+    let nowPerf = performance.now();
+    segmentElapsedMs = nowPerf - segmentStartPerf;
+    if (segmentElapsedMs <= 0) return;
+    let wallStart = segmentStartWallMs;
+    let wallEnd = wallStart + segmentElapsedMs;
+    let db = getDB();
+    let cursor = wallStart;
+    let committedStudySecThisCall = 0;
+    while (cursor < wallEnd) {
+        let cd = new Date(cursor);
+        let nextMidnight = new Date(cd.getFullYear(), cd.getMonth(), cd.getDate() + 1, 0, 0, 0, 0).getTime();
+        let chunkEnd = Math.min(nextMidnight, wallEnd);
+        let chunkMs = chunkEnd - cursor;
+        // Fold in whatever fraction of a second was left over from the
+        // previous commit (any state) before flooring, then bank whatever
+        // fraction is left over *this* time for the next commit.
+        let roundedMs = chunkMs + carryMs;
+        let chunkSec = Math.floor(roundedMs / 1000);
+        carryMs = roundedMs - chunkSec * 1000;
+        let dayKey = dateKeyFromWall(cursor);
+        if (chunkSec > 0) {
+            if (!db[dayKey]) db[dayKey] = blankDay();
+            let day = ensureDayShape(db[dayKey]);
+            let refKey = `${currentSegmentId}:${dayKey}:${timerState}`;
+            let stamp = new Date(chunkEnd).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            if (timerState === "STUDYING") {
+                day.subjects[activeSubject] = (day.subjects[activeSubject] || 0) + chunkSec;
+                day.totalStudy += chunkSec;
+                committedStudySecThisCall += chunkSec;
+                let ref = openEntryRefs[refKey];
+                let existing = ref ? day.studySessions.find(s => s.id === ref.id) : null;
+                if (existing && existing.subject === activeSubject) {
+                    existing.duration += chunkSec;
+                    existing.time = stamp;
+                } else {
+                    let newEntry = { id: generateId(), time: stamp, subject: activeSubject, duration: chunkSec };
+                    day.studySessions.push(newEntry);
+                    openEntryRefs[refKey] = { id: newEntry.id };
+                }
+            } else if (timerState === "BREAK") {
+                day.totalBreak += chunkSec;
+                let ref = openEntryRefs[refKey];
+                let existing = ref ? day.breaks.find(b => b.id === ref.id) : null;
+                if (existing) {
+                    existing.duration += chunkSec;
+                    existing.time = stamp;
+                } else {
+                    let newEntry = { id: generateId(), time: stamp, reason: activeBreakReason, duration: chunkSec };
+                    day.breaks.push(newEntry);
+                    openEntryRefs[refKey] = { id: newEntry.id };
+                }
+            }
+        }
+        cursor = chunkEnd;
+    }
+    if (timerState === "STUDYING") sessionStudySec += committedStudySecThisCall;
+    saveDB(db);
+    refreshCachedTodayDay();
+}
+
+export function flushAndRestartSegment() {
+    if (timerState !== "STUDYING" && timerState !== "BREAK") return;
+    commitActiveSegment(); startSegment();
+}
+
+export function startAutosave() {
+    if (autosaveInterval) clearInterval(autosaveInterval);
+    autosaveInterval = setInterval(flushAndRestartSegment, 20000);
+}
+
+export function persistActiveSession() {
+    if (timerState === "STUDYING" || timerState === "BREAK") {
+        saveActiveSessionRaw({ state: timerState, activeSubject, activeBreakReason, segmentStartWallMs, sessionStudySec, dayKey: currentDayKey });
+    } else { clearActiveSessionRaw(); }
+}
+
+export function clearActiveSession() { clearActiveSessionRaw(); }
+
+export function tryRestoreActiveSession() {
+    let raw = readActiveSessionRaw(); if (!raw) return;
+    let snap; try { snap = JSON.parse(raw); } catch(e) { clearActiveSessionRaw(); return; }
+    if (snap.dayKey && snap.dayKey !== getTodayKey()) { clearActiveSessionRaw(); return; }
+    let label = snap.state === "STUDYING" ? `studying ${snap.activeSubject}` : `on a break (${snap.activeBreakReason})`;
+    if (confirm(`You had an unfinished session (${label}) running when this tab last closed.\n\nResume it now?`)) {
+        timerState = snap.state; activeSubject = snap.activeSubject; activeBreakReason = snap.activeBreakReason; sessionStudySec = snap.sessionStudySec || 0; currentSegmentId++; startSegment(); updateUIState(); tick();
+    } else { clearActiveSessionRaw(); }
+}
+
+export function openSubjectModal() {
+    if (timerState === "PAUSED") { resumeStudy(); return; }
+    if (timerState === "BREAK") { commitActiveSegment(); cancelAnimationFrame(animFrame); clearActiveSession(); }
+    document.getElementById("modal-subject-select").value = activeSubject;
+    document.getElementById("subject-modal").style.display = "flex";
+}
+
+// BUG FIX: the old inline onclick just hid the modal. If openSubjectModal()
+// was entered from BREAK, it had already committed the segment, cancelled
+// the tick loop, and cleared the persisted session — so hitting the old
+// "Back" left timerState stuck on "BREAK" with no running tick and no
+// active-session record: a frozen phantom break. This restarts the break
+// segment/tick (mirroring resumeStudy's pattern) before closing the modal.
+export function cancelSubjectModal() {
+    document.getElementById("subject-modal").style.display = "none";
+    if (timerState === "BREAK") {
+        // NOT currentSegmentId++ — openSubjectModal()'s BREAK branch (above)
+        // never incremented it either, so this is still the same real-world
+        // break. Incrementing here would change the refKey commitActiveSegment()
+        // uses to find the existing log entry, forking a duplicate break row
+        // instead of extending the original one.
+        startSegment(); updateUIState(); tick();
+    }
+}
+
+export function confirmStartStudy() {
+    activeSubject = document.getElementById("modal-subject-select").value;
+    document.getElementById("subject-modal").style.display = "none";
+    timerState = "STUDYING"; currentSegmentId++; startSegment();
+    updateUIState(); tick();
+}
+
+export function pauseStudy() { commitActiveSegment(); cancelAnimationFrame(animFrame); timerState = "PAUSED"; clearActiveSession(); updateUIState(); }
+
+export function resumeStudy() { timerState = "STUDYING"; currentSegmentId++; startSegment(); updateUIState(); tick(); }
+
+export function takeBreak() {
+    commitActiveSegment(); cancelAnimationFrame(animFrame);
+    let reason = prompt("Break Reason (e.g. Lunch, Walk, Phone):");
+    if (!reason || !reason.trim()) reason = "Short Break";
+    activeBreakReason = reason;
+    timerState = "BREAK"; currentSegmentId++; startSegment();
+    updateUIState(); tick();
+}
+
+export function changeSubjectMidSession() { activeSubject = document.getElementById("switch-subject-select").value; updateLiveSummary(); }
+
+export function endDay() {
+    commitActiveSegment(); cancelAnimationFrame(animFrame);
+    timerState = "IDLE"; segmentElapsedMs = 0; sessionStudySec = 0; carryMs = 0; clearActiveSession();
+    updateUIState();
+    document.getElementById("session-timer").innerText = "00:00:00";
+    updateLiveSummary(); loadHistoryData(); renderGarden(); renderHeatmap(); renderTrendChart();
+}
+
+export function tick() {
+    segmentElapsedMs = performance.now() - segmentStartPerf;
+    if (timerState === "STUDYING") document.getElementById("session-timer").innerText = formatHMS(sessionStudySec * 1000 + segmentElapsedMs);
+    else if (timerState === "BREAK") document.getElementById("session-timer").innerText = formatHMS(segmentElapsedMs);
+    updateLiveSummaryFast();
+    animFrame = requestAnimationFrame(tick);
+}
+
+// Runs on every animation frame (~60/sec) while a session is active — a
+// cheap alternative to updateLiveSummary() for the hot loop specifically.
+// updateLiveSummary() re-reads and JSON.parses the entire study database
+// from localStorage every time it's called, which is fine for the
+// occasional call (button clicks, history deletes) but was pointless,
+// repeated work 60x/second here, and could be a real cost once the
+// database has months of entries. This uses the cached totals instead
+// (refreshed only when they actually change, in startSegment()/
+// commitActiveSegment()) and adds the live in-progress seconds on top —
+// same numbers, without re-parsing anything every frame. Falls back to the
+// full accurate path (and re-caches) if the cache is missing or has gone
+// stale across a midnight rollover.
+function updateLiveSummaryFast() {
+    if (!cachedTodayDay || cachedTodayDayKey !== getTodayKey()) { updateLiveSummary(); refreshCachedTodayDay(); return; }
+    let liveStudySec = (timerState === "STUDYING") ? Math.floor(segmentElapsedMs / 1000) : 0;
+    let liveBreakSec = (timerState === "BREAK") ? Math.floor(segmentElapsedMs / 1000) : 0;
+    document.getElementById("live-study-val").innerText = formatReadable(cachedTodayDay.totalStudy + liveStudySec);
+    document.getElementById("live-break-val").innerText = formatReadable(cachedTodayDay.totalBreak + liveBreakSec);
+    let html = "";
+    for (let [cat, sec] of Object.entries(cachedTodayDay.subjects)) {
+        let add = (timerState === "STUDYING" && activeSubject === cat) ? liveStudySec : 0;
+        html += `<div class="stat-row"><span style="color:var(--muted);">${cat}:</span><strong>${formatReadable(sec + add)}</strong></div>`;
+    }
+    document.getElementById("live-subject-list").innerHTML = html;
+}
+
+export function updateUIState() {
+    if (timerState === "STUDYING" || timerState === "BREAK") requestWakeLock(); else releaseWakeLock();
+    let badge = document.getElementById("status-badge");
+    let btnStart = document.getElementById("btn-start");
+    let btnPause = document.getElementById("btn-pause");
+    let btnBreak = document.getElementById("btn-break");
+    let btnStop = document.getElementById("btn-stop");
+    let changeSub = document.getElementById("change-subject-box");
+    let sessionLabel = document.getElementById("session-label");
+
+    if (timerState === "STUDYING") {
+        badge.className = "badge badge-studying"; badge.innerText = `STUDYING: ${activeSubject}`;
+        sessionLabel.innerText = "CURRENT SESSION";
+        btnStart.style.display = "none"; btnPause.style.display = "inline-block"; btnBreak.style.display = "inline-block"; btnStop.style.display = "inline-block"; changeSub.style.display = "none";
+    } else if (timerState === "PAUSED") {
+        badge.className = "badge badge-paused"; badge.innerText = `PAUSED (AT DESK)`;
+        sessionLabel.innerText = "CURRENT SESSION (paused)";
+        btnStart.innerText = "Resume"; btnStart.style.display = "inline-block"; btnPause.style.display = "none"; btnBreak.style.display = "inline-block"; btnStop.style.display = "inline-block"; changeSub.style.display = "block"; document.getElementById("switch-subject-select").value = activeSubject;
+    } else if (timerState === "BREAK") {
+        badge.className = "badge badge-break"; badge.innerText = `ON BREAK: ${activeBreakReason}`;
+        sessionLabel.innerText = "BREAK DURATION";
+        btnStart.innerText = "Resume Study"; btnStart.style.display = "inline-block"; btnPause.style.display = "none"; btnBreak.style.display = "none"; btnStop.style.display = "inline-block"; changeSub.style.display = "none";
+    } else {
+        badge.className = "badge badge-idle"; badge.innerText = `STATUS: IDLE`;
+        sessionLabel.innerText = "CURRENT SESSION";
+        btnStart.innerText = "Start"; btnStart.style.display = "inline-block"; btnPause.style.display = "none"; btnBreak.style.display = "none"; btnStop.style.display = "none"; changeSub.style.display = "none";
+    }
+}
+
+export function updateLiveSummary() {
+    let db = getDB();
+    let day = db[getTodayKey()] || initToday();
+    let liveStudySec = (timerState === "STUDYING") ? Math.floor(segmentElapsedMs / 1000) : 0;
+    let liveBreakSec = (timerState === "BREAK") ? Math.floor(segmentElapsedMs / 1000) : 0;
+    let studyTotal = day.totalStudy + liveStudySec;
+    let breakTotal = day.totalBreak + liveBreakSec;
+    document.getElementById("live-study-val").innerText = formatReadable(studyTotal);
+    document.getElementById("live-break-val").innerText = formatReadable(breakTotal);
+    let html = "";
+    for (let [cat, sec] of Object.entries(day.subjects)) {
+        let add = (timerState === "STUDYING" && activeSubject === cat) ? liveStudySec : 0;
+        html += `<div class="stat-row"><span style="color:var(--muted);">${cat}:</span><strong>${formatReadable(sec + add)}</strong></div>`;
+    }
+    document.getElementById("live-subject-list").innerHTML = html;
+}
+
+document.addEventListener("visibilitychange", () => { if (document.hidden) flushAndRestartSegment(); });
+// BUG FIX: was `commitActiveSegment()` — commits the segment but never
+// restarts it (segmentStartPerf stays at its old value). pagehide fires on
+// real navigation/close (harmless either way, nothing runs after), but also
+// fires in cases where the page context survives (e.g. bfcache) — if the
+// user comes back to that same still-running tab, the next commit would
+// recompute elapsed time from the stale pre-pagehide start and double-count
+// everything already committed here. flushAndRestartSegment() commits AND
+// calls startSegment() again, so the segment's baseline is always correct
+// whether or not the page actually unloads. It also already guards for
+// STUDYING/BREAK, so this is a strict improvement with no downside.
+window.addEventListener("pagehide", () => { flushAndRestartSegment(); });
+
+// ----------------- SCREEN WAKE LOCK -----------------
+// Keeps the display from auto-locking while a study/break session is
+// running (same idea as a video app staying awake during playback).
+// Unsupported browsers (no navigator.wakeLock) just silently no-op —
+// everything else keeps working exactly as before.
+let wakeLockSentinel = null;
+
+async function requestWakeLock() {
+    if (!("wakeLock" in navigator) || wakeLockSentinel) return;
+    try {
+        wakeLockSentinel = await navigator.wakeLock.request("screen");
+        wakeLockSentinel.addEventListener("release", () => { wakeLockSentinel = null; });
+    } catch (e) {
+        // Common causes: low battery mode, permissions policy, or the tab
+        // was already hidden when requested — fail silently, no user-facing
+        // error, the timer itself is unaffected either way.
+        wakeLockSentinel = null;
+    }
+}
+
+async function releaseWakeLock() {
+    if (!wakeLockSentinel) return;
+    try { await wakeLockSentinel.release(); } catch (e) {}
+    wakeLockSentinel = null;
+}
+
+// The browser force-releases the wake lock whenever the tab is hidden
+// (switch tabs, minimize, screen lock). If a session is still running when
+// the user comes back, re-acquire it.
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && (timerState === "STUDYING" || timerState === "BREAK")) requestWakeLock();
+});
