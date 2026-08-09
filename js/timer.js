@@ -18,7 +18,21 @@ window.addEventListener("beforeunload", (e) => {
 let segmentStartPerf = 0;
 let segmentStartWallMs = 0;
 let segmentElapsedMs = 0;
-let sessionStudyMs = 0;
+// BUG FIX: this used to be sessionStudyMs, a raw-millisecond accumulator
+// (`sessionStudyMs += segmentElapsedMs` on every commit). The blue
+// "CURRENT SESSION" timer built its committed base from that full-precision
+// ms total, while the Total Study / subject rows in Today's Live Summary
+// are built from cachedTodayDay.totalStudy — a whole-SECONDS integer that
+// commitActiveSegment() produces by flooring each chunk and deferring the
+// leftover fraction into carryMs for the next commit (see that function's
+// comment). Those are two different units of the same underlying time, so
+// on every frame the blue timer would float up to ~1s ahead of the panel
+// the moment any carryMs fraction had piled up — a small, real,
+// deterministic rounding gap, not actual async timing drift. Tracking the
+// session total in whole seconds instead, incremented by the exact same
+// chunkSec values that land in the DB, guarantees both displays floor to
+// the identical number every single frame.
+let sessionStudySec = 0;
 let animFrame = null;
 let autosaveInterval = null;
 let currentSegmentId = 0;
@@ -92,6 +106,7 @@ export function commitActiveSegment() {
     let wallEnd = wallStart + segmentElapsedMs;
     let db = getDB();
     let cursor = wallStart;
+    let committedStudySecThisCall = 0;
     while (cursor < wallEnd) {
         let cd = new Date(cursor);
         let nextMidnight = new Date(cd.getFullYear(), cd.getMonth(), cd.getDate() + 1, 0, 0, 0, 0).getTime();
@@ -112,6 +127,7 @@ export function commitActiveSegment() {
             if (timerState === "STUDYING") {
                 day.subjects[activeSubject] = (day.subjects[activeSubject] || 0) + chunkSec;
                 day.totalStudy += chunkSec;
+                committedStudySecThisCall += chunkSec;
                 let ref = openEntryRefs[refKey];
                 let existing = ref ? day.studySessions.find(s => s.id === ref.id) : null;
                 if (existing && existing.subject === activeSubject) {
@@ -138,7 +154,7 @@ export function commitActiveSegment() {
         }
         cursor = chunkEnd;
     }
-    if (timerState === "STUDYING") sessionStudyMs += segmentElapsedMs;
+    if (timerState === "STUDYING") sessionStudySec += committedStudySecThisCall;
     saveDB(db);
     refreshCachedTodayDay();
 }
@@ -155,7 +171,7 @@ export function startAutosave() {
 
 export function persistActiveSession() {
     if (timerState === "STUDYING" || timerState === "BREAK") {
-        saveActiveSessionRaw({ state: timerState, activeSubject, activeBreakReason, segmentStartWallMs, sessionStudyMs, dayKey: currentDayKey });
+        saveActiveSessionRaw({ state: timerState, activeSubject, activeBreakReason, segmentStartWallMs, sessionStudySec, dayKey: currentDayKey });
     } else { clearActiveSessionRaw(); }
 }
 
@@ -167,7 +183,7 @@ export function tryRestoreActiveSession() {
     if (snap.dayKey && snap.dayKey !== getTodayKey()) { clearActiveSessionRaw(); return; }
     let label = snap.state === "STUDYING" ? `studying ${snap.activeSubject}` : `on a break (${snap.activeBreakReason})`;
     if (confirm(`You had an unfinished session (${label}) running when this tab last closed.\n\nResume it now?`)) {
-        timerState = snap.state; activeSubject = snap.activeSubject; activeBreakReason = snap.activeBreakReason; sessionStudyMs = snap.sessionStudyMs || 0; currentSegmentId++; startSegment(); updateUIState(); tick();
+        timerState = snap.state; activeSubject = snap.activeSubject; activeBreakReason = snap.activeBreakReason; sessionStudySec = snap.sessionStudySec || 0; currentSegmentId++; startSegment(); updateUIState(); tick();
     } else { clearActiveSessionRaw(); }
 }
 
@@ -220,7 +236,7 @@ export function changeSubjectMidSession() { activeSubject = document.getElementB
 
 export function endDay() {
     commitActiveSegment(); cancelAnimationFrame(animFrame);
-    timerState = "IDLE"; segmentElapsedMs = 0; sessionStudyMs = 0; carryMs = 0; clearActiveSession();
+    timerState = "IDLE"; segmentElapsedMs = 0; sessionStudySec = 0; carryMs = 0; clearActiveSession();
     updateUIState();
     document.getElementById("session-timer").innerText = "00:00:00";
     updateLiveSummary(); loadHistoryData(); renderGarden(); renderHeatmap(); renderTrendChart();
@@ -228,7 +244,7 @@ export function endDay() {
 
 export function tick() {
     segmentElapsedMs = performance.now() - segmentStartPerf;
-    if (timerState === "STUDYING") document.getElementById("session-timer").innerText = formatHMS(sessionStudyMs + segmentElapsedMs);
+    if (timerState === "STUDYING") document.getElementById("session-timer").innerText = formatHMS(sessionStudySec * 1000 + segmentElapsedMs);
     else if (timerState === "BREAK") document.getElementById("session-timer").innerText = formatHMS(segmentElapsedMs);
     updateLiveSummaryFast();
     animFrame = requestAnimationFrame(tick);
