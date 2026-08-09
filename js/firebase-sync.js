@@ -49,6 +49,7 @@ export function initFirebaseAuthIfNeeded() {
                 showToast(`Signed in as ${user.displayName || user.email}`);
                 startAutoServices();
                 startCloudListener();
+                autoLoadCloudDataIfNeeded();
             } else {
                 if (autoSyncInterval) clearInterval(autoSyncInterval);
                 if (autoReportInterval) clearInterval(autoReportInterval);
@@ -80,7 +81,7 @@ export async function pushToCloud(silent = false) {
         // once a user has logged a handful of tests with photos. The mock
         // test entries themselves (subject, score, notes, mistake tags) DO
         // sync — only each entry's `files` array is stripped before upload.
-        let mockTests = (await getAllMockTests()).map(({ files, ...rest }) => rest);
+        let mockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) }));
         let docRef = fbDb.collection("users").doc(currentUser.uid);
         await docRef.set({
             studyDB: getDB(),
@@ -128,7 +129,7 @@ async function restoreMockTests(entries) {
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => resolve(undefined);
         });
-        if (!existing) store.put(e);
+        if (!existing) store.put({ ...e, files: [] });
     }
     await new Promise((resolve) => { tx.oncomplete = resolve; tx.onerror = resolve; });
 }
@@ -162,6 +163,35 @@ export async function pullFromCloud() {
         alert("Loaded! The page will reload.");
         location.reload();
     } catch (e) { alert("Load failed: " + e.message); }
+}
+
+// Runs once right after sign-in. If this device has never synced before
+// (jee_last_sync unset) and cloud data exists, load it automatically —
+// previously data only ever appeared after a manual "Load from Cloud" tap,
+// because the real-time listener below deliberately ignores its very first
+// snapshot on a fresh device (see startCloudListener's lastLocalSync guard).
+// That guard still protects against clobbering unsynced local work: if this
+// device already has real local study data, this asks first instead of
+// silently overwriting it.
+async function autoLoadCloudDataIfNeeded() {
+    if (!currentUser) return;
+    let alreadySynced = parseInt(getRawFlag("jee_last_sync") || "0", 10) > 0;
+    if (alreadySynced) return;
+    try {
+        let doc = await fbDb.collection("users").doc(currentUser.uid).get();
+        if (!doc.exists) return; // nothing saved to the cloud yet for this account
+        let data = doc.data();
+        let localHasData = Object.keys(getDB() || {}).length > 0;
+        if (localHasData) {
+            if (!confirm("Cloud data was found for this account. Load it onto this device now? This will replace the study logs, planner tasks, and other data currently on this device.")) return;
+        }
+        await applyCloudData(data);
+        setRawFlag("jee_last_sync", (data.updatedAt || Date.now()).toString());
+        showToast("Loaded your data from the cloud.");
+        location.reload();
+    } catch (e) {
+        console.log("Auto-load from cloud failed:", e.message);
+    }
 }
 
 // ----------------- REAL-TIME SYNC -----------------

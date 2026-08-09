@@ -1,4 +1,4 @@
-import { dateKeyFromWall, getTodayKey, mondayKeyFor } from './utils.js';
+import { dateKeyFromWall, getTodayKey, mondayKeyFor, formatDateDDMMYYYY } from './utils.js';
 import { getDB, blankDay } from './storage.js';
 import { getTimerState, getSegmentElapsedMs } from './timer.js';
 
@@ -123,7 +123,7 @@ export function renderHeatmap() {
             if (day.date > today) return;
             let x = wi * (cell + gap) + 8, y = di * (cell + gap) + 5;
             let colorIdx = day.hrs > 9 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
-            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${hmColors[colorIdx]}" stroke="#374357" stroke-width="1"><title>${day.key}: ${day.hrs.toFixed(1)}h</title></rect>`;
+            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${hmColors[colorIdx]}" stroke="#374357" stroke-width="1"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
         });
     });
     svg += `</svg>`;

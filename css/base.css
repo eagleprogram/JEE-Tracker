@@ -30,6 +30,8 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
 #syllabus-chapter-list::-webkit-scrollbar-thumb { border-radius: 4px; }
 #todo-list::-webkit-scrollbar { width: 5px; }
 #todo-list::-webkit-scrollbar-thumb { border-radius: 4px; }
+#mock-test-list::-webkit-scrollbar { width: 5px; }
+#mock-test-list::-webkit-scrollbar-thumb { border-radius: 4px; }
 #history-break-list::-webkit-scrollbar { width: 5px; }
 #history-break-list::-webkit-scrollbar-thumb { border-radius: 4px; }
 #history-session-list::-webkit-scrollbar { width: 5px; }

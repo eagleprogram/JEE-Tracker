@@ -1,4 +1,4 @@
-import { escapeHtml, fileToDataURL, getTodayKey } from './utils.js';
+import { escapeHtml, fileToDataURL, getTodayKey, formatDateDDMMYYYY } from './utils.js';
 import { openMockDB, getAllMockTests, MOCK_STORE } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
@@ -30,21 +30,30 @@ export function renderMistakeSummary(entries) {
 }
 
 export async function addMockTestEntry() {
-    let date = document.getElementById("mock-date-input").value || getTodayKey();
+    let date = document.getElementById("mock-date-input").value;
     let subject = document.getElementById("mock-subject-input").value.trim();
     let score = document.getElementById("mock-score-input").value.trim();
     let maxScore = document.getElementById("mock-maxscore-input").value.trim();
     let notes = document.getElementById("mock-notes-input").value.trim();
     let filesInput = document.getElementById("mock-files-input");
 
+    // Require date, subject, and both marks fields before saving — a
+    // half-filled entry (e.g. no score yet) used to be allowed through,
+    // making the mock-test log unreliable to trust for averages/trends.
+    if (!date) { alert("Pick a date for this mock test first."); return; }
     if (!subject) { alert("Enter the exam/subject name first."); return; }
-    if (score && maxScore) {
-        let sNum = parseFloat(score), mNum = parseFloat(maxScore);
-        if (!isNaN(sNum) && !isNaN(mNum) && sNum > mNum) { alert(`Score (${score}) can't be greater than Out of (${maxScore}) — please check the values.`); return; }
-    }
+    if (!score) { alert("Enter your score first."); return; }
+    if (!maxScore) { alert("Enter the maximum possible score (\"Out of\") first."); return; }
+    let sNum = parseFloat(score), mNum = parseFloat(maxScore);
+    if (isNaN(sNum) || isNaN(mNum)) { alert("Score and Out of must be numbers."); return; }
+    if (sNum > mNum) { alert(`Score (${score}) can't be greater than Out of (${maxScore}) — please check the values.`); return; }
 
     let files = []; for (let f of filesInput.files) files.push(await fileToDataURL(f));
-    let entry = { id: Date.now(), date, subject, score, maxScore, notes, files, mistakeTags: [...selectedMistakeTags] };
+    // hasFiles is synced to the cloud even though the actual file bytes
+    // never are (see firebase-sync.js) — it's how a browser that only has
+    // the metadata (pulled from another device) knows an attachment exists
+    // elsewhere and shouldn't be silently treated as if it has none.
+    let entry = { id: Date.now(), date, subject, score, maxScore, notes, files, hasFiles: files.length > 0, mistakeTags: [...selectedMistakeTags] };
     let db = await openMockDB();
     let tx = db.transaction(MOCK_STORE, "readwrite");
     tx.objectStore(MOCK_STORE).add(entry);
@@ -62,6 +71,19 @@ export async function addMockTestEntry() {
 }
 
 export async function deleteMockTestEntry(id) {
+    let entries = await getAllMockTests();
+    let entry = entries.find(e => e.id === id);
+    // If the cloud says this entry has an attachment (hasFiles) but this
+    // browser's IndexedDB doesn't actually hold the file (it was attached
+    // on a different device — file bytes never sync), block the delete
+    // here. Deleting would still remove the entry locally, and the next
+    // sync push from THIS browser would wipe the entry from the cloud too
+    // — silently destroying the only copy's record, since the browser that
+    // actually holds the file might not push again for hours.
+    if (entry && entry.hasFiles && (!entry.files || entry.files.length === 0)) {
+        alert("This mock test has a file attached on a different browser/device (not this one). To avoid losing that attachment, delete it from the browser where the file actually is.");
+        return;
+    }
     if (!confirm("Delete this mock test entry and its attachments?")) return;
     let db = await openMockDB();
     let tx = db.transaction(MOCK_STORE, "readwrite");
@@ -71,7 +93,7 @@ export async function deleteMockTestEntry(id) {
 
 export async function renderMockTestList() {
     let list = document.getElementById("mock-test-list");
-    let entries = await getAllMockTests();
+    let entries = await getAllMockTests(); // already sorted newest-added-first (id = Date.now() at creation)
     renderMistakeSummary(entries);
     if (entries.length === 0) { list.innerHTML = "<div class='small-note' style='margin-top:10px;'>No mock tests logged yet.</div>"; return; }
 
@@ -87,7 +109,8 @@ export async function renderMockTestList() {
 
     let html = "";
     entries.forEach(e => {
-        html += `<div class="mock-entry"><div class="mock-top"><div><strong>${escapeHtml(e.subject)}</strong><div class="small-note" style="margin:0;">${e.date}</div></div><div style="display:flex; align-items:center; gap:8px;"><span class="mock-score">${e.score || '—'}${e.maxScore ? ' / ' + e.maxScore : ''}</span><button class="del" onclick="deleteMockTestEntry(${e.id})">✕</button></div></div>${e.notes ? `<div style="font-size:13px; margin-top:8px; white-space:pre-wrap;">${escapeHtml(e.notes)}</div>` : ''}${(e.mistakeTags && e.mistakeTags.length) ? `<div class="entry-tags">${e.mistakeTags.map(t => `<span>${escapeHtml(t)}</span>`).join('')}</div>` : ''}<div class="mock-files">${(e.files||[]).map((f, i) => f.type.startsWith('image/') ? `<img src="${f.dataUrl}" onclick="viewMockFile(${e.id},${i})">` : `<a class="pdf-chip" href="${f.dataUrl}" download="${f.name}">📄 ${escapeHtml(f.name)}</a>`).join('')}</div></div>`;
+        let attachedElsewhere = e.hasFiles && (!e.files || e.files.length === 0);
+        html += `<div class="mock-entry"><div class="mock-top"><div><strong>${escapeHtml(e.subject)}</strong><div class="small-note" style="margin:0;">${formatDateDDMMYYYY(e.date)}</div></div><div style="display:flex; align-items:center; gap:8px;"><span class="mock-score">${e.score || '—'}${e.maxScore ? ' / ' + e.maxScore : ''}</span><button class="del" onclick="deleteMockTestEntry(${e.id})">✕</button></div></div>${e.notes ? `<div style="font-size:13px; margin-top:8px; white-space:pre-wrap;">${escapeHtml(e.notes)}</div>` : ''}${(e.mistakeTags && e.mistakeTags.length) ? `<div class="entry-tags">${e.mistakeTags.map(t => `<span>${escapeHtml(t)}</span>`).join('')}</div>` : ''}<div class="mock-files">${(e.files||[]).map((f, i) => f.type.startsWith('image/') ? `<img src="${f.dataUrl}" onclick="viewMockFile(${e.id},${i})">` : `<a class="pdf-chip" href="${f.dataUrl}" download="${f.name}">📄 ${escapeHtml(f.name)}</a>`).join('')}${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 Attached on another browser</span>` : ''}</div></div>`;
     });
     list.innerHTML = html + `<div style="height:40px;"></div>`; // Add bottom padding
 }

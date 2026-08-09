@@ -1,4 +1,4 @@
-import { formatReadable, dateKeyFromWall, getTodayKey } from './utils.js';
+import { formatReadable, dateKeyFromWall, getTodayKey, formatDateDDMMYYYY } from './utils.js';
 import { getDB, ensureDayShape, blankDay } from './storage.js';
 import { computeStreak, SUBJECT_COLORS } from './charts.js';
 // Forward references — ui.js, firebase-sync.js land in later steps. Only
@@ -10,9 +10,9 @@ import { getCurrentUser } from './firebase-sync.js';
 export 
     function buildShareText(dt) {
         let db = getDB(); let day = db[dt];
-        if (!day) return `No study data logged for ${dt}.`;
+        if (!day) return `No study data logged for ${formatDateDDMMYYYY(dt)}.`;
         ensureDayShape(day);
-        let lines = [`📚 Study Log — ${dt}`, `⏱ Total Study: ${formatReadable(day.totalStudy)}`, `☕ Total Break: ${formatReadable(day.totalBreak)}`, ``];
+        let lines = [`📚 Study Log — ${formatDateDDMMYYYY(dt)}`, `⏱ Total Study: ${formatReadable(day.totalStudy)}`, `☕ Total Break: ${formatReadable(day.totalBreak)}`, ``];
         lines.push(`Subject breakdown:`);
         for (let [cat, sec] of Object.entries(day.subjects)) if (sec > 0) lines.push(`• ${cat}: ${formatReadable(sec)}`);
         lines.push(``, `Tracked with @ẞhì's JEE Study Tracker 🎯`);

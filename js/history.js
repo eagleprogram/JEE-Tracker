@@ -1,4 +1,4 @@
-import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml } from './utils.js';
+import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml, formatDateDDMMYYYY } from './utils.js';
 import { getDB, saveDB, ensureDayShape, blankDay } from './storage.js';
 import { updateLiveSummary, resetOpenEntryRefs } from './timer.js';
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
@@ -47,7 +47,7 @@ export function loadHistoryData() {
 export function deleteSubjectEntry(dt, subject) {
     let db = getDB(); if (!db[dt]) return;
     let sec = db[dt].subjects[subject] || 0; if (sec <= 0) { alert("No time logged."); return; }
-    if (!confirm(`Delete ${formatReadable(sec)} logged for ${subject} on ${dt}?`)) return;
+    if (!confirm(`Delete ${formatReadable(sec)} logged for ${subject} on ${formatDateDDMMYYYY(dt)}?`)) return;
     db[dt].totalStudy = Math.max(0, db[dt].totalStudy - sec);
     db[dt].subjects[subject] = 0; if (db[dt].studySessions) db[dt].studySessions = db[dt].studySessions.filter(s => s.subject !== subject);
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
@@ -79,7 +79,7 @@ export function deleteBreakEntry(dt, id) {
 export function deleteStudyLog() {
     let dt = document.getElementById("history-picker").value; if (!dt) return;
     let db = getDB(); if (!db[dt]) { alert("No data."); return; }
-    if (!confirm(`Delete all study logs for ${dt}?`)) return;
+    if (!confirm(`Delete all study logs for ${formatDateDDMMYYYY(dt)}?`)) return;
     db[dt].subjects = { ...blankDay().subjects };
     db[dt].totalStudy = 0; db[dt].studySessions = [];
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
@@ -88,7 +88,7 @@ export function deleteStudyLog() {
 export function deleteBreakLog() {
     let dt = document.getElementById("history-picker").value; if (!dt) return;
     let db = getDB(); if (!db[dt]) { alert("No data."); return; }
-    if (!confirm(`Delete all break logs for ${dt}?`)) return;
+    if (!confirm(`Delete all break logs for ${formatDateDDMMYYYY(dt)}?`)) return;
     db[dt].breaks = []; db[dt].totalBreak = 0;
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
 }

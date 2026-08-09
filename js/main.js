@@ -37,7 +37,8 @@ import {
 } from './sleep.js';
 
 import {
-    toggleSyllabusChapterExpand, toggleSyllabusTag, setSyllabusSubject
+    toggleSyllabusChapterExpand, toggleSyllabusTag, setSyllabusSubject,
+    migrateSyllabusChapterRenames
 } from './syllabus.js';
 
 import {
@@ -123,6 +124,10 @@ Object.assign(window, {
 // -----------------------------------------------------------------------
 async function initApp() {
     setCurrentDayKey(getTodayKey());
+
+    // One-time migration for the just-renamed/split syllabus chapters —
+    // must run before the syllabus tab could possibly be rendered.
+    migrateSyllabusChapterRenames();
 
     // History date picker: default to today, cap at today.
     let historyPicker = document.getElementById("history-picker");
