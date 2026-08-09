@@ -11,6 +11,7 @@ let activeMistakeSubject = "Physics";       // View-tab subject filter
 let addFormSubject = "Physics";             // Add-form subject picker
 let addFormChapter = null;                  // Add-form chapter picker
 let expandedMistakeChapters = {};
+let editingMistakeChapters = {};           // View tab: which expanded chapters are in edit mode (default = read-only)
 let mistakeSearchQuery = "";
 let mistakeSortMode = "most";               // most | least | new | old
 // Cache of key -> entry, refreshed at the start of every render so the
@@ -109,6 +110,17 @@ export async function saveAddMistake() {
 async function doToggleExpand(subject, chapter) {
     let key = keyFor(subject, chapter);
     expandedMistakeChapters[key] = !expandedMistakeChapters[key];
+    if (!expandedMistakeChapters[key]) editingMistakeChapters[key] = false; // reset to read-only when collapsed
+    renderMistakesTracker();
+}
+
+// Pencil ⇄ Save toggle inside an expanded chapter's detail panel: View
+// Mistakes stays read-only by default (matches the mock-test entry look);
+// clicking the pencil switches that one chapter into the editable form,
+// clicking the save icon switches it back to the read-only view.
+async function doToggleEditMode(subject, chapter) {
+    let key = keyFor(subject, chapter);
+    editingMistakeChapters[key] = !editingMistakeChapters[key];
     renderMistakesTracker();
 }
 
@@ -224,6 +236,12 @@ function wireDelegationOnce() {
             doDeleteChapterLog(card.dataset.subject, card.dataset.chapter);
             return;
         }
+        let editToggleBtn = e.target.closest("[data-mc-edit-toggle]");
+        if (editToggleBtn) {
+            let card = editToggleBtn.closest(".mistake-chapter-card");
+            doToggleEditMode(card.dataset.subject, card.dataset.chapter);
+            return;
+        }
         // The expandable detail panel sits alongside (not inside) mc-top in
         // the DOM, so clicks inside it never bubble into mc-top's handler —
         // this guard just keeps that true if the markup nesting ever changes.
@@ -328,6 +346,7 @@ function renderViewList() {
         }
         let key = keyFor(activeMistakeSubject, ch);
         let isExpanded = !!expandedMistakeChapters[key];
+        let isEditing = isExpanded && !!editingMistakeChapters[key];
         let attachedElsewhere = entry.hasFiles && (!entry.files || entry.files.length === 0);
 
         html += `<div class="mistake-chapter-card ${isExpanded ? 'expanded' : ''}" data-subject="${escapeHtml(activeMistakeSubject)}" data-chapter="${escapeHtml(ch)}">
@@ -336,9 +355,29 @@ function renderViewList() {
                 <span class="mc-badge" style="color:var(--danger); border-color:var(--danger);">${entry.count || 0}</span>
             </div>`;
 
-        if (isExpanded) {
+        if (isExpanded && !isEditing) {
+            // ----- READ-ONLY VIEW (default) -----
             html += `<div class="mc-detail">
-                <label style="font-size:12px; color:var(--muted);">Mistakes made</label>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                    <span style="font-size:12px; color:var(--muted);">Mistakes made: <strong style="color:var(--danger); font-size:14px;">${entry.count || 0}</strong></span>
+                    <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Edit this chapter's log">✏️</button>
+                </div>
+                <div class="mc-notes-view">${entry.notes ? escapeHtml(entry.notes) : '<span style="color:var(--muted);">No notes yet.</span>'}</div>
+                ${((entry.files && entry.files.length) || attachedElsewhere) ? `<div class="mc-file-list">
+                    ${(entry.files || []).map(f => f.type.startsWith('image/')
+                        ? `<span class="mc-file-chip"><img src="${f.dataUrl}"></span>`
+                        : `<span class="mc-file-chip mc-file-pdf"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}">📄 ${escapeHtml(f.name)}</a></span>`
+                    ).join('')}
+                    ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}
+                </div>` : ''}
+            </div>`;
+        } else if (isEditing) {
+            // ----- EDITABLE FORM (entered via the pencil icon) -----
+            html += `<div class="mc-detail">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                    <label style="font-size:12px; color:var(--muted); margin:0;">Mistakes made</label>
+                    <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Done editing">💾</button>
+                </div>
                 <input type="number" min="0" step="1" class="mc-count-input" value="${entry.count || 0}">
                 <label style="font-size:12px; color:var(--muted);">Notes</label>
                 <textarea class="mc-notes" placeholder="What went wrong, how to fix it...">${escapeHtml(entry.notes || "")}</textarea>
@@ -352,7 +391,7 @@ function renderViewList() {
                         ? `<span class="mc-file-chip"><img src="${f.dataUrl}"><button type="button" data-mc-remove-file="${i}">✕</button></span>`
                         : `<span class="mc-file-chip mc-file-pdf"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}">📄 ${escapeHtml(f.name)}</a><button type="button" data-mc-remove-file="${i}">✕</button></span>`
                     ).join('')}
-                    ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 Attached on another browser</span>` : ''}
+                    ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}
                 </div>
                 <button type="button" class="btn btn-stop btn-small" style="margin-top:8px;" data-mc-delete-log>Clear this chapter's log</button>
             </div>`;

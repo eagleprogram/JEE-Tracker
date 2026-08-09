@@ -85,9 +85,9 @@ export function renderPlannerCalendar() {
 
 export function openPlannerModal(key) {
     plannerActiveDateKey = key; let [y, m, d] = key.split('-'); document.getElementById("planner-modal-title").innerText = `Tasks — ${d}/${m}/${y}`;
-    let input = document.getElementById("planner-task-input"); let addBtn = document.getElementById("planner-add-btn"); let note = document.getElementById("planner-past-note"); let isPast = key < getTodayKey();
+    let input = document.getElementById("planner-task-input"); let addBtn = document.getElementById("planner-add-btn"); let isPast = key < getTodayKey();
     let prioritySel = document.getElementById("planner-priority-select");
-    input.value = ""; input.disabled = isPast; addBtn.disabled = isPast; addBtn.style.opacity = isPast ? "0.4" : "1"; input.placeholder = isPast ? "Cannot add tasks for a past date" : "Add task for this day..."; note.style.display = isPast ? "block" : "none";
+    input.value = ""; input.disabled = isPast; addBtn.disabled = isPast; addBtn.style.opacity = isPast ? "0.4" : "1"; input.placeholder = isPast ? "Cannot add tasks for a past date" : "Add task for this day...";
     if (prioritySel) prioritySel.disabled = isPast;
     renderPlannerTasks(); document.getElementById("planner-modal").style.display = "flex";
 }

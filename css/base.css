@@ -128,6 +128,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
     display: none;
     flex-direction: column;
     gap: 15px;
+    padding-bottom: 24px;
 }
 
 /* ===== Main content ===== */
