@@ -25,8 +25,32 @@ export function renderMistakeSummary(entries) {
     let counts = {};
     entries.forEach(e => (e.mistakeTags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
     let tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    if (tags.length === 0) { summaryEl.innerHTML = ""; return; }
-    summaryEl.innerHTML = `<div class="small-note" style="margin-bottom:2px;">Mistake pattern frequency:</div><div class="mistake-summary">${tags.map(t => `<span class="ms-pill">${escapeHtml(t)}: ${counts[t]}</span>`).join('')}</div>`;
+    if (tags.length === 0) { summaryEl.innerHTML = `<span class="small-note">No mistake tags logged yet.</span>`; return; }
+    summaryEl.innerHTML = tags.map(t => `<span class="ms-pill">${escapeHtml(t)}: ${counts[t]}</span>`).join('');
+}
+
+// Score % used by the score-based sort options. Every saved entry always
+// has a valid numeric score/maxScore (enforced in addMockTestEntry), so no
+// null-handling needed here.
+function scorePct(e) {
+    let s = parseFloat(e.score), m = parseFloat(e.maxScore);
+    return (m > 0) ? (s / m) * 100 : 0;
+}
+
+function sortMockEntries(entries, mode) {
+    let arr = entries.slice();
+    switch (mode) {
+        case "added-asc": arr.sort((a, b) => a.id - b.id); break;
+        case "date-desc": arr.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id); break;
+        case "date-asc": arr.sort((a, b) => a.date.localeCompare(b.date) || b.id - a.id); break;
+        case "score-desc": arr.sort((a, b) => scorePct(b) - scorePct(a)); break;
+        case "score-asc": arr.sort((a, b) => scorePct(a) - scorePct(b)); break;
+        case "mistakes-desc": arr.sort((a, b) => (b.mistakeTags || []).length - (a.mistakeTags || []).length); break;
+        case "mistakes-asc": arr.sort((a, b) => (a.mistakeTags || []).length - (b.mistakeTags || []).length); break;
+        case "added-desc":
+        default: arr.sort((a, b) => b.id - a.id); break;
+    }
+    return arr;
 }
 
 export async function addMockTestEntry() {
@@ -108,8 +132,11 @@ export async function renderMockTestList() {
     document.getElementById("mock-avg-score").innerText = count > 0 ? Math.round(avg/count) + "%" : "0%";
     document.getElementById("mock-total-count").innerText = entries.length;
 
+    let sortSelect = document.getElementById("mock-sort-select");
+    let sortedEntries = sortMockEntries(entries, sortSelect ? sortSelect.value : "added-desc");
+
     let html = "";
-    entries.forEach(e => {
+    sortedEntries.forEach(e => {
         let attachedElsewhere = e.hasFiles && (!e.files || e.files.length === 0);
         html += `<div class="mock-entry"><div class="mock-top"><div><strong>${escapeHtml(e.subject)}</strong><div class="small-note" style="margin:0;">${formatDateDDMMYYYY(e.date)}</div></div><div style="display:flex; align-items:center; gap:8px;"><span class="mock-score">${e.score || '—'}${e.maxScore ? ' / ' + e.maxScore : ''}</span><button class="del" onclick="deleteMockTestEntry(${e.id})">✕</button></div></div>${e.notes ? `<div style="font-size:13px; margin-top:8px; white-space:pre-wrap;">${escapeHtml(e.notes)}</div>` : ''}${(e.mistakeTags && e.mistakeTags.length) ? `<div class="entry-tags">${e.mistakeTags.map(t => `<span>${escapeHtml(t)}</span>`).join('')}</div>` : ''}<div class="mock-files">${(e.files||[]).map((f, i) => f.type.startsWith('image/') ? `<img src="${f.dataUrl}" onclick="viewMockFile(${e.id},${i})">` : `<a class="pdf-chip" href="${f.dataUrl}" download="${f.name}">📄 ${escapeHtml(f.name)}</a>`).join('')}${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 Attached on another browser</span>` : ''}</div></div>`;
     });
