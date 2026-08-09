@@ -25,6 +25,16 @@ let cloudUnsubscribe = null;
 
 export function getCurrentUser() { return currentUser; }
 
+// Redeems a toast message that was queued right before a location.reload()
+// (see autoLoadCloudDataIfNeeded and startCloudListener) — called once from
+// main.js's initApp() so it's shown after the page has actually repainted,
+// instead of being lost in the reload that immediately followed the
+// original showToast() call.
+export function showPendingToastIfAny() {
+    let msg = getRawFlag("jee_pending_toast");
+    if (msg) { showToast(msg); clearRawFlag("jee_pending_toast"); }
+}
+
 export function firebaseConfigured() { return !FIREBASE_CONFIG.apiKey.includes("PASTE_"); }
 
 export function initFirebaseIfNeeded() {
@@ -82,7 +92,7 @@ export async function pushToCloud(silent = false) {
         // once a user has logged a handful of tests with photos. The mock
         // test entries themselves (subject, score, notes, mistake tags) DO
         // sync — only each entry's `files` array is stripped before upload.
-        let mockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) }));
+        let mockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
         let docRef = fbDb.collection("users").doc(currentUser.uid);
         await docRef.set({
             studyDB: getDB(),
@@ -125,9 +135,12 @@ export async function pushToCloud(silent = false) {
 
 // Cloud mock-test entries never carry `files` (stripped before upload — see
 // pushToCloud). Never clear() the store or overwrite an existing local
-// entry: either would destroy locally-attached mock-test images/PDFs, or
-// wipe out a brand-new local entry the cloud snapshot predates. Only add
-// entries that don't already exist locally.
+// entry's real fields: either would destroy locally-attached mock-test
+// images/PDFs, or wipe out a brand-new local entry the cloud snapshot
+// predates. New entries are added as-is; for an entry that already exists
+// locally, the only thing ever touched is upgrading hasFiles false->true —
+// every other field, and `files` itself, is left exactly as this browser
+// already has it.
 async function restoreMockTests(entries) {
     if (!Array.isArray(entries)) return;
     let db = await openMockDB();
@@ -139,7 +152,11 @@ async function restoreMockTests(entries) {
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => resolve(undefined);
         });
-        if (!existing) store.put({ ...e, files: [] });
+        if (!existing) {
+            store.put({ ...e, files: [] });
+        } else if (e.hasFiles && !existing.hasFiles) {
+            store.put({ ...existing, hasFiles: true });
+        }
     }
     await new Promise((resolve) => { tx.oncomplete = resolve; tx.onerror = resolve; });
 }
@@ -197,7 +214,14 @@ async function autoLoadCloudDataIfNeeded() {
         }
         await applyCloudData(data);
         setRawFlag("jee_last_sync", (data.updatedAt || Date.now()).toString());
-        showToast("Loaded your data from the cloud.");
+        // BUG FIX: showToast() immediately followed by location.reload() never
+        // actually appears — the toast <div> is appended to the DOM but the
+        // reload wipes everything before the browser paints that frame, so
+        // it's created and destroyed without ever being visible. Persisting
+        // the message and showing it after the reload (via
+        // showPendingToastIfAny(), called from main.js on init) guarantees
+        // it's actually seen.
+        setRawFlag("jee_pending_toast", "Loaded your data from the cloud.");
         location.reload();
     } catch (e) {
         console.log("Auto-load from cloud failed:", e.message);
@@ -241,7 +265,8 @@ function startCloudListener() {
         if (!confirm("New data was saved to the cloud from another device. Load it here now? This will replace local data on this device.")) return;
         await applyCloudData(data);
         setRawFlag("jee_last_sync", remoteUpdatedAt.toString());
-        showToast("Synced from another device.");
+        // Same reason as autoLoadCloudDataIfNeeded above — see that comment.
+        setRawFlag("jee_pending_toast", "Synced from another device.");
         location.reload();
     }, (err) => {
         console.log("Cloud listener error:", err.message);
