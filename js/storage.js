@@ -104,13 +104,20 @@ export const YT_HISTORY_MAX_ENTRIES = YT_HISTORY_MAX;
 // forces onupgradeneeded to run once more; the existing
 // `if (!contains(MOCK_STORE))` guard then creates the missing store without
 // touching any data that *was* already there.
-const MOCK_DB_VERSION = 2;
+// Bumped 2 -> 3 to add the "mistakes" store (per-chapter mistake counter,
+// notes, and attachments) alongside the existing mock-test store. Same
+// database as mock tests — one IndexedDB connection covers both, and
+// onupgradeneeded's per-store `if (!contains(...))` guards mean this never
+// touches data already in the "tests" store.
+export const MISTAKE_STORE = "mistakes";
+const MOCK_DB_VERSION = 3;
 export function openMockDB() {
     return new Promise((resolve, reject) => {
         let req = indexedDB.open(MOCK_DB_NAME, MOCK_DB_VERSION);
         req.onupgradeneeded = (e) => {
             let db = e.target.result;
             if (!db.objectStoreNames.contains(MOCK_STORE)) db.createObjectStore(MOCK_STORE, { keyPath: "id" });
+            if (!db.objectStoreNames.contains(MISTAKE_STORE)) db.createObjectStore(MISTAKE_STORE, { keyPath: "key" });
         };
         req.onsuccess = (e) => resolve(e.target.result);
         req.onerror = (e) => reject(e.target.error);
@@ -122,6 +129,36 @@ export function getAllMockTests() {
         let tx = db.transaction(MOCK_STORE, "readonly");
         let req = tx.objectStore(MOCK_STORE).getAll();
         req.onsuccess = () => resolve(req.result.sort((a,b) => b.id - a.id));
+        req.onerror = () => reject(req.error);
+    }));
+}
+
+// ----------------- MISTAKES (per syllabus chapter, IndexedDB) -----------------
+// One record per "Subject|Chapter" key — the same key format syllabus.js
+// uses for its progress object, so the chapter list can be shared.
+export function getMistakeEntry(key) {
+    return openMockDB().then(db => new Promise((resolve, reject) => {
+        let tx = db.transaction(MISTAKE_STORE, "readonly");
+        let req = tx.objectStore(MISTAKE_STORE).get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+    }));
+}
+
+export function saveMistakeEntry(entry) {
+    return openMockDB().then(db => new Promise((resolve, reject) => {
+        let tx = db.transaction(MISTAKE_STORE, "readwrite");
+        tx.objectStore(MISTAKE_STORE).put(entry);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    }));
+}
+
+export function getAllMistakeChapters() {
+    return openMockDB().then(db => new Promise((resolve, reject) => {
+        let tx = db.transaction(MISTAKE_STORE, "readonly");
+        let req = tx.objectStore(MISTAKE_STORE).getAll();
+        req.onsuccess = () => resolve(req.result || []);
         req.onerror = () => reject(req.error);
     }));
 }

@@ -10,6 +10,7 @@ import { renderGarden } from './charts.js';
 import { runNotificationChecks } from './notifications.js';
 import { renderMockTestList } from './mocktest.js';
 import { renderSyllabusTracker } from './syllabus.js';
+import { renderMistakesTracker } from './mistakes.js';
 
 // ----------------- TOASTS -----------------
 export function showToast(msg) {
@@ -31,9 +32,11 @@ export function closeSidebar() {
     document.getElementById("panel-planner").style.display = "none";
     document.getElementById("panel-mocktest").style.display = "none";
     document.getElementById("panel-syllabus").style.display = "none";
+    document.getElementById("panel-mistakes").style.display = "none";
     document.getElementById("rail-planner-btn").classList.remove("active");
     document.getElementById("rail-mocktest-btn").classList.remove("active");
     document.getElementById("rail-syllabus-btn").classList.remove("active");
+    document.getElementById("rail-mistakes-btn").classList.remove("active");
     activeSidebarPanel = null;
 }
 
@@ -46,19 +49,24 @@ export function openSidebarPanel(name) {
     let planner = document.getElementById("panel-planner");
     let mocktest = document.getElementById("panel-mocktest");
     let syllabus = document.getElementById("panel-syllabus");
+    let mistakes = document.getElementById("panel-mistakes");
     let plannerBtn = document.getElementById("rail-planner-btn");
     let mocktestBtn = document.getElementById("rail-mocktest-btn");
     let syllabusBtn = document.getElementById("rail-syllabus-btn");
+    let mistakesBtn = document.getElementById("rail-mistakes-btn");
     if (activeSidebarPanel === name) { closeSidebar(); return; }
     sidebar.classList.add("expanded"); document.body.classList.add("panel-open"); activeSidebarPanel = name;
     planner.style.display = (name === "planner") ? "flex" : "none";
     mocktest.style.display = (name === "mocktest") ? "flex" : "none";
     syllabus.style.display = (name === "syllabus") ? "flex" : "none";
+    mistakes.style.display = (name === "mistakes") ? "flex" : "none";
     plannerBtn.classList.toggle("active", name === "planner");
     mocktestBtn.classList.toggle("active", name === "mocktest");
     syllabusBtn.classList.toggle("active", name === "syllabus");
+    mistakesBtn.classList.toggle("active", name === "mistakes");
     if (name === "mocktest") renderMockTestList();
     if (name === "syllabus") renderSyllabusTracker();
+    if (name === "mistakes") renderMistakesTracker();
 }
 
 // ----------------- DAY ROLLOVER -----------------

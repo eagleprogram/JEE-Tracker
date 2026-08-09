@@ -4,6 +4,24 @@ import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending } from './
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast } from './ui.js';
 
+// A "pending" entry now has a `type` field — 'sleep' (bedtime logged, wake
+// still to come — the original flow) or 'wake' (wake time logged first,
+// e.g. first time opening the app after waking up, bedtime still to come).
+// Pending objects saved before this change have no `type` — always treated
+// as 'sleep', since that was the only kind that used to exist.
+function pendingType(pending) { return pending ? (pending.type || 'sleep') : null; }
+
+function expectedWakeDateFor(sleepDate, sleepTime) {
+    let [sh] = sleepTime.split(':').map(Number);
+    let isPM = sh >= 12;
+    if (isPM) {
+        let d = new Date(sleepDate + "T00:00:00");
+        d.setDate(d.getDate() + 1);
+        return dateKeyFromWall(d.getTime());
+    }
+    return sleepDate;
+}
+
 // Save today's complete sleep log (wake and sleep times)
 export function saveSleepLog() {
     let wakeVal = document.getElementById("wake-time-input").value;
@@ -12,24 +30,69 @@ export function saveSleepLog() {
         showToast("Please enter at least one time.");
         return;
     }
+    // Real-life rule: you only ever log a wake time for the morning you
+    // actually woke up in — so the wake field is AM-only (00:00–11:59).
+    if (wakeVal) {
+        let [wh] = wakeVal.split(':').map(Number);
+        if (wh >= 12) {
+            showToast("⚠️ Wake time must be in the AM (before noon).");
+            return;
+        }
+    }
+
     let today = getTodayKey();
     let log = getSleepLog();
     let pending = getSleepPending();
+    let pType = pendingType(pending);
 
-    // CASE 1: Only Sleep time provided (Creates a pending entry)
+    // CASE 1: Only Sleep time provided.
     if (sleepVal && !wakeVal) {
-        let [sh] = sleepVal.split(':').map(Number);
-        let isPM = sh >= 12;
-        let sleepDate = today;
-        let expectedWakeDate;
-        if (isPM) {
-            let d = new Date(today + "T00:00:00");
-            d.setDate(d.getDate() + 1);
-            expectedWakeDate = dateKeyFromWall(d.getTime());
-        } else {
-            expectedWakeDate = today;
+        // 1a: A wake time is already pending (user opened the app right
+        // after waking, logged the wake time alone, and is now filling in
+        // last night's/this morning's bedtime to complete it).
+        if (pending && pType === 'wake') {
+            let [sh] = sleepVal.split(':').map(Number);
+            let isPM = sh >= 12;
+            // PM bedtime → the night before the pending wake date.
+            // AM bedtime → same calendar day as the pending wake (e.g. fell
+            // asleep at 3 AM, woke at 7 AM the same morning).
+            let sleepDate;
+            if (isPM) {
+                let d = new Date(pending.date + "T00:00:00");
+                d.setDate(d.getDate() - 1);
+                sleepDate = dateKeyFromWall(d.getTime());
+            } else {
+                sleepDate = pending.date;
+            }
+            let sleepDateTime = new Date(sleepDate + "T" + sleepVal + ":00");
+            let wakeDateTime = new Date(pending.date + "T" + pending.time + ":00");
+            let diffMin = Math.round((wakeDateTime - sleepDateTime) / 60000);
+
+            if (diffMin <= 0 || diffMin > 20 * 60) {
+                showToast("⚠️ These times don't make sense together — can't go backward or sleep more than 20 hours. Please check.");
+                return;
+            }
+
+            log[pending.date] = {
+                sleepDate, sleepTime: sleepVal,
+                wakeDate: pending.date, wakeTime: pending.time,
+                durationMin: diffMin
+            };
+            writeSleepLog(log);
+            setSleepPending(null);
+            showToast("Sleep log completed!");
+            document.getElementById("wake-time-input").value = "";
+            document.getElementById("sleep-time-input").value = "";
+            renderSleepLog();
+            renderSleepPendingBanner();
+            return;
         }
-        setSleepPending({ date: sleepDate, time: sleepVal, expectedWakeDate });
+
+        // 1b: No wake pending — start a fresh pending sleep, exactly as
+        // before.
+        let sleepDate = today;
+        let expectedWakeDate = expectedWakeDateFor(sleepDate, sleepVal);
+        setSleepPending({ type: 'sleep', date: sleepDate, time: sleepVal, expectedWakeDate });
         document.getElementById("wake-time-input").value = "";
         document.getElementById("sleep-time-input").value = "";
         renderSleepLog();
@@ -38,24 +101,15 @@ export function saveSleepLog() {
         return;
     }
 
-    // CASE 2: Only Wake time provided (Completes a pending sleep)
+    // CASE 2: Only Wake time provided.
     if (wakeVal && !sleepVal) {
-        if (pending) {
-            // Safety: fallback if old pending entry lacks expectedWakeDate
-            if (!pending.expectedWakeDate) {
-                let [sh] = pending.time.split(':').map(Number);
-                let isPM = sh >= 12;
-                if (isPM) {
-                    let d = new Date(today + "T00:00:00");
-                    d.setDate(d.getDate() + 1);
-                    pending.expectedWakeDate = dateKeyFromWall(d.getTime());
-                } else {
-                    pending.expectedWakeDate = today;
-                }
-            }
+        // 2a: A sleep time is already pending — this is the original
+        // "complete the pending bedtime" flow.
+        if (pending && pType === 'sleep') {
+            let expectedWakeDate = pending.expectedWakeDate || expectedWakeDateFor(pending.date, pending.time);
 
             let sleepDateTime = new Date(pending.date + "T" + pending.time + ":00");
-            let wakeDateTime  = new Date(pending.expectedWakeDate + "T" + wakeVal + ":00");
+            let wakeDateTime = new Date(expectedWakeDate + "T" + wakeVal + ":00");
             let diffMin = Math.round((wakeDateTime - sleepDateTime) / 60000);
 
             if (diffMin <= 0 || diffMin > 20 * 60) {
@@ -63,10 +117,10 @@ export function saveSleepLog() {
                 return;
             }
 
-            log[pending.expectedWakeDate] = {
+            log[expectedWakeDate] = {
                 sleepDate: pending.date,
                 sleepTime: pending.time,
-                wakeDate: pending.expectedWakeDate,
+                wakeDate: expectedWakeDate,
                 wakeTime: wakeVal,
                 durationMin: diffMin
             };
@@ -74,10 +128,13 @@ export function saveSleepLog() {
             setSleepPending(null);
             showToast("Sleep log completed!");
         } else {
-            // No pending log found — logging a wake time alone without a
-            // matching pending sleep time causes impossible dates.
-            showToast("⚠️ No pending sleep log found. Please enter both Sleep and Wake times together.");
-            return;
+            // 2b: Nothing pending, or a wake time is already pending —
+            // treat this as a brand-new "I just woke up" log, waiting for
+            // the bedtime to be filled in later. This is the realistic
+            // first-time-opening-the-app case: there's no prior sleep entry
+            // to attach to yet.
+            setSleepPending({ type: 'wake', date: today, time: wakeVal });
+            showToast("Wake time logged — log your bedtime to complete it.");
         }
         document.getElementById("wake-time-input").value = "";
         document.getElementById("sleep-time-input").value = "";
@@ -91,9 +148,9 @@ export function saveSleepLog() {
         let [sh, sm] = sleepVal.split(':').map(Number);
         let [wh, wm] = wakeVal.split(':').map(Number);
         let sleepMin = sh * 60 + sm;
-        let wakeMin  = wh * 60 + wm;
+        let wakeMin = wh * 60 + wm;
         let sleepDate = today;
-        let wakeDate  = today;
+        let wakeDate = today;
         let durationMin;
 
         let isPM = sh >= 12; // Night/afternoon sleep
@@ -124,23 +181,27 @@ export function saveSleepLog() {
     }
 }
 
-// Shows a small banner with a ✕ button whenever a sleep time has been
-// logged but the matching wake time hasn't come in yet, so a wrong entry
-// can be cancelled immediately instead of only being fixable from History.
+// Shows a small banner with a ✕ button whenever a sleep or wake time has
+// been logged but its counterpart hasn't come in yet, so a wrong entry can
+// be cancelled immediately instead of only being fixable from History.
 export function renderSleepPendingBanner() {
     let banner = document.getElementById("sleep-pending-banner");
     if (!banner) return;
     let pending = getSleepPending();
     if (!pending) { banner.style.display = "none"; banner.innerHTML = ""; return; }
     banner.style.display = "flex";
-    banner.innerHTML = `<span>⏳ Pending: slept ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYYYY(pending.date)} — waiting for wake time.</span><button onclick="cancelPendingSleepLog()" title="Cancel this pending sleep log" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0;">✕</button>`;
+    let pType = pendingType(pending);
+    let text = (pType === 'wake')
+        ? `⏳ Pending: woke at ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYYYY(pending.date)} — waiting for your bedtime.`
+        : `⏳ Pending: slept ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYYYY(pending.date)} — waiting for wake time.`;
+    banner.innerHTML = `<span>${text}</span><button onclick="cancelPendingSleepLog()" title="Cancel this pending log" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0;">✕</button>`;
 }
 
 export function cancelPendingSleepLog() {
-    if (!confirm("Cancel this pending sleep log entry?")) return;
+    if (!confirm("Cancel this pending log entry?")) return;
     setSleepPending(null);
     renderSleepPendingBanner();
-    showToast("Pending sleep log cancelled.");
+    showToast("Pending log cancelled.");
 }
 
 // Render today's log status (simple update of history if open)
@@ -164,7 +225,6 @@ export function renderSleepHistory() {
     let log = getSleepLog();
     let pending = getSleepPending();
     let wakeDates = Object.keys(log).sort().reverse();
-    let today = getTodayKey(); // Required for fallback calculations
 
     if (wakeDates.length === 0 && !pending) { cont.innerHTML = "<div class='yt-history-empty'>No sleep logs yet.</div>"; return; }
 
@@ -173,23 +233,12 @@ export function renderSleepHistory() {
     </div>`;
 
     if (pending) {
-        let expectedWakeDate = pending.expectedWakeDate || pending.date;
-        if (!pending.expectedWakeDate) {
-            let [sh] = pending.time.split(':').map(Number);
-            let isPM = sh >= 12;
-            if (isPM) {
-                let d = new Date(today + "T00:00:00");
-                d.setDate(d.getDate() + 1);
-                expectedWakeDate = dateKeyFromWall(d.getTime());
-            } else {
-                expectedWakeDate = today;
-            }
-        }
+        let pType = pendingType(pending);
+        let label = (pType === 'wake')
+            ? `-- --:-- → ${formatDateDDMMYYYY(pending.date)} ${formatTime12Hour(pending.time)}`
+            : `${formatDateDDMMYYYY(pending.date)} ${formatTime12Hour(pending.time)} → -- --:--`;
         html += `<div style="display:grid; grid-template-columns: 1fr auto 28px; gap:8px; padding:6px 4px; align-items:center; font-size:12px; color:var(--warning);">
-            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                ${formatDateDDMMYYYY(pending.date)} ${formatTime12Hour(pending.time)}
-                → ${formatDateDDMMYYYY(expectedWakeDate)} --:--
-            </span>
+            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span>
             <span style="white-space:nowrap;">—</span>
             <span></span>
         </div>`;

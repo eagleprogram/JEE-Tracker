@@ -40,6 +40,10 @@
             <span class="menu-icon">📚</span>
             <span class="menu-label">Syllabus</span>
         </button>
+        <button class="menu-btn" id="rail-mistakes-btn" onclick="openSidebarPanel('mistakes')" title="Mistakes Tracker">
+            <span class="menu-icon">❗</span>
+            <span class="menu-label">Mistakes</span>
+        </button>
     </div>
 
     <div class="sidebar-content" id="panel-planner">
@@ -272,6 +276,14 @@
         <div class="syllabus-subject-tabs" id="syllabus-subject-tabs"></div>
         <div class="syllabus-overall" id="syllabus-overall"></div>
         <div id="syllabus-chapter-list"></div>
+    </div>
+
+    <div class="sidebar-content" id="panel-mistakes">
+        <h3 style="margin:0; color:var(--primary);">❗ Mistakes Tracker</h3>
+        <div class="small-note">Log how many mistakes you've made in each syllabus chapter, with optional notes and attachments.</div>
+        <div class="syllabus-subject-tabs" id="mistake-subject-tabs"></div>
+        <div class="syllabus-overall" id="mistake-overall"></div>
+        <div id="mistake-chapter-list"></div>
     </div>
 </div>
 

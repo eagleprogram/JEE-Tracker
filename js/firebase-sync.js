@@ -1,4 +1,4 @@
-import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE } from './storage.js';
+import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry } from './storage.js';
 import { getTodayKey } from './utils.js';
 // Forward reference — ui.js lands alongside this file in Step 7. Only used
 // inside function bodies, safe against the circular module graph (both
@@ -93,6 +93,10 @@ export async function pushToCloud(silent = false) {
         // test entries themselves (subject, score, notes, mistake tags) DO
         // sync — only each entry's `files` array is stripped before upload.
         let mockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
+        // Same file-stripping approach as mock tests: the mistake counter,
+        // notes, and hasFiles flag sync — the actual attachment bytes don't
+        // (keeps documents under Firestore's 1MiB limit).
+        let mistakeChapters = (await getAllMistakeChapters()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
         let docRef = fbDb.collection("users").doc(currentUser.uid);
         await docRef.set({
             studyDB: getDB(),
@@ -105,6 +109,7 @@ export async function pushToCloud(silent = false) {
             examYear: getExamYear(),
             ytLastLink: getRawFlag("jee_yt_last_link") || "",
             mockTests,
+            mistakeChapters,
             updatedAt: now
         });
         // Verify the write actually landed on the server (force a real
@@ -161,6 +166,30 @@ async function restoreMockTests(entries) {
     await new Promise((resolve) => { tx.oncomplete = resolve; tx.onerror = resolve; });
 }
 
+// Unlike mock tests (add-only, never overwrite an existing entry — see
+// restoreMockTests above), mistake counts/notes are meant to be edited
+// repeatedly across devices, so the cloud's metadata is applied on top of
+// whatever's local. The one thing that's NEVER taken from the cloud is
+// `files` — cloud entries never carry attachment bytes (see pushToCloud),
+// so blindly overwriting `files` with the cloud's copy would silently wipe
+// this browser's locally-attached images/PDFs. This browser's own files
+// array (or an empty one for a chapter it's never seen) is always kept.
+async function restoreMistakeChapters(chapters) {
+    if (!Array.isArray(chapters)) return;
+    for (const cloudEntry of chapters) {
+        let local = await getMistakeEntry(cloudEntry.key);
+        await saveMistakeEntry({
+            key: cloudEntry.key,
+            subject: cloudEntry.subject,
+            chapter: cloudEntry.chapter,
+            count: cloudEntry.count || 0,
+            notes: cloudEntry.notes || "",
+            hasFiles: !!cloudEntry.hasFiles,
+            files: (local && local.files) ? local.files : []
+        });
+    }
+}
+
 // Shared by pullFromCloud (explicit, user-initiated) and the real-time
 // listener below (automatic, from another device). Applies every synced
 // category to local storage.
@@ -175,12 +204,13 @@ async function applyCloudData(data) {
     if (data.examYear) setStoredExamYear(data.examYear);
     if (data.ytLastLink) setRawFlag("jee_yt_last_link", data.ytLastLink);
     await restoreMockTests(data.mockTests);
+    await restoreMistakeChapters(data.mistakeChapters);
 }
 
 export async function pullFromCloud() {
     if (!initFirebaseAuthIfNeeded()) return;
     if (!currentUser) { alert("Sign in first."); return; }
-    if (!confirm("This will REPLACE all study logs, planner tasks, sleep log, syllabus progress, notification settings, YouTube history, exam year, and mock test entries (scores & notes — not attached files) on THIS device with your saved cloud data. Continue?")) return;
+    if (!confirm("This will REPLACE all study logs, planner tasks, sleep log, syllabus progress, notification settings, YouTube history, exam year, mock test entries, and mistake-tracker entries (scores/counts & notes — not attached files) on THIS device with your saved cloud data. Continue?")) return;
     try {
         let doc = await fbDb.collection("users").doc(currentUser.uid).get();
         if (!doc.exists) { alert("No cloud data saved yet — tap Save to Cloud first."); return; }
