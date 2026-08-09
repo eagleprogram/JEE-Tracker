@@ -1,4 +1,10 @@
 import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry } from './storage.js';
+// mistakes.js switched each chapter's stored record from one flat
+// {count, notes, files} blob to an `entries` array (separately editable
+// mistake log entries). normalizeRecord() upgrades either shape (a record
+// synced from an older client may still be the old flat shape) into the
+// new one, so sync logic below never has to branch on which shape it got.
+import { normalizeRecord } from './mistakes.js';
 import { getTodayKey } from './utils.js';
 // Forward reference — ui.js lands alongside this file in Step 7. Only used
 // inside function bodies, safe against the circular module graph (both
@@ -93,10 +99,17 @@ export async function pushToCloud(silent = false) {
         // test entries themselves (subject, score, notes, mistake tags) DO
         // sync — only each entry's `files` array is stripped before upload.
         let mockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
-        // Same file-stripping approach as mock tests: the mistake counter,
+        // Same file-stripping approach as mock tests: each entry's counter,
         // notes, and hasFiles flag sync — the actual attachment bytes don't
-        // (keeps documents under Firestore's 1MiB limit).
-        let mistakeChapters = (await getAllMistakeChapters()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
+        // (keeps documents under Firestore's 1MiB limit). Each chapter can
+        // now hold several separately-logged entries (see mistakes.js).
+        let mistakeChapters = (await getAllMistakeChapters()).map(rec => {
+            let norm = normalizeRecord(rec) || { key: rec.key, subject: rec.subject, chapter: rec.chapter, entries: [], updatedAt: rec.updatedAt || 0 };
+            return {
+                key: norm.key, subject: norm.subject, chapter: norm.chapter, updatedAt: norm.updatedAt,
+                entries: (norm.entries || []).map(({ files, ...erest }) => ({ ...erest, hasFiles: !!(files && files.length > 0) || !!erest.hasFiles }))
+            };
+        });
         let docRef = fbDb.collection("users").doc(currentUser.uid);
         await docRef.set({
             studyDB: getDB(),
@@ -167,30 +180,47 @@ async function restoreMockTests(entries) {
 }
 
 // Unlike mock tests (add-only, never overwrite an existing entry — see
-// restoreMockTests above), mistake counts/notes are meant to be edited
-// repeatedly across devices, so the cloud's metadata is applied on top of
-// whatever's local. The one thing that's NEVER taken from the cloud is
-// `files` — cloud entries never carry attachment bytes (see pushToCloud),
-// so blindly overwriting `files` with the cloud's copy would silently wipe
-// this browser's locally-attached images/PDFs. This browser's own files
-// array (or an empty one for a chapter it's never seen) is always kept.
+// restoreMockTests above), mistake entries are meant to be edited
+// repeatedly across devices, so the cloud's metadata is merged onto
+// whatever's local, entry-by-entry (matched by each entry's id). The one
+// thing that's NEVER taken from the cloud is `files` — cloud entries never
+// carry attachment bytes (see pushToCloud), so blindly overwriting `files`
+// with the cloud's copy would silently wipe this browser's locally-attached
+// images/PDFs. Entries that only exist locally (created after the last
+// push, or never pushed) are kept rather than dropped.
 async function restoreMistakeChapters(chapters) {
     if (!Array.isArray(chapters)) return;
     for (const cloudEntry of chapters) {
-        let local = await getMistakeEntry(cloudEntry.key);
+        let cloudNorm = normalizeRecord(cloudEntry) || { entries: [] };
+        let localRaw = await getMistakeEntry(cloudEntry.key);
+        let localNorm = normalizeRecord(localRaw) || { entries: [] };
+        let localById = {};
+        (localNorm.entries || []).forEach(e => { localById[String(e.id)] = e; });
+
+        let mergedEntries = (cloudNorm.entries || []).map(ce => {
+            let le = localById[String(ce.id)];
+            return {
+                id: ce.id,
+                notes: ce.notes || "",
+                count: ce.count || 1,
+                hasFiles: !!ce.hasFiles,
+                files: (le && le.files) ? le.files : [],
+                createdAt: ce.createdAt || (le && le.createdAt) || Date.now()
+            };
+        });
+        let cloudIds = new Set(mergedEntries.map(e => String(e.id)));
+        (localNorm.entries || []).forEach(le => { if (!cloudIds.has(String(le.id))) mergedEntries.push(le); });
+
         await saveMistakeEntry({
             key: cloudEntry.key,
             subject: cloudEntry.subject,
             chapter: cloudEntry.chapter,
-            count: cloudEntry.count || 0,
-            notes: cloudEntry.notes || "",
-            hasFiles: !!cloudEntry.hasFiles,
-            files: (local && local.files) ? local.files : [],
+            entries: mergedEntries,
             // Keep whichever timestamp is newer so the View Mistakes
             // "newest/oldest" sort still reflects reality after a pull —
             // never blindly take the cloud's, since a chapter edited on
             // this device after the last push would otherwise look stale.
-            updatedAt: Math.max(cloudEntry.updatedAt || 0, (local && local.updatedAt) || 0)
+            updatedAt: Math.max(cloudEntry.updatedAt || 0, localNorm.updatedAt || 0)
         });
     }
 }

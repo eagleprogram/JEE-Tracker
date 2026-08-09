@@ -11,21 +11,57 @@ let activeMistakeSubject = "Physics";       // View-tab subject filter
 let addFormSubject = "Physics";             // Add-form subject picker
 let addFormChapter = null;                  // Add-form chapter picker
 let expandedMistakeChapters = {};
-let editingMistakeChapters = {};           // View tab: which expanded chapters are in edit mode (default = read-only)
+// View tab: which (chapter-key + entry-id) pairs are in edit mode (default
+// = read-only). Keyed per-entry now, not per-chapter, since each mistake
+// logged for a chapter is its own separately editable block.
+let editingEntries = {};
 let mistakeSearchQuery = "";
 let mistakeSortMode = "most";               // most | least | new | old
-// Cache of key -> entry, refreshed at the start of every render so the
-// synchronous HTML-building pass below doesn't need to be async itself.
+// Cache of chapter-key -> stored record, refreshed at the start of every
+// render so the synchronous HTML-building pass below doesn't need to be
+// async itself.
 let mistakeCache = {};
 let delegationWired = false;
 
 function keyFor(subject, chapter) { return subject + "|" + chapter; }
+function entryKey(chapterKey, entryId) { return chapterKey + "::" + entryId; }
 // DOM ids can't contain the characters chapter/subject names sometimes
 // have (spaces, parens, /, etc.) — build a safe id from the key.
 function safeId(key) { return "mistake-file-" + key.replace(/[^a-zA-Z0-9]/g, "_"); }
 
-function blankEntry(subject, chapter) {
-    return { key: keyFor(subject, chapter), subject, chapter, count: 0, notes: "", files: [], hasFiles: false, updatedAt: 0 };
+// A chapter's record now holds an ARRAY of separately-logged mistake
+// entries, each with its own notes/files/count, instead of one blob whose
+// notes were all concatenated together. blankRecord() is what a chapter
+// with nothing logged yet looks like.
+function blankRecord(subject, chapter) {
+    return { key: keyFor(subject, chapter), subject, chapter, entries: [], updatedAt: 0 };
+}
+
+// Older saved records (before this change) had a single flat
+// {count, notes, files, hasFiles, updatedAt} shape instead of an `entries`
+// array. Rather than try to split that one concatenated notes string back
+// into the original separate submissions (the boundaries aren't reliably
+// recoverable, and guessing wrong would scramble real data), everything
+// that chapter had logged so far is kept exactly as-is, as ONE entry. Any
+// *new* mistake logged for that chapter from now on becomes its own
+// separate entry alongside it.
+export function normalizeRecord(rec) {
+    if (!rec) return null;
+    if (Array.isArray(rec.entries)) return rec;
+    let hasLegacyData = (rec.count || 0) > 0 || (rec.notes && rec.notes.trim()) || (rec.files && rec.files.length);
+    let entries = hasLegacyData ? [{
+        id: "legacy",
+        notes: rec.notes || "",
+        files: rec.files || [],
+        hasFiles: !!rec.hasFiles,
+        count: rec.count || 1,
+        createdAt: rec.updatedAt || Date.now()
+    }] : [];
+    return { key: rec.key, subject: rec.subject, chapter: rec.chapter, entries, updatedAt: rec.updatedAt || 0 };
+}
+
+function totalCount(rec) {
+    return (rec.entries || []).reduce((sum, e) => sum + (e.count || 1), 0);
 }
 
 // ----------------- SUB-TAB SWITCH -----------------
@@ -70,134 +106,178 @@ export function onAddChapterChange() {
 
 export async function saveAddMistake() {
     if (!addFormChapter) { alert("Pick a chapter first."); return; }
-    let countInput = document.getElementById("mistake-add-count");
     let notesInput = document.getElementById("mistake-add-notes");
     let filesInput = document.getElementById("mistake-add-files");
 
-    let n = parseInt(countInput ? countInput.value : "1", 10);
-    if (isNaN(n) || n < 1) n = 1;
     let notes = notesInput ? notesInput.value.trim() : "";
     if (!notes) { alert("Notes are required — jot down what went wrong."); return; }
 
     let key = keyFor(addFormSubject, addFormChapter);
-    let entry = mistakeCache[key] || blankEntry(addFormSubject, addFormChapter);
-    entry.count = (entry.count || 0) + n;
-    let stamp = new Date().toLocaleString();
-    entry.notes = entry.notes ? `${entry.notes}\n[${stamp}] ${notes}` : `[${stamp}] ${notes}`;
+    let record = mistakeCache[key] || blankRecord(addFormSubject, addFormChapter);
+    let files = [];
     if (filesInput && filesInput.files && filesInput.files.length > 0) {
-        if (!entry.files) entry.files = [];
-        for (let f of filesInput.files) entry.files.push(await fileToDataURL(f));
-        entry.hasFiles = entry.files.length > 0;
+        for (let f of filesInput.files) files.push(await fileToDataURL(f));
     }
-    entry.updatedAt = Date.now();
-    await saveMistakeEntry(entry);
-    mistakeCache[key] = entry;
+    // Each "Log Mistake" is its own separate entry — the chapter's total
+    // (shown on the collapsed row) is just how many entries exist, summed
+    // by their individual counts. No manual count field to fill in.
+    record.entries.push({
+        id: Date.now(),
+        notes,
+        files,
+        hasFiles: files.length > 0,
+        count: 1,
+        createdAt: Date.now()
+    });
+    record.updatedAt = Date.now();
+    await saveMistakeEntry(record);
+    mistakeCache[key] = record;
 
-    if (countInput) countInput.value = "1";
     if (notesInput) notesInput.value = "";
     if (filesInput) filesInput.value = "";
     showToast(`Mistake logged for ${addFormChapter}.`);
     renderMistakesTracker();
 }
 
-// ----------------- VIEW LIST: per-chapter actions -----------------
-// All of these take the already-decoded subject/chapter strings straight
+// ----------------- VIEW LIST: per-entry actions -----------------
+// All of these take the already-decoded subject/chapter/entryId straight
 // from element.dataset (the browser decodes HTML-attribute entities for
 // us) — never reconstructed from a hand-escaped JS string literal, so
-// parens, slashes, commas, and quotes in chapter names ("Electromagnetic
+// parens, slashes, commas, and quotes in a chapter name ("Electromagnetic
 // Induction (EMI)", "Aldehydes/Ketones/Carboxylic Acids") can never break
 // the handler the way embedding them in onclick="...('...')" could.
 async function doToggleExpand(subject, chapter) {
     let key = keyFor(subject, chapter);
     expandedMistakeChapters[key] = !expandedMistakeChapters[key];
-    if (!expandedMistakeChapters[key]) editingMistakeChapters[key] = false; // reset to read-only when collapsed
+    if (!expandedMistakeChapters[key]) {
+        // Reset every entry in this chapter back to read-only when collapsed.
+        Object.keys(editingEntries).forEach(k => { if (k.startsWith(key + "::")) delete editingEntries[k]; });
+    }
     renderMistakesTracker();
 }
 
-// Pencil ⇄ Save toggle inside an expanded chapter's detail panel: View
-// Mistakes stays read-only by default (matches the mock-test entry look);
-// clicking the pencil switches that one chapter into the editable form,
-// clicking the save icon switches it back to the read-only view.
-async function doToggleEditMode(subject, chapter) {
-    let key = keyFor(subject, chapter);
-    editingMistakeChapters[key] = !editingMistakeChapters[key];
+function findEntry(record, entryId) {
+    return (record.entries || []).find(e => String(e.id) === String(entryId));
+}
+
+// Pencil ⇄ Save toggle inside one entry block: entries stay read-only by
+// default (matches the mock-test entry look); clicking the pencil switches
+// that one entry into an editable form, clicking the save icon switches it
+// back to read-only.
+async function doToggleEditMode(subject, chapter, entryId) {
+    let ek = entryKey(keyFor(subject, chapter), entryId);
+    editingEntries[ek] = !editingEntries[ek];
     renderMistakesTracker();
 }
 
-async function doUpdateCount(subject, chapter, value) {
+async function doUpdateEntryCount(subject, chapter, entryId, value) {
     let key = keyFor(subject, chapter);
-    let entry = mistakeCache[key] || blankEntry(subject, chapter);
+    let record = mistakeCache[key];
+    if (!record) return;
+    let entry = findEntry(record, entryId);
+    if (!entry) return;
     let n = parseInt(value, 10);
-    entry.count = (isNaN(n) || n < 0) ? 0 : n;
-    entry.updatedAt = Date.now();
-    await saveMistakeEntry(entry);
-    mistakeCache[key] = entry;
+    entry.count = (isNaN(n) || n < 1) ? 1 : n;
+    record.updatedAt = Date.now();
+    await saveMistakeEntry(record);
+    mistakeCache[key] = record;
     renderMistakesTracker();
 }
 
-async function doSaveNotes(subject, chapter, value) {
+async function doSaveEntryNotes(subject, chapter, entryId, value) {
     let key = keyFor(subject, chapter);
-    let entry = mistakeCache[key] || blankEntry(subject, chapter);
+    let record = mistakeCache[key];
+    if (!record) return;
+    let entry = findEntry(record, entryId);
+    if (!entry) return;
     entry.notes = value;
-    entry.updatedAt = Date.now();
-    await saveMistakeEntry(entry);
-    mistakeCache[key] = entry;
+    record.updatedAt = Date.now();
+    await saveMistakeEntry(record);
+    mistakeCache[key] = record;
     // No re-render needed — avoids yanking focus out of the textarea the
     // user is still typing in (change only fires when they leave it).
 }
 
-async function doAddFiles(subject, chapter) {
+async function doAddFilesToEntry(subject, chapter, entryId) {
     let key = keyFor(subject, chapter);
-    let input = document.getElementById(safeId(key));
+    let ek = entryKey(key, entryId);
+    let input = document.getElementById(safeId(ek));
     if (!input || !input.files || input.files.length === 0) return;
-    let entry = mistakeCache[key] || blankEntry(subject, chapter);
+    let record = mistakeCache[key];
+    if (!record) return;
+    let entry = findEntry(record, entryId);
+    if (!entry) return;
     if (!entry.files) entry.files = [];
     for (let f of input.files) entry.files.push(await fileToDataURL(f));
     entry.hasFiles = entry.files.length > 0;
-    entry.updatedAt = Date.now();
-    await saveMistakeEntry(entry);
-    mistakeCache[key] = entry;
+    record.updatedAt = Date.now();
+    await saveMistakeEntry(record);
+    mistakeCache[key] = record;
     input.value = "";
     showToast("Attachment added.");
     renderMistakesTracker();
 }
 
-async function doRemoveFile(subject, chapter, idx) {
+async function doRemoveFileFromEntry(subject, chapter, entryId, idx) {
     let key = keyFor(subject, chapter);
-    let entry = mistakeCache[key];
+    let record = mistakeCache[key];
+    if (!record) return;
+    let entry = findEntry(record, entryId);
     if (!entry) return;
     // Same cross-device guard as mock tests' deleteMockTestEntry(): if the
-    // cloud says this chapter has attachments but this browser's IndexedDB
+    // cloud says this entry has attachments but this browser's IndexedDB
     // doesn't actually hold them (attached on a different device — file
-    // bytes never sync, see firebase-sync.js), there is nothing local to
-    // remove, and clearing the entry's hasFiles flag here would make the
-    // next sync push silently erase the record of that attachment for the
-    // browser that actually has it.
+    // bytes never sync), there is nothing local to remove, and clearing
+    // the entry's hasFiles flag here would make the next sync push
+    // silently erase the record of that attachment for the browser that
+    // actually has it.
     if (entry.hasFiles && (!entry.files || entry.files.length === 0)) {
-        alert("This chapter has an attachment on a different browser/device (not this one). Remove it from the browser where the file actually is.");
+        alert("This entry has an attachment on a different browser/device (not this one). Remove it from the browser where the file actually is.");
         return;
     }
     if (!confirm("Remove this attachment?")) return;
     entry.files.splice(idx, 1);
     entry.hasFiles = entry.files.length > 0;
-    entry.updatedAt = Date.now();
-    await saveMistakeEntry(entry);
-    mistakeCache[key] = entry;
+    record.updatedAt = Date.now();
+    await saveMistakeEntry(record);
+    mistakeCache[key] = record;
+    renderMistakesTracker();
+}
+
+async function doDeleteEntry(subject, chapter, entryId) {
+    let key = keyFor(subject, chapter);
+    let record = mistakeCache[key];
+    if (!record) return;
+    let entry = findEntry(record, entryId);
+    if (!entry) return;
+    // Same guard as doRemoveFileFromEntry — never let a delete wipe an
+    // attachment that only exists on another browser/device.
+    if (entry.hasFiles && (!entry.files || entry.files.length === 0)) {
+        alert("This entry has an attachment on a different browser/device (not this one). Delete it from the browser where the file actually is.");
+        return;
+    }
+    if (!confirm("Delete this mistake entry?")) return;
+    record.entries = record.entries.filter(e => String(e.id) !== String(entryId));
+    record.updatedAt = Date.now();
+    await saveMistakeEntry(record);
+    mistakeCache[key] = record;
+    delete editingEntries[entryKey(key, entryId)];
     renderMistakesTracker();
 }
 
 async function doDeleteChapterLog(subject, chapter) {
     let key = keyFor(subject, chapter);
-    let entry = mistakeCache[key];
-    if (!entry) return;
-    // Same guard as doRemoveFile — never let a delete wipe an attachment
-    // that only exists on another browser/device.
-    if (entry.hasFiles && (!entry.files || entry.files.length === 0)) {
-        alert("This chapter has an attachment on a different browser/device (not this one). Delete it from the browser where the file actually is.");
+    let record = mistakeCache[key];
+    if (!record) return;
+    // Never let a bulk clear wipe an attachment that only exists on
+    // another browser/device — same guard as the per-entry delete.
+    let blockedByRemoteFile = (record.entries || []).some(e => e.hasFiles && (!e.files || e.files.length === 0));
+    if (blockedByRemoteFile) {
+        alert("One or more entries in this chapter have an attachment on a different browser/device (not this one). Delete those individually from the browser where the file actually is.");
         return;
     }
-    if (!confirm("Clear all mistakes logged for this chapter?")) return;
-    let cleared = blankEntry(subject, chapter);
+    if (!confirm("Clear ALL mistake entries logged for this chapter?")) return;
+    let cleared = blankRecord(subject, chapter);
     cleared.updatedAt = Date.now();
     await saveMistakeEntry(cleared);
     mistakeCache[key] = cleared;
@@ -220,14 +300,23 @@ function wireDelegationOnce() {
     panel.addEventListener("click", (e) => {
         let removeBtn = e.target.closest("[data-mc-remove-file]");
         if (removeBtn) {
+            let block = removeBtn.closest(".mc-entry-block");
             let card = removeBtn.closest(".mistake-chapter-card");
-            doRemoveFile(card.dataset.subject, card.dataset.chapter, parseInt(removeBtn.dataset.mcRemoveFile, 10));
+            doRemoveFileFromEntry(card.dataset.subject, card.dataset.chapter, block.dataset.entryId, parseInt(removeBtn.dataset.mcRemoveFile, 10));
             return;
         }
         let addBtn = e.target.closest("[data-mc-add-files]");
         if (addBtn) {
+            let block = addBtn.closest(".mc-entry-block");
             let card = addBtn.closest(".mistake-chapter-card");
-            doAddFiles(card.dataset.subject, card.dataset.chapter);
+            doAddFilesToEntry(card.dataset.subject, card.dataset.chapter, block.dataset.entryId);
+            return;
+        }
+        let delEntryBtn = e.target.closest("[data-mc-delete-entry]");
+        if (delEntryBtn) {
+            let block = delEntryBtn.closest(".mc-entry-block");
+            let card = delEntryBtn.closest(".mistake-chapter-card");
+            doDeleteEntry(card.dataset.subject, card.dataset.chapter, block.dataset.entryId);
             return;
         }
         let delBtn = e.target.closest("[data-mc-delete-log]");
@@ -238,8 +327,9 @@ function wireDelegationOnce() {
         }
         let editToggleBtn = e.target.closest("[data-mc-edit-toggle]");
         if (editToggleBtn) {
+            let block = editToggleBtn.closest(".mc-entry-block");
             let card = editToggleBtn.closest(".mistake-chapter-card");
-            doToggleEditMode(card.dataset.subject, card.dataset.chapter);
+            doToggleEditMode(card.dataset.subject, card.dataset.chapter, block.dataset.entryId);
             return;
         }
         // The expandable detail panel sits alongside (not inside) mc-top in
@@ -255,11 +345,13 @@ function wireDelegationOnce() {
 
     panel.addEventListener("change", (e) => {
         if (e.target.matches(".mc-count-input")) {
+            let block = e.target.closest(".mc-entry-block");
             let card = e.target.closest(".mistake-chapter-card");
-            doUpdateCount(card.dataset.subject, card.dataset.chapter, e.target.value);
+            doUpdateEntryCount(card.dataset.subject, card.dataset.chapter, block.dataset.entryId, e.target.value);
         } else if (e.target.matches(".mc-notes")) {
+            let block = e.target.closest(".mc-entry-block");
             let card = e.target.closest(".mistake-chapter-card");
-            doSaveNotes(card.dataset.subject, card.dataset.chapter, e.target.value);
+            doSaveEntryNotes(card.dataset.subject, card.dataset.chapter, block.dataset.entryId, e.target.value);
         }
     });
 }
@@ -268,13 +360,46 @@ function wireDelegationOnce() {
 function sortChapterRows(rows, mode) {
     let arr = rows.slice();
     switch (mode) {
-        case "least": arr.sort((a, b) => (a.entry.count || 0) - (b.entry.count || 0)); break;
-        case "new": arr.sort((a, b) => (b.entry.updatedAt || 0) - (a.entry.updatedAt || 0)); break;
-        case "old": arr.sort((a, b) => (a.entry.updatedAt || 0) - (b.entry.updatedAt || 0)); break;
+        case "least": arr.sort((a, b) => totalCount(a.record) - totalCount(b.record)); break;
+        case "new": arr.sort((a, b) => (b.record.updatedAt || 0) - (a.record.updatedAt || 0)); break;
+        case "old": arr.sort((a, b) => (a.record.updatedAt || 0) - (b.record.updatedAt || 0)); break;
         case "most":
-        default: arr.sort((a, b) => (b.entry.count || 0) - (a.entry.count || 0)); break;
+        default: arr.sort((a, b) => totalCount(b.record) - totalCount(a.record)); break;
     }
     return arr;
+}
+
+// Wires "type a letter to jump to a matching chapter" onto the chapter
+// <select>. Real <select> elements already do this natively on desktop, but
+// it's flaky-to-absent on several mobile browsers once a soft keyboard is
+// involved, which is what was actually being asked for here. Buffers
+// consecutive keystrokes (e.g. "k" "i" "n" -> "Kinematics") and resets the
+// buffer after a short pause, same as native typeahead behaves.
+let typeaheadBuffer = "";
+let typeaheadTimer = null;
+function wireChapterTypeahead(select) {
+    if (!select || select.dataset.typeaheadWired) return;
+    select.dataset.typeaheadWired = "1";
+    select.addEventListener("keydown", (e) => {
+        if (e.key.length !== 1 || !/[a-z0-9]/i.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
+        typeaheadBuffer += e.key.toLowerCase();
+        clearTimeout(typeaheadTimer);
+        typeaheadTimer = setTimeout(() => { typeaheadBuffer = ""; }, 800);
+        let options = Array.from(select.options);
+        let match = options.find(o => o.textContent.toLowerCase().includes(" " + typeaheadBuffer) || o.textContent.toLowerCase().startsWith(typeaheadBuffer));
+        if (!match) {
+            // No match for the full buffer (e.g. mistyped) — fall back to
+            // just the newest keystroke, matching how native typeahead
+            // recovers instead of getting stuck.
+            typeaheadBuffer = e.key.toLowerCase();
+            match = options.find(o => o.textContent.toLowerCase().includes(" " + typeaheadBuffer) || o.textContent.toLowerCase().startsWith(typeaheadBuffer));
+        }
+        if (match && match.value !== select.value) {
+            select.value = match.value;
+            select.dispatchEvent(new Event("change"));
+        }
+        e.preventDefault();
+    });
 }
 
 function renderAddForm() {
@@ -285,18 +410,21 @@ function renderAddForm() {
     }
     let chapterOptions = [11, 12].flatMap(cls => (SYLLABUS_SUBJECTS[addFormSubject][cls] || []).map(ch => ({ cls, ch })));
 
+    let key = addFormChapter ? keyFor(addFormSubject, addFormChapter) : null;
+    let existingTotal = key && mistakeCache[key] ? totalCount(mistakeCache[key]) : 0;
+
     let html = `<div class="card" style="padding:12px;">
         <label style="font-size:12px; color:var(--muted);">Subject</label>
         <select id="mistake-add-subject" class="sort-select" style="width:100%; max-width:none;" onchange="onAddSubjectChange()">
             ${subjects.map(s => `<option value="${escapeHtml(s)}" ${s === addFormSubject ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
         </select>
         <label style="font-size:12px; color:var(--muted); margin-top:8px; display:block;">Chapter</label>
-        <select id="mistake-add-chapter" class="sort-select" style="width:100%; max-width:none;" onchange="onAddChapterChange()">
+        <select id="mistake-add-chapter" class="sort-select" style="width:100%; max-width:none;" onchange="onAddChapterChange()" title="Tip: focus this and type a letter to jump to a chapter">
             ${chapterOptions.map(o => `<option value="${escapeHtml(o.ch)}" ${o.ch === addFormChapter ? 'selected' : ''}>Class ${o.cls} · ${escapeHtml(o.ch)}</option>`).join('')}
         </select>
         <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
             <span class="mc-name" style="flex:1;">${escapeHtml(addFormChapter || "—")}</span>
-            <input type="number" id="mistake-add-count" min="1" step="1" value="1" style="width:70px;" title="Mistakes to log">
+            <span class="mc-badge" style="color:var(--danger); border-color:var(--danger);" title="Already logged for this chapter">${existingTotal}</span>
         </div>
         <label style="font-size:12px; color:var(--muted); margin-top:8px; display:block;">Notes (required)</label>
         <textarea id="mistake-add-notes" class="mc-notes" placeholder="What went wrong, how to fix it..."></textarea>
@@ -305,6 +433,56 @@ function renderAddForm() {
         <button type="button" class="btn btn-start" style="width:100%; margin-top:12px;" onclick="saveAddMistake()">Log Mistake</button>
     </div>`;
     document.getElementById("mistake-add-wrap").innerHTML = html;
+    wireChapterTypeahead(document.getElementById("mistake-add-chapter"));
+}
+
+function renderEntryBlock(subject, chapter, entry, isEditing) {
+    let ek = entryKey(keyFor(subject, chapter), entry.id);
+    let attachedElsewhere = entry.hasFiles && (!entry.files || entry.files.length === 0);
+    let stamp = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : "";
+
+    if (!isEditing) {
+        return `<div class="mc-entry-block" data-entry-id="${escapeHtml(String(entry.id))}">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span class="mc-entry-meta">${escapeHtml(stamp)}${entry.count > 1 ? ` · counted as ${entry.count}` : ''}</span>
+                <div style="display:flex; gap:4px;">
+                    <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Edit this entry">✏️</button>
+                    <button type="button" class="mc-icon-btn" data-mc-delete-entry title="Delete this entry">🗑</button>
+                </div>
+            </div>
+            <div class="mc-notes-view">${entry.notes ? escapeHtml(entry.notes) : '<span style="color:var(--muted);">No notes.</span>'}</div>
+            ${((entry.files && entry.files.length) || attachedElsewhere) ? `<div class="mc-file-list">
+                ${(entry.files || []).map(f => f.type.startsWith('image/')
+                    ? `<span class="mc-file-chip"><img src="${f.dataUrl}"></span>`
+                    : `<span class="mc-file-chip mc-file-pdf"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}">📄 ${escapeHtml(f.name)}</a></span>`
+                ).join('')}
+                ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}
+            </div>` : ''}
+        </div>`;
+    }
+
+    return `<div class="mc-entry-block" data-entry-id="${escapeHtml(String(entry.id))}">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <label style="font-size:12px; color:var(--muted); margin:0;">Count</label>
+            <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Done editing">💾</button>
+        </div>
+        <input type="number" min="1" step="1" class="mc-count-input" value="${entry.count || 1}">
+        <label style="font-size:12px; color:var(--muted);">Notes</label>
+        <textarea class="mc-notes" placeholder="What went wrong, how to fix it...">${escapeHtml(entry.notes || "")}</textarea>
+        <label style="font-size:12px; color:var(--muted);">Attach files (images / PDFs)</label>
+        <div class="mc-files-row">
+            <input type="file" id="${safeId(ek)}" accept="image/*,application/pdf" multiple>
+            <button type="button" class="btn btn-start btn-small" data-mc-add-files>Add</button>
+        </div>
+        <div class="mc-file-list">
+            ${(entry.files || []).map((f, i) => f.type.startsWith('image/')
+                ? `<span class="mc-file-chip"><img src="${f.dataUrl}"><button type="button" data-mc-remove-file="${i}">✕</button></span>`
+                : `<span class="mc-file-chip mc-file-pdf"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}">📄 ${escapeHtml(f.name)}</a><button type="button" data-mc-remove-file="${i}">✕</button></span>`
+            ).join('')}
+            ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}
+        </div>
+        <button type="button" class="btn btn-stop btn-small" style="margin-top:8px;" data-mc-delete-entry>Delete this entry</button>
+    </div>`;
 }
 
 function renderViewList() {
@@ -313,12 +491,12 @@ function renderViewList() {
         `<button class="${s === activeMistakeSubject ? 'active' : ''}" onclick="setMistakesSubject('${s}')">${escapeHtml(s)}</button>`
     ).join('');
 
-    let allEntries = Object.values(mistakeCache);
-    let totalMistakes = allEntries.reduce((sum, e) => sum + (e.count || 0), 0);
+    let allRecords = Object.values(mistakeCache);
+    let grandTotal = allRecords.reduce((sum, r) => sum + totalCount(r), 0);
     let bySubject = {};
-    allEntries.forEach(e => { bySubject[e.subject] = (bySubject[e.subject] || 0) + (e.count || 0); });
+    allRecords.forEach(r => { bySubject[r.subject] = (bySubject[r.subject] || 0) + totalCount(r); });
     document.getElementById("mistake-overall").innerHTML =
-        `<div>Total mistakes logged: <span class="highlight-text">${totalMistakes}</span></div>
+        `<div>Total mistakes logged: <span class="highlight-text">${grandTotal}</span></div>
          <div class="small-note">This subject: <span class="highlight-text" style="font-size:12px;">${bySubject[activeMistakeSubject] || 0}</span></div>`;
 
     let rows = [];
@@ -326,7 +504,7 @@ function renderViewList() {
         (SYLLABUS_SUBJECTS[activeMistakeSubject][cls] || []).forEach(ch => {
             if (mistakeSearchQuery && !ch.toLowerCase().includes(mistakeSearchQuery)) return;
             let key = keyFor(activeMistakeSubject, ch);
-            rows.push({ cls, ch, entry: mistakeCache[key] || blankEntry(activeMistakeSubject, ch) });
+            rows.push({ cls, ch, record: mistakeCache[key] || blankRecord(activeMistakeSubject, ch) });
         });
     });
     rows = sortChapterRows(rows, mistakeSortMode);
@@ -339,62 +517,33 @@ function renderViewList() {
 
     let html = "";
     let lastCls = null;
-    rows.forEach(({ cls, ch, entry }) => {
+    rows.forEach(({ cls, ch, record }) => {
         if (showClassHeaders && cls !== lastCls) {
             html += `<div class="syllabus-class-header">Class ${cls}</div>`;
             lastCls = cls;
         }
         let key = keyFor(activeMistakeSubject, ch);
         let isExpanded = !!expandedMistakeChapters[key];
-        let isEditing = isExpanded && !!editingMistakeChapters[key];
-        let attachedElsewhere = entry.hasFiles && (!entry.files || entry.files.length === 0);
+        let entries = (record.entries || []).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
         html += `<div class="mistake-chapter-card ${isExpanded ? 'expanded' : ''}" data-subject="${escapeHtml(activeMistakeSubject)}" data-chapter="${escapeHtml(ch)}">
             <div class="mc-top">
                 <span class="mc-name">${escapeHtml(ch)}</span>
-                <span class="mc-badge" style="color:var(--danger); border-color:var(--danger);">${entry.count || 0}</span>
+                <span class="mc-badge" style="color:var(--danger); border-color:var(--danger);">${totalCount(record)}</span>
             </div>`;
 
-        if (isExpanded && !isEditing) {
-            // ----- READ-ONLY VIEW (default) -----
-            html += `<div class="mc-detail">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                    <span style="font-size:12px; color:var(--muted);">Mistakes made: <strong style="color:var(--danger); font-size:14px;">${entry.count || 0}</strong></span>
-                    <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Edit this chapter's log">✏️</button>
-                </div>
-                <div class="mc-notes-view">${entry.notes ? escapeHtml(entry.notes) : '<span style="color:var(--muted);">No notes yet.</span>'}</div>
-                ${((entry.files && entry.files.length) || attachedElsewhere) ? `<div class="mc-file-list">
-                    ${(entry.files || []).map(f => f.type.startsWith('image/')
-                        ? `<span class="mc-file-chip"><img src="${f.dataUrl}"></span>`
-                        : `<span class="mc-file-chip mc-file-pdf"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}">📄 ${escapeHtml(f.name)}</a></span>`
-                    ).join('')}
-                    ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}
-                </div>` : ''}
-            </div>`;
-        } else if (isEditing) {
-            // ----- EDITABLE FORM (entered via the pencil icon) -----
-            html += `<div class="mc-detail">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                    <label style="font-size:12px; color:var(--muted); margin:0;">Mistakes made</label>
-                    <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Done editing">💾</button>
-                </div>
-                <input type="number" min="0" step="1" class="mc-count-input" value="${entry.count || 0}">
-                <label style="font-size:12px; color:var(--muted);">Notes</label>
-                <textarea class="mc-notes" placeholder="What went wrong, how to fix it...">${escapeHtml(entry.notes || "")}</textarea>
-                <label style="font-size:12px; color:var(--muted);">Attach files (images / PDFs)</label>
-                <div class="mc-files-row">
-                    <input type="file" id="${safeId(key)}" accept="image/*,application/pdf" multiple>
-                    <button type="button" class="btn btn-start btn-small" data-mc-add-files>Add</button>
-                </div>
-                <div class="mc-file-list">
-                    ${(entry.files || []).map((f, i) => f.type.startsWith('image/')
-                        ? `<span class="mc-file-chip"><img src="${f.dataUrl}"><button type="button" data-mc-remove-file="${i}">✕</button></span>`
-                        : `<span class="mc-file-chip mc-file-pdf"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}">📄 ${escapeHtml(f.name)}</a><button type="button" data-mc-remove-file="${i}">✕</button></span>`
-                    ).join('')}
-                    ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}
-                </div>
-                <button type="button" class="btn btn-stop btn-small" style="margin-top:8px;" data-mc-delete-log>Clear this chapter's log</button>
-            </div>`;
+        if (isExpanded) {
+            html += `<div class="mc-detail">`;
+            if (entries.length === 0) {
+                html += `<span class="small-note">No mistakes logged for this chapter yet.</span>`;
+            } else {
+                entries.forEach(entry => {
+                    let isEditing = !!editingEntries[entryKey(key, entry.id)];
+                    html += renderEntryBlock(activeMistakeSubject, ch, entry, isEditing);
+                });
+                html += `<button type="button" class="btn btn-stop btn-small" data-mc-delete-log>Clear ALL entries for this chapter</button>`;
+            }
+            html += `</div>`;
         }
         html += `</div>`;
     });
@@ -405,7 +554,7 @@ export async function renderMistakesTracker() {
     wireDelegationOnce();
     let list = await getAllMistakeChapters();
     mistakeCache = {};
-    list.forEach(e => { mistakeCache[e.key] = e; });
+    list.forEach(rec => { let normalized = normalizeRecord(rec); if (normalized) mistakeCache[normalized.key] = normalized; });
 
     let addTabEl = document.getElementById("mistake-tab-add");
     let viewTabEl = document.getElementById("mistake-tab-view");

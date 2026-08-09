@@ -12,9 +12,9 @@
 .heatmap-scroll { overflow-x: auto; padding-bottom: 6px; display: flex; justify-content: center; }
 .heatmap-legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 8px; justify-content: center; }
 .heatmap-legend .heatmap-swatch-group { display: flex; gap: 10px; }
-.heatmap-legend .heatmap-swatch-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.heatmap-legend .sq { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
-.heatmap-legend .sq-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.heatmap-legend .heatmap-swatch-item { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 30px; }
+.heatmap-legend .sq { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+.heatmap-legend .sq-label { font-size: 10px; color: var(--muted); white-space: nowrap; text-align: center; width: 100%; }
 
 /* NOTE: the Subject-Breakdown pie chart and the Weekly Trend line chart are
    both drawn as inline SVG generated directly by charts.js (renderTrendChart)

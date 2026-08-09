@@ -12,6 +12,34 @@ import { renderMockTestList } from './mocktest.js';
 import { renderSyllabusTracker } from './syllabus.js';
 import { renderMistakesTracker } from './mistakes.js';
 
+// ----------------- CACHE -----------------
+// Some browsers (Edge in particular) make clearing site data + hard-reload
+// a multi-step chore just to pick up a new deployed version, since sw.js
+// serves cache-first. This does both in one click: drops every Cache
+// Storage bucket this origin owns (the service worker's onactivate handler
+// already deletes stale-named caches on its own, but this also covers the
+// case where the SW itself hasn't updated yet) and unregisters the current
+// service worker so the next load re-registers sw.js fresh, then reloads.
+// Available both signed-out and signed-in — it never touches
+// localStorage/IndexedDB study data, only the PWA cache layer.
+export async function clearCacheAndReload() {
+    if (!confirm("This clears the app's cached files and reloads the page to fetch the latest version. Your study data is not affected. Continue?")) return;
+    try {
+        if ("caches" in window) {
+            let keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        if ("serviceWorker" in navigator) {
+            let regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister()));
+        }
+    } catch (e) {
+        // Even if clearing fails partway, still force the reload below —
+        // a plain reload is strictly better than doing nothing.
+    }
+    location.reload();
+}
+
 // ----------------- TOASTS -----------------
 export function showToast(msg) {
     let stack = document.getElementById("toast-stack");

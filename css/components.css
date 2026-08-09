@@ -198,9 +198,12 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mistake-chapter-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
 .mistake-chapter-card .mc-top { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
 .mistake-chapter-card .mc-name { font-size: 13px; font-weight: 600; }
-.mistake-chapter-card .mc-badge { font-size: 11px; color: var(--muted); white-space: nowrap; margin-left: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px 9px; }
+.mistake-chapter-card .mc-badge { font-size: 11px; color: var(--muted); white-space: nowrap; margin-left: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 50%; min-width: 22px; height: 22px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
 .mistake-chapter-card.expanded .mc-badge { color: var(--danger); border-color: var(--danger); }
-.mc-detail { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.mc-detail { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.mc-entry-block { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+.mc-entry-block + .mc-entry-block { margin-top: 0; }
+.mc-entry-meta { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
 .mc-detail input, .mc-detail textarea { margin: 0 0 6px 0; }
 .mc-count-input { width: 100%; }
 .mc-notes { width: 100%; min-height: 80px; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; box-sizing: border-box; font-family: inherit; resize: vertical; overflow-wrap: break-word; word-break: break-word; }

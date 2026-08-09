@@ -119,7 +119,12 @@ export function deletePlannerTask(idx) {
 
 export function renderPlannerTasks() {
     let db = getPlannerDB(); let tasks = db[plannerActiveDateKey] || [];
-    let html = ""; if (tasks.length === 0) html = "<div style='color:var(--muted); font-size:13px; margin-top:8px;'>No tasks yet.</div>";
+    let isPast = plannerActiveDateKey < getTodayKey();
+    // Past dates can never have tasks added (see openPlannerModal), so an
+    // empty list there is expected, not noteworthy — showing "No tasks
+    // yet." reads like an invitation to add one. Only today/future empty
+    // days get that message.
+    let html = ""; if (tasks.length === 0 && !isPast) html = "<div style='color:var(--muted); font-size:13px; margin-top:8px;'>No tasks yet.</div>";
     let sortSelect = document.getElementById("planner-sort-select");
     let order = sortTaskIndices(tasks, sortSelect ? sortSelect.value : "added");
     order.forEach(i => { let t = tasks[i]; html += `<div class="task-item"><input type="checkbox" ${t.done ? 'checked' : ''} onchange="togglePlannerTask(${i})"><span class="task-text ${t.done ? 'done' : ''}">${getPriorityEmoji(t.priority)} ${escapeHtml(t.text)}</span><button class="del" onclick="deletePlannerTask(${i})">✕</button></div>`; });

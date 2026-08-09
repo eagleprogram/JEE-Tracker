@@ -22,6 +22,12 @@ export function toggleMistakeTag(tag) {
 export function renderMistakeSummary(entries) {
     let summaryEl = document.getElementById("mistake-tag-summary");
     if (!summaryEl) return;
+    // With zero mock tests at all, "No mock tests logged yet." (rendered by
+    // renderMockTestList below) already says everything — showing "No
+    // mistake tags logged yet." right above it was redundant (there can't
+    // be tags without tests). Only show this line once there's at least one
+    // test but it/they carry no tags yet.
+    if (entries.length === 0) { summaryEl.innerHTML = ""; return; }
     let counts = {};
     entries.forEach(e => (e.mistakeTags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
     let tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
