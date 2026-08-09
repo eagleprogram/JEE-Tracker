@@ -334,10 +334,12 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
                     showToast(`Report sent successfully to ${emailInput}!`);
                 } else {
                     const errorText = await response.text();
-                    if (!silent) alert("Email send failed: " + errorText);
+                    if (silent) { showToast(`⚠️ Auto-email of the ${type} report failed — will retry next cycle.`); }
+                    else { alert("Email send failed: " + errorText); }
                 }
             } catch (e) {
-                if (!silent) alert("Email send failed: " + e.message);
+                if (silent) { showToast(`⚠️ Auto-email of the ${type} report failed — will retry next cycle.`); }
+                else { alert("Email send failed: " + e.message); }
             }
         };
     }

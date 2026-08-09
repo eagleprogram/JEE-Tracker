@@ -108,9 +108,18 @@ export async function pushToCloud(silent = false) {
         }
         setRawFlag("jee_last_sync", now.toString());
         renderSyncUI();
-        if (!silent) showToast("Saved to the cloud.");
+        showToast(silent ? "Auto-synced to the cloud." : "Saved to the cloud.");
     } catch (e) {
-        if (!silent) alert("Save failed: " + e.message);
+        // BUG FIX: silent (auto-sync) failures used to hit `if (!silent) alert(...)`
+        // and do nothing at all — meaning a failed background sync looked
+        // identical to a successful one from the user's perspective. A quiet
+        // toast (not a blocking alert, which would be intrusive popping up
+        // unprompted every 30 min) makes failures visible without interrupting
+        // whatever the user is doing. Manual Save-to-Cloud keeps its existing
+        // blocking alert, since that's an intentional user action expecting
+        // a direct response.
+        if (silent) { showToast("⚠️ Auto-sync failed — will retry next cycle."); return; }
+        alert("Save failed: " + e.message);
     }
 }
 
