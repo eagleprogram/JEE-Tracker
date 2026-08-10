@@ -213,12 +213,12 @@
                 <div id="sync-last" class="small-note"></div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="pushToCloud()">Save to Cloud ⬆</button>
-                    <button class="btn btn-pause btn-small" style="flex:1;" onclick="pullFromCloud()">Load from Cloud ⬇</button>
+                    <button class="btn btn-start btn-small" style="flex:1;" onclick="pullFromCloud()">Load from Cloud ⬇</button>
                 </div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="btn btn-stop btn-small" style="flex:1;" onclick="deleteCloudData()">🗑 Delete Cloud Data</button>
                     <button class="btn btn-stop btn-small" style="flex:1;" onclick="resetAllData()">🔴 Reset All Data</button>
-                    <button class="btn btn-break btn-small" style="flex:1;" onclick="signOutOfGoogle()">Sign Out</button>
+                    <button class="btn btn-stop btn-small" style="flex:1;" onclick="signOutOfGoogle()">Sign Out</button>
                 </div>
                 <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="clearCacheAndReload()" title="Clears cached app files and reloads — doesn't touch your study data">🧹 Delete Cache & Reload Website</button>
             </div>
@@ -317,7 +317,10 @@
 <div class="modal" id="mock-file-modal" onclick="closeMockFileModal()">
     <div class="modal-content" style="width:min(90vw,700px); max-height:85vh; overflow:auto; text-align:center;" onclick="event.stopPropagation()">
         <div id="mock-file-modal-body"></div>
-        <div style="margin-top:12px;"><button class="btn btn-pause" onclick="closeMockFileModal()">Close</button></div>
+        <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+            <button class="btn btn-start" onclick="downloadCurrentMockFile()">⬇ Download</button>
+            <button class="btn btn-pause" onclick="closeMockFileModal()">Close</button>
+        </div>
     </div>
 </div>
 
@@ -448,8 +451,8 @@
                 <button class="btn btn-break btn-compact" onclick="downloadReport('monthly')">Download Monthly Report</button>
                 <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('weekly', false)">Send Weekly Report (Email)</button>
                 <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('monthly', false)">Send Monthly Report (Email)</button>
-                <button class="btn btn-yellow btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
-                <button class="btn btn-yellow btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
+                <button class="btn btn-pause btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
+                <button class="btn btn-pause btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
             </div>
             <div class="small-note" style="margin-top:4px; color:var(--warning);">NOTE: Emails are automatically sent on Sundays and at month-ends if signed in. Use the buttons above to send manually.</div>
         </div>

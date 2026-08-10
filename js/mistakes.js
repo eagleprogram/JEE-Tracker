@@ -444,8 +444,8 @@ function renderEntryBlock(subject, chapter, entry, isEditing, entryNumber) {
     if (!isEditing) {
         return `<div class="mc-entry-block" data-entry-id="${escapeHtml(String(entry.id))}">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                <span class="mc-entry-meta">${entryNumber ? `#${entryNumber} · ` : ''}${escapeHtml(stamp)}${entry.count > 1 ? ` · counted as ${entry.count}` : ''}</span>
-                <div style="display:flex; gap:4px;">
+                <span class="mc-entry-meta">${entryNumber ? `<span class="mc-entry-num">#${entryNumber}</span> · ` : ''}${escapeHtml(stamp)}${entry.count > 1 ? ` · counted as ${entry.count}` : ''}</span>
+                <div style="display:flex; gap:8px;">
                     <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Edit this entry">✏️</button>
                     <button type="button" class="mc-icon-btn" data-mc-delete-entry title="Delete this entry">🗑</button>
                 </div>
@@ -453,7 +453,7 @@ function renderEntryBlock(subject, chapter, entry, isEditing, entryNumber) {
             <div class="mc-notes-view">${entry.notes ? escapeHtml(entry.notes) : '<span style="color:var(--muted);">No notes.</span>'}</div>
             ${((entry.files && entry.files.length) || attachedElsewhere) ? `<div class="mc-file-list">
                 ${(entry.files || []).map(f => f.type.startsWith('image/')
-                    ? `<span class="mc-file-chip"><img src="${f.dataUrl}"></span>`
+                    ? `<span class="mc-file-chip"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}" title="Download image"><img src="${f.dataUrl}"></a></span>`
                     : `<span class="mc-file-chip mc-file-pdf"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}">📄 ${escapeHtml(f.name)}</a></span>`
                 ).join('')}
                 ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}
@@ -476,7 +476,7 @@ function renderEntryBlock(subject, chapter, entry, isEditing, entryNumber) {
         </div>
         <div class="mc-file-list">
             ${(entry.files || []).map((f, i) => f.type.startsWith('image/')
-                ? `<span class="mc-file-chip"><img src="${f.dataUrl}"><button type="button" data-mc-remove-file="${i}">✕</button></span>`
+                ? `<span class="mc-file-chip"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}" title="Download image"><img src="${f.dataUrl}"></a><button type="button" data-mc-remove-file="${i}">✕</button></span>`
                 : `<span class="mc-file-chip mc-file-pdf"><a href="${f.dataUrl}" download="${escapeHtml(f.name)}">📄 ${escapeHtml(f.name)}</a><button type="button" data-mc-remove-file="${i}">✕</button></span>`
             ).join('')}
             ${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}

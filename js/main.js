@@ -49,7 +49,8 @@ import {
 
 import {
     renderMistakeTagPicker, toggleMistakeTag, addMockTestEntry,
-    deleteMockTestEntry, viewMockFile, closeMockFileModal, renderMockTestList
+    deleteMockTestEntry, viewMockFile, closeMockFileModal, renderMockTestList,
+    downloadCurrentMockFile
 } from './mocktest.js';
 
 import {
@@ -109,7 +110,7 @@ Object.assign(window, {
     onAddSubjectChange, onAddChapterChange, saveAddMistake, renderMistakesTracker,
     // mocktest.js
     toggleMistakeTag, addMockTestEntry, deleteMockTestEntry, viewMockFile,
-    closeMockFileModal, renderMockTestList,
+    closeMockFileModal, renderMockTestList, downloadCurrentMockFile,
     // youtube.js
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry,

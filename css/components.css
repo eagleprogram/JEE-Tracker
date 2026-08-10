@@ -160,6 +160,12 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mistake-tag-chip.selected { background: var(--primary); border-color: var(--primary); color: #04121f; font-weight: 600; }
 .mistake-summary-wrap { margin-top: 10px; }
 #mistake-tag-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+/* When there are 0 mock tests, renderMistakeSummary() leaves this element
+   truly empty — its own margin-top (both rules above) still took up space
+   with nothing to show for it, stacking on top of the flex `gap` that
+   .sidebar-content already applies between every section. Zero it out
+   whenever it's empty so an empty state doesn't reserve extra blank space. */
+.mistake-summary-wrap:empty, #mistake-tag-summary:empty { margin: 0; }
 #mistake-tag-summary .ms-pill { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px 9px; font-size: 11px; color: var(--text); }
 .section-header-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 .section-header-row .section-subtitle { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
@@ -200,10 +206,11 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mistake-chapter-card .mc-name { font-size: 13px; font-weight: 600; }
 .mistake-chapter-card .mc-badge { font-size: 11px; color: var(--muted); white-space: nowrap; margin-left: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 50%; min-width: 22px; height: 22px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
 .mistake-chapter-card.expanded .mc-badge { color: var(--danger); border-color: var(--danger); }
-.mc-detail { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.mc-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
 .mc-entry-block { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
 .mc-entry-block + .mc-entry-block { margin-top: 0; }
-.mc-entry-meta { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+.mc-entry-meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; background: rgba(239, 68, 68, 0.08); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; display: inline-block; }
+.mc-entry-meta .mc-entry-num { color: var(--danger); font-weight: 700; }
 .mc-detail input, .mc-detail textarea { margin: 0 0 6px 0; }
 .mc-count-input { width: 100%; }
 .mc-notes { width: 100%; min-height: 80px; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; box-sizing: border-box; font-family: inherit; resize: vertical; overflow-wrap: break-word; word-break: break-word; }
@@ -218,10 +225,12 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 /* View-mode (read-only) mistake detail — the notes box gets its own
    scrollbar once a chapter accumulates a lot of logged entries, instead of
    growing the card indefinitely. */
-.mc-notes-view { max-height: 160px; overflow-y: auto; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
-.mc-notes-view::-webkit-scrollbar { width: 5px; }
-.mc-notes-view::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-.mc-icon-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; width: 26px; height: 26px; font-size: 13px; line-height: 1; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
+/* Notes now expand fully inline instead of scrolling in their own small
+   box — removes a third nested scroll layer (subject tabs > chapter
+   accordion > this) that made the panel feel like stacked mini-sidebars
+   and invited mis-taps between them. */
+.mc-notes-view { padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.mc-icon-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; width: 30px; height: 30px; font-size: 14px; line-height: 1; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
 .mc-icon-btn:hover { border-color: var(--primary); }
 
 /* Add Mistake / View Mistakes sub-tabs — two equal-width (X/2) segments

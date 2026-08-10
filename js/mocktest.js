@@ -126,7 +126,12 @@ export async function renderMockTestList() {
     let list = document.getElementById("mock-test-list");
     let entries = await getAllMockTests(); // already sorted newest-added-first (id = Date.now() at creation)
     renderMistakeSummary(entries);
-    if (entries.length === 0) { list.innerHTML = "<div class='small-note' style='margin-top:10px;'>No mock tests logged yet.</div>"; return; }
+    // No margin-top here — .sidebar-content's flex `gap` already spaces this
+    // from the section above; adding one on top of that (and on top of
+    // #mistake-tag-summary's own margin, even while empty) is what was
+    // compounding into the large gap above this message when there were 0
+    // mock tests logged.
+    if (entries.length === 0) { list.innerHTML = "<div class='small-note'>No mock tests logged yet.</div>"; return; }
 
     let avg = 0, count = 0;
     entries.forEach(e => {
@@ -149,15 +154,34 @@ export async function renderMockTestList() {
     list.innerHTML = html + `<div style="height:40px;"></div>`; // Add bottom padding
 }
 
+// Holds the file currently shown in the preview modal so the modal's
+// Download button knows what to save — set on open, cleared on close.
+let currentModalFile = null;
+
 export async function viewMockFile(entryId, fileIdx) {
     let entries = await getAllMockTests();
     let entry = entries.find(e => e.id === entryId);
     if (!entry) return;
     let f = entry.files[fileIdx];
+    currentModalFile = f;
     document.getElementById("mock-file-modal-body").innerHTML = `<img src="${f.dataUrl}" style="max-width:100%; border-radius:8px;">`;
     document.getElementById("mock-file-modal").style.display = "flex";
 }
 
 export function closeMockFileModal() {
     document.getElementById("mock-file-modal").style.display = "none";
+    currentModalFile = null;
+}
+
+// Images in the mock-test attachment strip open this preview modal instead
+// of downloading directly on click (so tapping one to look at it doesn't
+// immediately dump a file), so the download action lives here instead.
+export function downloadCurrentMockFile() {
+    if (!currentModalFile) return;
+    let a = document.createElement("a");
+    a.href = currentModalFile.dataUrl;
+    a.download = currentModalFile.name || "attachment";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 }

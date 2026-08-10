@@ -25,6 +25,13 @@ body.panel-open { padding-left: 440px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
 .sidebar { scrollbar-width: thin; scrollbar-color: var(--border) var(--card); }
+/* The global ::-webkit-scrollbar rule above should already cover this, but
+   giving the sidebar's own scroll track a directly-targeted, higher-
+   specificity rule guarantees it stays dark/thin instead of ever falling
+   back to the browser's native (light, arrow-button) scrollbar. */
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-track { background: var(--card); }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 #syllabus-chapter-list { max-height: 55vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) var(--card); padding-right: 4px; padding-bottom: 40px; }
 #syllabus-chapter-list::-webkit-scrollbar { width: 5px; }
 #syllabus-chapter-list::-webkit-scrollbar-thumb { border-radius: 4px; }
