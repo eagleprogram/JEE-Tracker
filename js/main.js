@@ -44,13 +44,14 @@ import {
 
 import {
     setMistakesView, setMistakesSubject, setMistakeSort, filterMistakeSearch,
-    onAddSubjectChange, onAddChapterChange, saveAddMistake, renderMistakesTracker
+    onAddSubjectChange, onAddChapterChange, saveAddMistake, renderMistakesTracker,
+    exportAllMistakes
 } from './mistakes.js';
 
 import {
     renderMistakeTagPicker, toggleMistakeTag, addMockTestEntry,
     deleteMockTestEntry, viewMockFile, closeMockFileModal, renderMockTestList,
-    downloadCurrentMockFile
+    downloadCurrentMockFile, exportAllMockTests
 } from './mocktest.js';
 
 import {
@@ -108,9 +109,10 @@ Object.assign(window, {
     // mistakes.js
     setMistakesView, setMistakesSubject, setMistakeSort, filterMistakeSearch,
     onAddSubjectChange, onAddChapterChange, saveAddMistake, renderMistakesTracker,
+    exportAllMistakes,
     // mocktest.js
     toggleMistakeTag, addMockTestEntry, deleteMockTestEntry, viewMockFile,
-    closeMockFileModal, renderMockTestList, downloadCurrentMockFile,
+    closeMockFileModal, renderMockTestList, downloadCurrentMockFile, exportAllMockTests,
     // youtube.js
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry,

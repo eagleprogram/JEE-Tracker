@@ -158,7 +158,7 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mistake-tag-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
 .mistake-tag-chip { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--muted); user-select: none; }
 .mistake-tag-chip.selected { background: var(--primary); border-color: var(--primary); color: #04121f; font-weight: 600; }
-.mistake-summary-wrap { margin-top: 10px; }
+.mock-mistake-summary-section { display: flex; flex-direction: column; gap: 6px; }
 #mistake-tag-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 /* When there are 0 mock tests, renderMistakeSummary() leaves this element
    truly empty — its own margin-top (both rules above) still took up space

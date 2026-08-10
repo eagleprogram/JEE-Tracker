@@ -9,6 +9,7 @@ export const SUBJECT_COLORS = {
     "Physical Chemistry": "#f59e0b",
     "Mathematics": "#d946ef",
     "Revision": "#84cc16",
+    "School Prep": "#f97316",
     "Mock Test / Analysis": "#0ea5e9"
 };
 

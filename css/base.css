@@ -34,14 +34,22 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 #syllabus-chapter-list { max-height: 55vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) var(--card); padding-right: 4px; padding-bottom: 40px; }
 #syllabus-chapter-list::-webkit-scrollbar { width: 5px; }
+#syllabus-chapter-list::-webkit-scrollbar-track { background: var(--card); }
 #syllabus-chapter-list::-webkit-scrollbar-thumb { border-radius: 4px; }
 #todo-list::-webkit-scrollbar { width: 5px; }
+#todo-list::-webkit-scrollbar-track { background: var(--card); }
 #todo-list::-webkit-scrollbar-thumb { border-radius: 4px; }
 #mock-test-list::-webkit-scrollbar { width: 5px; }
+#mock-test-list::-webkit-scrollbar-track { background: var(--card); }
 #mock-test-list::-webkit-scrollbar-thumb { border-radius: 4px; }
+#mistake-chapter-list::-webkit-scrollbar { width: 5px; }
+#mistake-chapter-list::-webkit-scrollbar-track { background: var(--card); }
+#mistake-chapter-list::-webkit-scrollbar-thumb { border-radius: 4px; }
 #history-break-list::-webkit-scrollbar { width: 5px; }
+#history-break-list::-webkit-scrollbar-track { background: var(--card); }
 #history-break-list::-webkit-scrollbar-thumb { border-radius: 4px; }
 #history-session-list::-webkit-scrollbar { width: 5px; }
+#history-session-list::-webkit-scrollbar-track { background: var(--card); }
 #history-session-list::-webkit-scrollbar-thumb { border-radius: 4px; }
 
 /* ===== Sidebar drawer (collapsed icon rail <-> expanded panel, same box) ===== */

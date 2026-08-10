@@ -1,4 +1,4 @@
-import { escapeHtml, fileToDataURL } from './utils.js';
+import { escapeHtml, fileToDataURL, getTodayKey, downloadBlob } from './utils.js';
 import { getAllMistakeChapters, saveMistakeEntry } from './storage.js';
 import { SYLLABUS_SUBJECTS } from './syllabus.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
@@ -569,4 +569,63 @@ export async function renderMistakesTracker() {
 
     if (activeMistakeView === "add") renderAddForm();
     else renderViewList();
+}
+
+// Bundles every logged mistake, across every subject and chapter, into one
+// .zip: a single readable Markdown summary (grouped by subject > chapter,
+// same order as the on-screen tabs) plus every attached file — so
+// revising doesn't mean opening chapter after chapter one at a time.
+export async function exportAllMistakes() {
+    let records = await getAllMistakeChapters();
+    let totalEntries = records.reduce((sum, r) => sum + ((r.entries || []).length), 0);
+    if (totalEntries === 0) { alert("No mistake entries to export yet."); return; }
+    if (typeof JSZip === "undefined") { alert("The export library didn't load — check your connection and try again."); return; }
+
+    let bySubject = {};
+    records.forEach(r => {
+        if (!r.entries || r.entries.length === 0) return;
+        if (!bySubject[r.subject]) bySubject[r.subject] = [];
+        bySubject[r.subject].push(r);
+    });
+
+    let zip = new JSZip();
+    let lines = [`# Mistake Entries`, `Exported ${new Date().toLocaleString()} · ${totalEntries} entr${totalEntries === 1 ? 'y' : 'ies'} total`, ""];
+
+    Object.keys(SYLLABUS_SUBJECTS).forEach(subject => {
+        let chapterRecords = bySubject[subject];
+        if (!chapterRecords || chapterRecords.length === 0) return;
+        let subjectTotal = chapterRecords.reduce((sum, r) => sum + r.entries.length, 0);
+        lines.push(`# ${subject} (${subjectTotal} mistakes)`, "");
+
+        chapterRecords.forEach(rec => {
+            let sortedEntries = rec.entries.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+            lines.push(`## ${rec.chapter} (${sortedEntries.length})`, "");
+            let safeChapter = rec.chapter.replace(/[\\/:*?"<>|]/g, "_");
+
+            sortedEntries.forEach((entry, idx) => {
+                let num = idx + 1;
+                let stamp = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : "";
+                lines.push(`**#${num} · ${stamp}${entry.count > 1 ? ` · counted as ${entry.count}` : ''}**`);
+                lines.push("");
+                lines.push(entry.notes ? entry.notes : "_(no notes)_");
+                if (entry.files && entry.files.length) {
+                    lines.push("");
+                    lines.push(`Attachments: ${entry.files.map(f => f.name).join(", ")}`);
+                    let folder = `${subject}/${safeChapter}/${num}`;
+                    entry.files.forEach(f => {
+                        let base64 = (f.dataUrl || "").split(",")[1];
+                        if (base64) zip.file(`${folder}/${f.name}`, base64, { base64: true });
+                    });
+                } else if (entry.hasFiles) {
+                    lines.push("");
+                    lines.push("_(attachment saved on another browser — not included here)_");
+                }
+                lines.push("", "---", "");
+            });
+        });
+    });
+
+    zip.file("Mistakes-Summary.md", lines.join("\n"));
+    let blob = await zip.generateAsync({ type: "blob" });
+    downloadBlob(blob, `JEE-Tracker-Mistakes-${getTodayKey()}.zip`, "application/zip");
 }

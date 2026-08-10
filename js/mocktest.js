@@ -1,4 +1,4 @@
-import { escapeHtml, fileToDataURL, getTodayKey, formatDateDDMMYYYY } from './utils.js';
+import { escapeHtml, fileToDataURL, getTodayKey, formatDateDDMMYYYY, downloadBlob } from './utils.js';
 import { openMockDB, getAllMockTests, MOCK_STORE } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
@@ -171,6 +171,47 @@ export async function viewMockFile(entryId, fileIdx) {
 export function closeMockFileModal() {
     document.getElementById("mock-file-modal").style.display = "none";
     currentModalFile = null;
+}
+
+// Bundles every mock-test entry into one .zip: a single readable Markdown
+// summary (score, tags, notes, in order) plus every attached file, so
+// revising doesn't mean scrolling/opening entries one at a time. Uses
+// JSZip (loaded via CDN in index.html) since browsers can't build a real
+// zip archive on their own — only one file per click without it.
+export async function exportAllMockTests() {
+    let entries = await getAllMockTests();
+    if (entries.length === 0) { alert("No mock test entries to export yet."); return; }
+    if (typeof JSZip === "undefined") { alert("The export library didn't load — check your connection and try again."); return; }
+
+    let sorted = entries.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "") || a.id - b.id);
+    let zip = new JSZip();
+    let lines = [`# Mock Test Entries`, `Exported ${new Date().toLocaleString()} · ${sorted.length} entr${sorted.length === 1 ? 'y' : 'ies'}`, ""];
+
+    sorted.forEach((e, idx) => {
+        let num = idx + 1;
+        let safeName = `${num}. ${(e.subject || "Untitled").replace(/[\\/:*?"<>|]/g, "_")} (${formatDateDDMMYYYY(e.date)})`;
+        lines.push(`## #${num} · ${e.subject || "Untitled"} · ${formatDateDDMMYYYY(e.date)}`);
+        lines.push(`Score: ${e.score || "—"}${e.maxScore ? " / " + e.maxScore : ""}`);
+        if (e.mistakeTags && e.mistakeTags.length) lines.push(`Mistake tags: ${e.mistakeTags.join(", ")}`);
+        lines.push("");
+        lines.push(e.notes ? e.notes : "_(no notes)_");
+        if (e.files && e.files.length) {
+            lines.push("");
+            lines.push(`Attachments: ${e.files.map(f => f.name).join(", ")}`);
+            e.files.forEach(f => {
+                let base64 = (f.dataUrl || "").split(",")[1];
+                if (base64) zip.file(`${safeName}/${f.name}`, base64, { base64: true });
+            });
+        } else if (e.hasFiles) {
+            lines.push("");
+            lines.push("_(attachment saved on another browser — not included here)_");
+        }
+        lines.push("", "---", "");
+    });
+
+    zip.file("Mock-Tests-Summary.md", lines.join("\n"));
+    let blob = await zip.generateAsync({ type: "blob" });
+    downloadBlob(blob, `JEE-Tracker-MockTests-${getTodayKey()}.zip`, "application/zip");
 }
 
 // Images in the mock-test attachment strip open this preview modal instead

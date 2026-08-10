@@ -13,7 +13,7 @@ export const BASE_EXAM_DATES = { mains1: "2027-01-21T00:00:00+05:30", mains2: "2
 
 // ----------------- STUDY DAY DB -----------------
 export function blankDay() {
-    return { subjects: { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "Mock Test / Analysis": 0 }, breaks: [], studySessions: [], todos: [], slots: [], totalStudy: 0, totalBreak: 0 };
+    return { subjects: { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Prep": 0, "Mock Test / Analysis": 0 }, breaks: [], studySessions: [], todos: [], slots: [], totalStudy: 0, totalBreak: 0 };
 }
 
 export function ensureDayShape(day) {
