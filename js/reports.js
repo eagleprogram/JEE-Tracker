@@ -300,7 +300,7 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
             days = [];
             for (let i = range; i >= 0; i--) { let d = new Date(today); d.setDate(today.getDate() - i); days.push(dateKeyFromWall(d.getTime())); }
             totalStudy = 0; totalBreak = 0;
-            aggregateSubjects = { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Prep": 0, "Mock Test / Analysis": 0 };
+            aggregateSubjects = { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Preparation": 0, "Mock Test / Analysis": 0 };
             days.forEach(key => { let day = db[key]; if (!day) return; ensureDayShape(day); totalStudy += day.totalStudy || 0; totalBreak += day.totalBreak || 0; for (let [cat, sec] of Object.entries(day.subjects)) { aggregateSubjects[cat] = (aggregateSubjects[cat] || 0) + (sec || 0); } });
             dateRangeLabel = `${days[0]} → ${days[days.length - 1]}`;
             canvas = buildReportCanvas(days, type === 'weekly' ? 'Weekly Study Report' : 'Monthly Study Report');
@@ -348,7 +348,7 @@ export
 function buildReportCanvas(days, title) {
     let db = getDB();
     let totalStudy = 0, totalBreak = 0;
-    let aggregateSubjects = { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Prep": 0, "Mock Test / Analysis": 0 };
+    let aggregateSubjects = { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Preparation": 0, "Mock Test / Analysis": 0 };
     let dayData = [];
     days.forEach(key => {
         let day = db[key];

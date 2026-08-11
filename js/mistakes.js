@@ -572,9 +572,12 @@ export async function renderMistakesTracker() {
 }
 
 // Bundles every logged mistake, across every subject and chapter, into one
-// .zip: a single readable Markdown summary (grouped by subject > chapter,
-// same order as the on-screen tabs) plus every attached file — so
-// revising doesn't mean opening chapter after chapter one at a time.
+// .zip: a top-level Mistakes-Summary.md overview (grouped by subject >
+// chapter, same order as the on-screen tabs) for quick browsing, PLUS a
+// Subject/Chapter/Mistake N/ folder per entry containing that entry's own
+// Notes.md alongside its own attachments — so revising doesn't mean opening
+// chapter after chapter one at a time, and each mistake's files stay paired
+// with its own notes rather than only living in the shared summary.
 export async function exportAllMistakes() {
     let records = await getAllMistakeChapters();
     let totalEntries = records.reduce((sum, r) => sum + ((r.entries || []).length), 0);
@@ -608,13 +611,28 @@ export async function exportAllMistakes() {
                 lines.push(`**#${num} · ${stamp}${entry.count > 1 ? ` · counted as ${entry.count}` : ''}**`);
                 lines.push("");
                 lines.push(entry.notes ? entry.notes : "_(no notes)_");
+
+                // Per-entry folder — "Mistake 1", "Mistake 2", ... — so each
+                // mistake's own note text lives in the SAME folder as its own
+                // attachments, instead of every entry's attachments sitting
+                // loose in one shared chapter folder with only the combined
+                // top-level summary to reference them by.
+                let entryFolder = `${subject}/${safeChapter}/Mistake ${num}`;
+                let entryNoteLines = [
+                    `# ${subject} · ${rec.chapter} · Mistake ${num}`,
+                    stamp ? `Logged: ${stamp}` : "",
+                    entry.count > 1 ? `Counted as: ${entry.count}` : "",
+                    "",
+                    entry.notes ? entry.notes : "_(no notes)_"
+                ].filter(l => l !== "");
+                zip.file(`${entryFolder}/Notes.md`, entryNoteLines.join("\n"));
+
                 if (entry.files && entry.files.length) {
                     lines.push("");
                     lines.push(`Attachments: ${entry.files.map(f => f.name).join(", ")}`);
-                    let folder = `${subject}/${safeChapter}/${num}`;
                     entry.files.forEach(f => {
                         let base64 = (f.dataUrl || "").split(",")[1];
-                        if (base64) zip.file(`${folder}/${f.name}`, base64, { base64: true });
+                        if (base64) zip.file(`${entryFolder}/${f.name}`, base64, { base64: true });
                     });
                 } else if (entry.hasFiles) {
                     lines.push("");

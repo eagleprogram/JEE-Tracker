@@ -173,11 +173,14 @@ export function closeMockFileModal() {
     currentModalFile = null;
 }
 
-// Bundles every mock-test entry into one .zip: a single readable Markdown
-// summary (score, tags, notes, in order) plus every attached file, so
-// revising doesn't mean scrolling/opening entries one at a time. Uses
-// JSZip (loaded via CDN in index.html) since browsers can't build a real
-// zip archive on their own — only one file per click without it.
+// Bundles every mock-test entry into one .zip: a top-level Mock-Tests-
+// Summary.md overview (score, tags, notes, in order) for quick browsing,
+// PLUS a per-entry folder ("1. Physics (date)", ...) containing that
+// entry's own Notes.md alongside its own attached files, so each test's
+// notes stay paired with its own files instead of only living in the
+// shared summary. Uses JSZip (loaded via CDN in index.html) since browsers
+// can't build a real zip archive on their own — only one file per click
+// without it.
 export async function exportAllMockTests() {
     let entries = await getAllMockTests();
     if (entries.length === 0) { alert("No mock test entries to export yet."); return; }
@@ -195,6 +198,19 @@ export async function exportAllMockTests() {
         if (e.mistakeTags && e.mistakeTags.length) lines.push(`Mistake tags: ${e.mistakeTags.join(", ")}`);
         lines.push("");
         lines.push(e.notes ? e.notes : "_(no notes)_");
+
+        // Per-entry notes file, kept in the SAME folder as this entry's own
+        // attachments — so opening one test's folder gives the score/tags/
+        // notes right next to its files, not just a shared summary elsewhere.
+        let entryNoteLines = [
+            `# ${e.subject || "Untitled"} · ${formatDateDDMMYYYY(e.date)}`,
+            `Score: ${e.score || "—"}${e.maxScore ? " / " + e.maxScore : ""}`,
+            (e.mistakeTags && e.mistakeTags.length) ? `Mistake tags: ${e.mistakeTags.join(", ")}` : "",
+            "",
+            e.notes ? e.notes : "_(no notes)_"
+        ].filter(l => l !== "");
+        zip.file(`${safeName}/Notes.md`, entryNoteLines.join("\n"));
+
         if (e.files && e.files.length) {
             lines.push("");
             lines.push(`Attachments: ${e.files.map(f => f.name).join(", ")}`);

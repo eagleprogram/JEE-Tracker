@@ -2,7 +2,7 @@ import { getTodayKey, generateId } from './utils.js';
 
 // ----------------- KEYS / CONSTANTS -----------------
 const SYLLABUS_KEY = "jee_syllabus_progress";
-const NOTIF_DEFAULTS = { enabled: false, breakOverrun: true, breakThresholdMin: 45, plannerReminder: true, examMilestones: true, idleNudge: true, idleThresholdMin: 30, revisionReminder: true, sleepReminder: true, parentLogReminder: true };
+const NOTIF_DEFAULTS = { enabled: false, breakOverrun: true, breakThresholdMin: 45, plannerReminder: true, examMilestones: true, idleNudge: true, idleThresholdMin: 30, revisionReminder: true, sleepReminder: true, parentLogReminder: true, backupReminder: true };
 const YT_HISTORY_KEY = "jee_yt_history";
 const YT_HISTORY_MAX = 20;
 export const MOCK_DB_NAME = "jee_mocktest_db";
@@ -13,7 +13,38 @@ export const BASE_EXAM_DATES = { mains1: "2027-01-21T00:00:00+05:30", mains2: "2
 
 // ----------------- STUDY DAY DB -----------------
 export function blankDay() {
-    return { subjects: { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Prep": 0, "Mock Test / Analysis": 0 }, breaks: [], studySessions: [], todos: [], slots: [], totalStudy: 0, totalBreak: 0 };
+    return { subjects: { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Preparation": 0, "Mock Test / Analysis": 0 }, breaks: [], studySessions: [], todos: [], slots: [], totalStudy: 0, totalBreak: 0 };
+}
+
+// One-time rename map for subject keys that changed after data already
+// existed in users' localStorage. Subject names double as the storage key
+// (day.subjects[name] and studySessions[].subject), so a plain find/replace
+// of "School Prep" -> "School Preparation" in the UI alone would silently
+// orphan every already-logged minute under the old key. getDB() runs this
+// on every read; once a browser's data is migrated the old key is gone so
+// it's a no-op (and skips the save) from then on.
+const SUBJECT_RENAME_MAP = { "School Prep": "School Preparation" };
+function migrateSubjectNames(db) {
+    let changed = false;
+    for (let dayKey in db) {
+        let day = db[dayKey];
+        if (day && day.subjects) {
+            for (let oldName in SUBJECT_RENAME_MAP) {
+                if (Object.prototype.hasOwnProperty.call(day.subjects, oldName)) {
+                    let newName = SUBJECT_RENAME_MAP[oldName];
+                    day.subjects[newName] = (day.subjects[newName] || 0) + day.subjects[oldName];
+                    delete day.subjects[oldName];
+                    changed = true;
+                }
+            }
+        }
+        if (day && day.studySessions) {
+            day.studySessions.forEach(s => {
+                if (SUBJECT_RENAME_MAP[s.subject]) { s.subject = SUBJECT_RENAME_MAP[s.subject]; changed = true; }
+            });
+        }
+    }
+    return changed;
 }
 
 export function ensureDayShape(day) {
@@ -28,7 +59,9 @@ export function ensureDayShape(day) {
 
 export function getDB() {
     let raw = localStorage.getItem("jee_ypt_v3_data");
-    return raw ? JSON.parse(raw) : {};
+    let db = raw ? JSON.parse(raw) : {};
+    if (migrateSubjectNames(db)) saveDB(db);
+    return db;
 }
 
 export function saveDB(data) { localStorage.setItem("jee_ypt_v3_data", JSON.stringify(data)); }

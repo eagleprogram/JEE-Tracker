@@ -2,7 +2,7 @@ import { shiftDateByYears, getTodayKey } from './utils.js';
 import { getExamYear, setStoredExamYear, BASE_EXAM_YEAR, BASE_EXAM_DATES } from './storage.js';
 import { getCurrentDayKey, setCurrentDayKey, flushAndRestartSegment, updateLiveSummary } from './timer.js';
 import { initToday } from './storage.js';
-import { renderSidebarTools, renderPlannerCalendar } from './planner.js';
+import { renderSidebarTools, renderPlannerCalendar, carryOverIncompleteTodos } from './planner.js';
 // Forward reference — history.js/charts.js were built in earlier steps and
 // have no dependency back on ui.js, so this is a normal (non-circular) import.
 import { loadHistoryData } from './history.js';
@@ -115,6 +115,7 @@ export function checkDayRollover() {
     let nowKey = getTodayKey();
     if (nowKey === getCurrentDayKey()) return;
     flushAndRestartSegment();
+    carryOverIncompleteTodos(getCurrentDayKey(), nowKey);
     setCurrentDayKey(nowKey);
     renderQuoteOfDay(); initToday(); renderSidebarTools(); updateLiveSummary(); renderPlannerCalendar();
     let picker = document.getElementById("history-picker");

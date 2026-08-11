@@ -54,7 +54,7 @@
         <h4 class="section-subtitle">📌 Today's To-Do</h4>
         <select id="todo-sort-select" class="sort-select" onchange="renderSidebarTools()" title="Sort tasks">
             <option value="added">Added order</option>
-            <option value="priority-desc">High → Low</option>
+            <option value="priority-desc" selected>High → Low</option>
             <option value="priority-asc">Low → High</option>
         </select>
     </div>
@@ -171,6 +171,10 @@
                 <div class="settings-row">
                     <label>Send daily log to parent (10:30pm, once)</label>
                     <input type="checkbox" id="notif-parentLogReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-row">
+                    <label>Export local backup reminder (every 2 days)</label>
+                    <input type="checkbox" id="notif-backupReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
                     <label>Exam milestone pings</label>
@@ -385,7 +389,7 @@
                         <option value="Physical Chemistry">Physical Chemistry</option>
                         <option value="Mathematics">Mathematics</option>
                         <option value="Revision">Revision</option>
-                        <option value="School Prep">School Prep</option>
+                        <option value="School Preparation">School Preparation</option>
                         <option value="Mock Test / Analysis">Mock Test / Analysis</option>
                     </select>
                 </div>
@@ -506,7 +510,7 @@
             <option value="Physical Chemistry">Physical Chemistry</option>
             <option value="Mathematics">Mathematics</option>
             <option value="Revision">Revision</option>
-            <option value="School Prep">School Prep</option>
+            <option value="School Preparation">School Preparation</option>
             <option value="Mock Test / Analysis">Mock Test / Analysis</option>
         </select>
         <div style="margin-top:15px; display:flex; justify-content:flex-end; gap:12px; align-items:center;">

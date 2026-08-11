@@ -43,22 +43,22 @@ Tracker/
 │   ├── components.css  — cards, buttons, modals, inputs, badges
 │   └── charts.css      — garden, heatmap, pie, trend chart styling
 └── js/
-    ├── utils.js        — pure helper functions, no DOM/storage
-    ├── storage.js      — the only file that touches localStorage/IndexedDB
-    ├── timer.js        — study/break timer state machine
+    ├── utils.js         — pure helper functions, no DOM/storage
+    ├── storage.js       — the only file that touches localStorage/IndexedDB
+    ├── timer.js         — study/break timer state machine
     ├── notifications.js — idle nudge, break overrun, reminders, pings
-    ├── planner.js      — to-do list + calendar
-    ├── history.js      — logs, per-entry delete
-    ├── sleep.js        — sleep/wake log
-    ├── syllabus.js     — chapter-by-chapter syllabus tracker
-    ├── mocktest.js     — mock test scores + mistake tags
-    ├── youtube.js      — study-music player + history
-    ├── charts.js       — garden, heatmap, streak, trend
-    ├── reports.js      — share/download/email reports
-    ├── backup.js       — export/import JSON
+    ├── planner.js       — to-do list + calendar
+    ├── history.js       — logs, per-entry delete
+    ├── sleep.js         — sleep/wake log
+    ├── syllabus.js      — chapter-by-chapter syllabus tracker
+    ├── mocktest.js      — mock test scores + mistake tags
+    ├── youtube.js       — study-music player + history
+    ├── charts.js        — garden, heatmap, streak, trend
+    ├── reports.js       — share/download/email reports
+    ├── backup.js        — export/import JSON
     ├── firebase-sync.js — auth + cloud sync
-    ├── ui.js           — sidebar, toasts, countdown
-    └── main.js         — entry point, wires it all
+    ├── ui.js            — sidebar, toasts, countdown
+    └── main.js          — entry point, wires it all
 ```
 
 ## Known Bugs Fixed in This Rebuild

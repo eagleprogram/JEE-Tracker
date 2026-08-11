@@ -47,7 +47,7 @@ export function renderSidebarTools() {
     let todayKey = getTodayKey(); let db = getPlannerDB(); let tasks = db[todayKey] || [];
     let todoHtml = ""; if (tasks.length === 0) todoHtml = "<div style='color:var(--muted); font-size:12px; margin-top:8px;'>No tasks for today yet.</div>";
     let sortSelect = document.getElementById("todo-sort-select");
-    let order = sortTaskIndices(tasks, sortSelect ? sortSelect.value : "added");
+    let order = sortTaskIndices(tasks, sortSelect ? sortSelect.value : "priority-desc");
     order.forEach(i => { let t = tasks[i]; todoHtml += `<div class="todo-item"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${i})"><span style="flex:1; ${t.done?'text-decoration:line-through;color:var(--muted);':''}">${getPriorityEmoji(t.priority)} ${escapeHtml(t.text)}</span><button class="del" onclick="deleteTodo(${i})">✕</button></div>`; });
     document.getElementById("todo-list").innerHTML = todoHtml;
 }
@@ -62,6 +62,26 @@ export function deleteTodo(idx) {
     let todayKey = getTodayKey(); let db = getPlannerDB();
     if (!db[todayKey]) return;
     db[todayKey].splice(idx, 1); savePlannerDB(db); renderSidebarTools(); renderPlannerCalendar();
+}
+
+// Called once from checkDayRollover() (ui.js) at the exact moment local
+// midnight flips over. Any todo still unchecked on the day that just ended
+// moves onto the new day's list instead of being left behind on a date the
+// user will likely never revisit — the 8pm planner reminder (notifications.js)
+// nudges them beforehand, but whatever's still pending at midnight follows
+// them forward. Completed tasks stay put on the day they were finished. If
+// a carried-over task is STILL incomplete by the next midnight, this same
+// function runs again and carries it forward again — so it keeps rolling
+// day to day until it's either checked off or deleted.
+export function carryOverIncompleteTodos(oldDayKey, newDayKey) {
+    let db = getPlannerDB();
+    let oldTasks = db[oldDayKey];
+    if (!oldTasks || oldTasks.length === 0) return;
+    let incomplete = oldTasks.filter(t => !t.done);
+    if (incomplete.length === 0) return;
+    db[oldDayKey] = oldTasks.filter(t => t.done);
+    db[newDayKey] = (db[newDayKey] || []).concat(incomplete);
+    savePlannerDB(db);
 }
 
 // ----------------- CALENDAR + PER-DAY PLANNER MODAL -----------------

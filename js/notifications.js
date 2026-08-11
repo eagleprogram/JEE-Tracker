@@ -17,6 +17,7 @@ export function renderNotifSettingsUI() {
     document.getElementById("notif-revisionReminder").checked = s.revisionReminder;
     document.getElementById("notif-sleepReminder").checked = s.sleepReminder;
     document.getElementById("notif-parentLogReminder").checked = s.parentLogReminder;
+    document.getElementById("notif-backupReminder").checked = s.backupReminder;
     updateNotifPermissionStatus();
 }
 
@@ -31,7 +32,8 @@ export function saveNotifSettingsFromUI() {
         idleThresholdMin: Math.max(10, parseInt(document.getElementById("notif-idleThreshold").value) || 30),
         revisionReminder: document.getElementById("notif-revisionReminder").checked,
         sleepReminder: document.getElementById("notif-sleepReminder").checked,
-        parentLogReminder: document.getElementById("notif-parentLogReminder").checked
+        parentLogReminder: document.getElementById("notif-parentLogReminder").checked,
+        backupReminder: document.getElementById("notif-backupReminder").checked
     };
     saveNotifSettings(s); showToast("Notification settings saved.");
 }
@@ -163,19 +165,33 @@ function checkExamMilestones(s) {
 }
 
 // ----------------- BACKUP REMINDER -----------------
-// NEW IMPLEMENTATION — storage.js's markBackupDone() tracked the timestamp
-// (via exportDataJSON) but nothing ever read it back. Reminds once every 7
-// days if no backup has been exported.
+// storage.js's markBackupDone() tracks the last-export timestamp; this
+// reminds every 2 days (48h) if no fresh backup has been exported since.
+// Toggle-able via s.backupReminder (Settings > Notifications), same as the
+// other reminders.
+//
+// Cooldown is tracked as an actual "last reminded at" timestamp (not a
+// per-calendar-day flag) so it holds for a true 48h window: the old
+// per-day-flag version fired once on the day it first became due, then
+// fired AGAIN the very next calendar day (still >=2 days since backup, new
+// day = new flag) instead of waiting out the remaining ~24h. With a
+// timestamp cooldown: once it fires, it stays silent until 48h after that
+// firing, then fires again immediately on the next check afterwards
+// (including right when the user next opens/signs into the app) — matching
+// "if he didn't open the site, ring again right when he opens it."
+// Exporting a backup calls markBackupDone(), which pushes `last` forward
+// and makes the first condition below false again, resetting the whole cycle.
 const BACKUP_REMINDER_INTERVAL_MS = 2 * 24 * 60 * 60 * 1000;
-function checkBackupReminder() {
+const BACKUP_REMINDER_LAST_KEY = "jee_backup_reminder_last_at";
+function checkBackupReminder(s) {
+    if (!s.backupReminder) return;
     let last = getLastBackupAt();
     if (!last) return; // main.js seeds this on first run; nothing to compare yet
-    if (Date.now() - last < BACKUP_REMINDER_INTERVAL_MS) return;
-    let flagKey = "jee_backup_reminder_" + getTodayKey();
-    if (!getRawFlag(flagKey)) {
-        notify("Backup reminder", "It's been 2 days since your last backup — export one now from Settings.");
-        setRawFlag(flagKey, "1");
-    }
+    if (Date.now() - last < BACKUP_REMINDER_INTERVAL_MS) return; // backed up recently enough
+    let lastReminded = parseInt(getRawFlag(BACKUP_REMINDER_LAST_KEY) || "0", 10);
+    if (Date.now() - lastReminded < BACKUP_REMINDER_INTERVAL_MS) return; // already pinged within the last 48h
+    notify("Backup reminder", "It's been 2+ days since your last backup — export one now from Settings.");
+    setRawFlag(BACKUP_REMINDER_LAST_KEY, String(Date.now()));
 }
 
 // ----------------- MASTER CHECK LOOP -----------------
@@ -233,5 +249,5 @@ export function runNotificationChecks() {
     checkBreakOverrun(s);
     checkIdleNudge(s);
     checkExamMilestones(s);
-    checkBackupReminder();
+    checkBackupReminder(s);
 }
