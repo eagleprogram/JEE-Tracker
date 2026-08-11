@@ -33,9 +33,9 @@ For multi-device users, Firebase Firestore provides effortless, cross-device syn
 
 ```text
 Tracker/
-├── index.html          — page shell, all markup
-├── manifest.json       — PWA manifest
-├── sw.js               — service worker (offline app-shell caching)
+├── index.html                    — page shell, all markup
+├── manifest.json                 — PWA manifest
+├── sw.js                         — service worker (offline app-shell caching)
 ├── icon-192.png / icon-512.png   — PWA icons (repo root, not an icons/ subfolder)
 ├── css/
 │   ├── variables.css   — color/spacing tokens only
