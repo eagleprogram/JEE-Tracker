@@ -234,25 +234,28 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    border-radius:50% (instead of a min-width + horizontal padding pill)
    so it stays a true circle for both single- and double-digit counts,
    rather than stretching into an oval. */
+/* Number-of-tasks-left badge next to "Today's To-Do" — outlined circle,
+   text/border colored to match the sidebar's accent so it sits quietly in
+   the left rail instead of competing with it. Centered via line-height
+   (not flexbox align-items) — a fixed line-height equal to the circle's
+   inner (content-box) height vertically centers a single line of text far
+   more reliably than flex centering, which centers the whole line box and
+   can read as visually high/low depending on the font's own ascent/descent
+   metrics. width/height are the OUTER box (border included, box-sizing:
+   border-box), so line-height = height − 2×border-width to match the
+   actual inner content area. */
 .todo-count-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-block;
     width: 22px;
     height: 22px;
-    padding: 0;
+    line-height: 19px;
+    text-align: center;
     margin-left: 4px;
     border: 1.5px solid var(--primary);
     border-radius: 50%;
     color: var(--primary);
     font-size: 11px;
     font-weight: 700;
-    line-height: 1;
-    /* Flex-centering alone still reads as slightly high: the digits'
-       glyph box sits a hair above the true vertical middle of the line
-       box in this font, so a 1px nudge down is what actually lands them
-       dead-center inside the circle. */
-    padding-top: 1px;
     vertical-align: middle;
     box-sizing: border-box;
     flex-shrink: 0;

@@ -5,7 +5,7 @@
 // thing that makes the activate handler below delete the old cache and let
 // the new files be fetched fresh. Forgetting this step means fixes silently
 // never reach anyone who doesn't manually hard-refresh.
-const CACHE_NAME = "jee-tracker-v2.4.1";
+const CACHE_NAME = "jee-tracker-v2.4.2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -30,9 +30,9 @@ const APP_SHELL = [
   "./js/firebase-sync.js",
   "./js/ui.js",
   "./js/main.js",
-  "./icon-192.png",
-  "./icon-512.png",
-  "./target-icon.png"
+  "./assets/icon-192.png",
+  "./assets/icon-512.png",
+  "./assets/target-icon.png"
 ];
 
 self.addEventListener("install", (event) => {
