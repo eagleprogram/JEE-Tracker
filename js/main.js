@@ -17,7 +17,8 @@ import {
 import {
     showToast, closeSidebar, openSidebarPanel, checkDayRollover,
     renderQuoteOfDay, renderExamYearUI, setExamYear, tickCountdowns,
-    clearCacheAndReload, toggleZenMode, exitZenMode
+    clearCacheAndReload, toggleZenMode, exitZenMode,
+    hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze
 } from './ui.js';
 
 import {
@@ -92,6 +93,7 @@ Object.assign(window, {
     showToast, closeSidebar, openSidebarPanel, checkDayRollover,
     renderQuoteOfDay, renderExamYearUI, setExamYear, tickCountdowns,
     clearCacheAndReload, toggleZenMode, exitZenMode,
+    hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
     // planner.js
     addTodo, toggleTodo, deleteTodo, calShiftMonth, renderSidebarTools,
     renderPlannerCalendar, openPlannerModal, closePlannerModal,

@@ -1,5 +1,5 @@
 import { shiftDateByYears, getTodayKey } from './utils.js';
-import { getExamYear, setStoredExamYear, BASE_EXAM_YEAR, BASE_EXAM_DATES } from './storage.js';
+import { getExamYear, setStoredExamYear, BASE_EXAM_YEAR, BASE_EXAM_DATES, getRawFlag, setRawFlag } from './storage.js';
 import { getCurrentDayKey, setCurrentDayKey, flushAndRestartSegment, updateLiveSummary } from './timer.js';
 import { initToday } from './storage.js';
 import { renderSidebarTools, renderPlannerCalendar, carryOverIncompleteTodos } from './planner.js';
@@ -57,6 +57,47 @@ export function showToast(msg) {
     el.innerText = msg;
     stack.appendChild(el);
     setTimeout(() => el.remove(), 8000);
+}
+
+// ----------------- GUEST SIGN-IN REMINDER -----------------
+// Nudges a not-signed-in user to sign in, so a cleared cache/browser reset
+// doesn't silently wipe study data that only ever lived in localStorage.
+// Persistence uses the existing getRawFlag/setRawFlag raw-key helpers
+// (same mechanism notifications.js uses for its own cooldown flags) rather
+// than new dedicated storage.js functions, since this is the same shape of
+// "one-off flag" data.
+const GUEST_REMINDER_DISMISSED_KEY = "jee_guestReminderDismissed";
+const GUEST_REMINDER_SNOOZE_KEY = "jee_guestReminderSnoozeUntil";
+const GUEST_REMINDER_SNOOZE_MS = 5 * 60 * 1000;
+
+export function maybeShowGuestSignInReminder() {
+    if (getRawFlag(GUEST_REMINDER_DISMISSED_KEY) === "1") return;
+    let snoozeUntil = parseInt(getRawFlag(GUEST_REMINDER_SNOOZE_KEY) || "0", 10);
+    let remaining = snoozeUntil - Date.now();
+    if (remaining > 0) {
+        // Tab may stay open past the snooze window — re-check when it lapses
+        // instead of only re-prompting on the next full page load.
+        setTimeout(maybeShowGuestSignInReminder, remaining + 500);
+        return;
+    }
+    let modal = document.getElementById("guest-reminder-modal");
+    if (modal) modal.style.display = "flex";
+}
+
+export function hideGuestSignInReminder() {
+    let modal = document.getElementById("guest-reminder-modal");
+    if (modal) modal.style.display = "none";
+}
+
+export function guestReminderIgnore() {
+    setRawFlag(GUEST_REMINDER_DISMISSED_KEY, "1");
+    hideGuestSignInReminder();
+}
+
+export function guestReminderSnooze() {
+    setRawFlag(GUEST_REMINDER_SNOOZE_KEY, String(Date.now() + GUEST_REMINDER_SNOOZE_MS));
+    hideGuestSignInReminder();
+    setTimeout(maybeShowGuestSignInReminder, GUEST_REMINDER_SNOOZE_MS + 500);
 }
 
 // ----------------- ZEN / FOCUS MODE -----------------

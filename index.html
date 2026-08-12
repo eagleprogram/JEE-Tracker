@@ -360,14 +360,22 @@
                         <stop offset="40%" stop-color="#ffffff" stop-opacity="0"/>
                     </radialGradient>
                 </defs>
-                <!-- dartboard-style target: true red/white rings, crisp at any size since it's a vector, not a raster clip-art import -->
-                <circle cx="24" cy="24" r="21" fill="#ef4444"/>
-                <circle cx="24" cy="24" r="21" fill="none" stroke="#0f172a" stroke-width="1"/>
-                <circle cx="24" cy="24" r="16.2" fill="#f8fafc"/>
-                <circle cx="24" cy="24" r="11.4" fill="#ef4444"/>
-                <circle cx="24" cy="24" r="6.6" fill="#f8fafc"/>
-                <circle cx="24" cy="24" r="2.4" fill="#ef4444"/>
-                <circle cx="24" cy="24" r="21" fill="url(#targetShine)"/>
+                <!-- Dartboard + dart ("🎯 direct hit"), built as flat vector
+                     shapes on a 48x48 grid — crisp at any size, unlike a
+                     raster emoji-font glyph or a clip-art import. -->
+                <circle cx="22" cy="24" r="18.5" fill="#ef4444"/>
+                <circle cx="22" cy="24" r="18.5" fill="none" stroke="#0f172a" stroke-width="1"/>
+                <circle cx="22" cy="24" r="14.2" fill="#f8fafc"/>
+                <circle cx="22" cy="24" r="9.9" fill="#ef4444"/>
+                <circle cx="22" cy="24" r="5.6" fill="#f8fafc"/>
+                <circle cx="22" cy="24" r="2.3" fill="#ef4444"/>
+                <!-- dart shaft, angled in from the upper-right so its tip lands dead-center -->
+                <g transform="rotate(42 22 24)">
+                    <rect x="21" y="-6" width="2" height="27" rx="1" fill="#334155"/>
+                    <path d="M22 -9 L26 -3 L22 -6 L18 -3 Z" fill="#ef4444"/>
+                    <path d="M20.1 21 L23.9 21 L22 25.2 Z" fill="#e2e8f0"/>
+                </g>
+                <circle cx="22" cy="24" r="18.5" fill="url(#targetShine)"/>
             </svg>
             <div class="app-title-text">
                 <span class="app-title-main" id="app-title-main">JEE 2027</span>
@@ -598,6 +606,24 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
 <script type="module" src="js/main.js"></script>
+    <!-- Guest Sign-In Reminder — nudges a not-signed-in user toward cloud
+         sync so a cleared cache/browser reset doesn't silently wipe their
+         study data. Shown by maybeShowGuestSignInReminder() in ui.js,
+         triggered from firebase-sync.js's onAuthStateChanged once the
+         first guest/signed-in check resolves. -->
+<div class="modal" id="guest-reminder-modal" style="z-index: 998;">
+    <div class="modal-content" style="text-align: center; padding: 32px 26px;">
+        <div style="font-size: 48px; margin-bottom: 6px;">☁️</div>
+        <h3 style="color: var(--text); margin: 0 0 8px 0; font-size: 19px;">You're browsing as a guest</h3>
+        <p style="color: var(--muted); margin: 0 0 22px 0; font-size: 13px; line-height: 1.5;">Your study logs are only saved on this device right now. Signing in backs them up to the cloud and keeps them safe if you clear your browser data or switch devices.</p>
+        <button class="btn btn-start" onclick="hideGuestSignInReminder(); signInWithGoogle();" style="width: 100%; margin-bottom: 8px;">Sign In</button>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn btn-ghost btn-small" onclick="guestReminderSnooze()" style="flex: 1;">Remind Later (5 min)</button>
+            <button class="btn btn-ghost btn-small" onclick="guestReminderIgnore()" style="flex: 1;">Ignore</button>
+        </div>
+    </div>
+</div>
+
     <!-- Persistent Alarm Modal -->
 <div class="modal" id="alarm-modal" style="z-index: 999;">
     <div class="modal-content" style="text-align: center; padding: 40px 30px; border: 2px solid var(--danger);">

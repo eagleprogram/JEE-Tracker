@@ -91,6 +91,8 @@ button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radiu
 .btn-export { background: var(--primary); color: #04121f; font-weight: 700; }
 .btn-stop { background: var(--danger); color: white; }
 .btn-yellow { background: #eab308; color: #1a1400; }
+.btn-ghost { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: var(--primary); }
 .btn:hover { opacity: 0.9; transform: translateY(-1px); }
 .btn-small { padding: 8px 12px; font-size: 12px; }
 .btn-compact { padding: 7px 10px; font-size: 11px; }

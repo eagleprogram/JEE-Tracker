@@ -9,7 +9,7 @@ import { getTodayKey } from './utils.js';
 // Forward reference — ui.js lands alongside this file in Step 7. Only used
 // inside function bodies, safe against the circular module graph (both
 // showToast and everything imported here are hoisted function declarations).
-import { showToast } from './ui.js';
+import { showToast, maybeShowGuestSignInReminder, hideGuestSignInReminder } from './ui.js';
 // Forward reference — reports.js (Step 6) needs sendReportViaEmail for the
 // auto-report scheduler below.
 import { sendReportViaEmail } from './reports.js';
@@ -63,6 +63,7 @@ export function initFirebaseAuthIfNeeded() {
             renderSyncUI();
             if (user) {
                 showToast(`Signed in as ${user.displayName || user.email}`);
+                hideGuestSignInReminder();
                 startAutoServices();
                 startCloudListener();
                 autoLoadCloudDataIfNeeded();
@@ -71,6 +72,9 @@ export function initFirebaseAuthIfNeeded() {
                 if (autoSyncInterval) clearInterval(autoSyncInterval);
                 if (autoReportInterval) clearInterval(autoReportInterval);
                 stopCloudListener();
+                // Small delay so this doesn't pop before the rest of the UI
+                // has finished its first render.
+                setTimeout(maybeShowGuestSignInReminder, 1500);
             }
         });
     }
