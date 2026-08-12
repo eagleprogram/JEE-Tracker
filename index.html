@@ -348,6 +348,8 @@
     </div>
 </div>
 
+<div id="zen-backdrop" onclick="exitZenMode()"></div>
+
 <div class="main-wrapper">
     <div class="header">
         <div class="app-title-wrap">
@@ -394,7 +396,13 @@
     <div class="card quote-banner" id="quote-of-day"></div>
 
     <div class="grid-2">
-        <div class="card">
+        <div class="card timer-card" id="timer-card">
+            <button class="zen-toggle-btn" id="zen-toggle-btn" onclick="toggleZenMode()" title="Zen Mode — hide distractions and focus on the timer">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
+                </svg>
+            </button>
             <div id="status-badge" class="badge badge-idle">STATUS: IDLE</div>
             <div class="timer-box">
                 <div style="font-size:13px; color:var(--muted);" id="session-label">CURRENT SESSION</div>

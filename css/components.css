@@ -5,6 +5,77 @@
 .timer-screen { font-size: 72px; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: -1px; max-width: 100%; overflow-wrap: anywhere; transition: font-size 0.25s ease; }
 .controls-row { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
 
+/* ===== Zen / Focus Mode =====
+   Design: one full-viewport backdrop (positioned, its own z-index) that
+   automatically paints above every ordinary in-flow element on the page —
+   header, quote banner, live-summary card, garden, heatmap, trend chart —
+   with zero per-element rules needed for any of them. The timer card is
+   pulled out of the grid and re-centered on top of that backdrop, at up to
+   75% of the viewport width. Toggling body.zen-mode is the only thing the
+   JS does (see toggleZenMode() in ui.js); every visual change here is a
+   CSS transition, so entering/exiting is fully symmetric and never
+   restructures the underlying layout. */
+.timer-card { position: relative; }
+
+.zen-toggle-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s;
+    z-index: 3;
+}
+.zen-toggle-btn:hover { color: var(--primary); border-color: var(--primary); }
+.zen-toggle-btn svg { width: 17px; height: 17px; }
+body.zen-mode .zen-toggle-btn { color: var(--success); border-color: var(--success); background: rgba(16, 185, 129, 0.12); }
+
+#zen-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 7, 15, 0.93);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+}
+body.zen-mode #zen-backdrop { opacity: 1; pointer-events: auto; }
+
+/* The sidebar is the only other element on the page with its own z-index
+   (200, set in base.css) — high enough to otherwise sit above the zen
+   backdrop and poke through it. Drop it below while zen is active so it's
+   covered like everything else; restored the instant zen-mode is removed. */
+body.zen-mode .sidebar { z-index: 40; }
+
+body.zen-mode .timer-card {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(75vw, 760px);
+    max-width: 92vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    z-index: 110;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+body.zen-mode .timer-screen { font-size: clamp(52px, 9vw, 110px); }
+body.zen-mode .timer-box { min-height: 320px; }
+@media (max-width: 700px) {
+    body.zen-mode .timer-card { width: 92vw; }
+    body.zen-mode .timer-screen { font-size: clamp(38px, 15vw, 68px); }
+}
+
 /* ===== Buttons ===== */
 button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; }
 .btn-start { background: var(--success); color: white; }

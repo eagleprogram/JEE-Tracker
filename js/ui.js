@@ -59,6 +59,30 @@ export function showToast(msg) {
     setTimeout(() => el.remove(), 8000);
 }
 
+// ----------------- ZEN / FOCUS MODE -----------------
+// Pure visual toggle — no new state to persist. The timer keeps ticking and
+// updating the exact same #session-timer/#status-badge/button nodes it
+// always does; zen mode only changes how those nodes are POSITIONED and
+// SIZED on screen (see body.zen-mode rules in components.css — the timer
+// card gets pulled out of the grid and re-centered as a large overlay,
+// everything else is covered by a dim/blurred backdrop). Nothing here
+// alters the timer state machine, so Pause/Break/End/switch-subject all
+// keep working completely unmodified inside the enlarged card.
+export function toggleZenMode() {
+    let active = document.body.classList.toggle("zen-mode");
+    let btn = document.getElementById("zen-toggle-btn");
+    if (btn) btn.title = active ? "Exit Zen Mode" : "Zen Mode — hide distractions and focus on the timer";
+}
+
+// Wired to #zen-backdrop's own click handler — clicking the dim area around
+// the timer card exits zen mode (a click ON the card itself never reaches
+// the backdrop, since the card sits visually and structurally above it).
+export function exitZenMode() {
+    document.body.classList.remove("zen-mode");
+    let btn = document.getElementById("zen-toggle-btn");
+    if (btn) btn.title = "Zen Mode — hide distractions and focus on the timer";
+}
+
 // ----------------- SIDEBAR -----------------
 let activeSidebarPanel = null;
 
