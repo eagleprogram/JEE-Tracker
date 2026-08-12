@@ -114,7 +114,18 @@ button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radiu
 .btn-report-share:hover { background: rgba(var(--tint-indigo), 0.2); }
 
 .btn-small { padding: 8px 12px; font-size: 12px; }
-.btn-compact { padding: 7px 10px; font-size: 11px; }
+/* .btn-compact: the 3-across "Delete Cloud Data / Reset All Data / Sign Out"
+   row. These sit in a `flex:1` row with white-space:nowrap, but flex items
+   default to min-width:auto — meaning a flex item is never allowed to
+   shrink below its own text's intrinsic width, no matter how little room
+   flex:1 gives it. With 3 fairly long labels that made the row overflow its
+   card (or crush against each other) instead of actually fitting on one
+   line. min-width:0 lifts that floor so flex:1 can size them down for real;
+   overflow/text-overflow give a graceful ellipsis instead of a raw clip on
+   the rare viewport where even that isn't enough room. Padding is tightened
+   (not font-size, which stays matched across all three buttons) to keep
+   them from feeling cramped once they're this narrow. */
+.btn-compact { padding: 7px 6px; font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* ===== Single-line button rows (no wrapping to a 2nd row) ===== */
 .btn-row-nowrap {
@@ -245,17 +256,19 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    border-box), so line-height = height − 2×border-width to match the
    actual inner content area. */
 .todo-count-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 22px;
     height: 22px;
-    line-height: 19px;
-    text-align: center;
+    padding: 0;
     margin-left: 4px;
     border: 1.5px solid var(--primary);
     border-radius: 50%;
     color: var(--primary);
     font-size: 11px;
     font-weight: 700;
+    line-height: 1;
     vertical-align: middle;
     box-sizing: border-box;
     flex-shrink: 0;

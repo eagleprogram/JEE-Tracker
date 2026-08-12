@@ -202,6 +202,17 @@ async function initApp() {
     renderExamYearUI();
     tickCountdowns();                 // also runs checkDayRollover + notif checks + renderGarden
     setInterval(tickCountdowns, 1000);
+    // Catch-up on visibility regain: background/hidden tabs get their
+    // setInterval throttled by the browser (Chrome limits hidden tabs to
+    // roughly one timer wakeup per minute, sometimes coarser), which is why
+    // time-of-day reminders (revision, parent log, planner, sleep) could
+    // sit silently overdue while the tab sat unfocused and only catch up
+    // whenever the next throttled tick happened to land. Firing an extra
+    // tick the instant the tab becomes visible again closes that gap
+    // immediately instead of waiting up to a minute (or more) for it.
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") tickCountdowns();
+    });
 
     // Charts.
     renderHeatmap();

@@ -229,7 +229,7 @@
                 <!-- BOTTOM: Guest Delete Button -->
                 <div class="small-note" style="color:var(--danger); margin-bottom:4px;">⚠️ Guest mode: Deletes ALL local data from this device.<br>   (Study logs, Planner, Sleep, Settings) </div>
                 <button class="btn btn-stop btn-small" style="width:100%;" onclick="resetAllData()">Delete All Local Data</button>
-                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
+                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: auto-saves to cloud (if signed in), signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
             </div>
             <div id="signed-in-block" style="display:none;">
                 <div id="sync-last" class="small-note"></div>
@@ -237,12 +237,12 @@
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="pushToCloud()">Save to Cloud ⬆</button>
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="pullFromCloud()">Load from Cloud ⬇</button>
                 </div>
-                <div style="display:flex; gap:6px; margin-top:6px;">
+                <div style="display:flex; gap:4px; margin-top:6px;">
                     <button class="btn btn-stop btn-compact" style="flex:1; white-space:nowrap;" onclick="deleteCloudData()">Delete Cloud Data</button>
                     <button class="btn btn-stop btn-compact" style="flex:1; white-space:nowrap;" onclick="resetAllData()">Reset All Data</button>
                     <button class="btn btn-stop btn-compact" style="flex:1; white-space:nowrap;" onclick="signOutOfGoogle()">Sign Out</button>
                 </div>
-                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
+                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: auto-saves to cloud (if signed in), signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
             </div>
         </div>
     </div>
@@ -518,7 +518,7 @@
         <div>
             <h4>Logged Breaks</h4>
             <div class="missed-break-form">
-                <input type="text" id="missed-break-reason" placeholder="Forgot to log a break (Add here)">
+                <input type="text" id="missed-break-reason" placeholder="Forgot to log a break? (Add here)">
                 <div class="missed-break-times">
                     <input type="time" id="missed-break-start" title="Start time">
                     <span>&ndash;</span>

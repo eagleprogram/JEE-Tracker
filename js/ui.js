@@ -19,7 +19,7 @@ import { wipeLocalData } from './storage.js';
 // is safe here: signOutOfGoogle/getCurrentUser are only ever called from
 // inside deleteCookiesAndReload()'s function body, well after both modules
 // have finished evaluating — never at module-eval time.
-import { signOutOfGoogle, getCurrentUser } from './firebase-sync.js';
+import { signOutOfGoogle, getCurrentUser, pushToCloud } from './firebase-sync.js';
 
 // ----------------- FULL DEVICE RESET (Delete Cookies & Reload) -----------------
 // This used to only clear the PWA's Cache Storage layer (so a stale cached
@@ -32,24 +32,34 @@ import { signOutOfGoogle, getCurrentUser } from './firebase-sync.js';
 // session with it. This function now does the same full wipe from inside
 // the app in one click, instead of requiring that manual multi-step process.
 //
-// Order matters: sign out FIRST (before local data is wiped) so
+// Order matters: push the current data to the cloud FIRST (while still
+// signed in), THEN sign out (before local data is wiped) so
 // onAuthStateChanged's signed-out branch doesn't race the wipe below, then
 // clear the PWA cache layer, then local study data, then cookies, then do a
-// cache-busted reload. Because sign-out + local wipe are destructive and
-// unrecoverable from this device alone, the confirm dialog below leads with
-// telling the user to save to the cloud first — the cloud copy is what lets
-// them get their data back afterwards (autoLoadCloudDataIfNeeded in
-// firebase-sync.js already offers to restore it the next time they sign in
-// on this browser).
+// cache-busted reload. This used to just tell the user to go save to the
+// cloud manually beforehand and hope they had — now the reset itself does
+// that save automatically (best-effort: a failed auto-sync is surfaced via
+// toast but does not block the reset, since the user already confirmed they
+// want to proceed), so the only thing needed to get everything back is
+// signing back in on this browser afterwards — autoLoadCloudDataIfNeeded in
+// firebase-sync.js already offers to restore it the moment they do.
 export async function deleteCookiesAndReload() {
     if (!confirm(
         "This fully resets the app on THIS browser — the same as manually deleting cookies and site data. It will:\n\n" +
+        "• Auto-save your current data to the cloud (if signed in)\n" +
         "• Sign you out of your account\n" +
         "• Erase all study logs, planner tasks, sleep logs, syllabus progress, and mock tests on this device\n" +
         "• Clear cached app files and reload the latest version from GitHub\n\n" +
-        "This cannot be undone on this device. If you haven't saved to the cloud recently, go to Account & Sync → Save to Cloud first — you'll be offered your cloud data back the next time you sign in here.\n\n" +
+        "This cannot be undone on this device — but if you're signed in, your data is synced to the cloud first, so all you need to get it back is signing in again after this reload.\n\n" +
         "Continue?"
     )) return;
+    try {
+        if (getCurrentUser()) await pushToCloud(true);
+    } catch (e) {
+        // Best-effort — a failed auto-sync shouldn't block the reset the
+        // user already confirmed; pushToCloud's own silent-mode toast has
+        // already surfaced the failure to them.
+    }
     try {
         if (getCurrentUser()) await signOutOfGoogle();
     } catch (e) {
@@ -106,7 +116,7 @@ export function showToast(msg) {
     el.className = "toast";
     el.innerText = msg;
     stack.appendChild(el);
-    setTimeout(() => el.remove(), 8000);
+    setTimeout(() => el.remove(), 5000);
 }
 
 // ----------------- GUEST SIGN-IN REMINDER -----------------

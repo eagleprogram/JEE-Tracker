@@ -65,21 +65,68 @@ export function enableNotifications() {
 }
 
 // ----------------- ALARM (persistent, for critical pings) -----------------
+// BUG FIX: this used to call `new (AudioContext)()` fresh on every single
+// beep — every 1s for as long as the persistent alarm rings, and once more
+// for every one-off toast-only notify(). Two problems with that:
+// 1) A brand-new AudioContext starts life "suspended" in browsers with
+//    autoplay-restriction policies unless it's created/resumed inside a
+//    direct user-gesture handler. A scheduled reminder firing from a
+//    setInterval tick is NOT a user gesture, so a freshly-created context
+//    can silently stay suspended and never actually produce sound — the
+//    try/catch here doesn't even catch that, because creating the context
+//    doesn't throw, it just does nothing audible. This is a strong
+//    candidate for "the alarm modal shows but sometimes there's no sound"
+//    reported while studying with the tab backgrounded.
+// 2) Never closing any of those contexts leaves them piling up for the
+//    lifetime of the tab — browsers cap how many concurrent AudioContexts a
+//    page may hold, so a long study session with several alarms over the
+//    day could eventually exhaust that cap and start failing outright.
+// Fixed by reusing ONE lazily-created AudioContext for the whole page
+// session and explicitly resume()-ing it before every beep (resume() on an
+// already-running context is a harmless no-op) — same pattern browsers
+// recommend for audio triggered by non-gesture events like timers.
+let sharedAudioCtx = null;
 export function playAlarmSound() {
     try {
-        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let oscillator = audioCtx.createOscillator();
-        let gainNode = audioCtx.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.value = 800;
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.5);
+        if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let start = () => {
+            let oscillator = sharedAudioCtx.createOscillator();
+            let gainNode = sharedAudioCtx.createGain();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 800;
+            oscillator.connect(gainNode);
+            gainNode.connect(sharedAudioCtx.destination);
+            gainNode.gain.setValueAtTime(0.3, sharedAudioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, sharedAudioCtx.currentTime + 0.5);
+            oscillator.start();
+            oscillator.stop(sharedAudioCtx.currentTime + 0.5);
+        };
+        if (sharedAudioCtx.state === "suspended") {
+            sharedAudioCtx.resume().then(start).catch(e => console.log("Audio resume failed", e));
+        } else {
+            start();
+        }
     } catch (e) { console.log("Audio alarm failed", e); }
 }
+
+// Pre-warm/unlock the shared AudioContext on the very first real user
+// gesture anywhere on the page (click, key press, or touch) — that's the
+// one moment browsers reliably allow audio to be resumed, so doing it here
+// means the context is already running long before an alarm ever needs to
+// fire from a background timer tick, instead of trying (and sometimes
+// failing) to resume it in that same non-gesture callback.
+function unlockAudioOnce() {
+    try {
+        if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (sharedAudioCtx.state === "suspended") sharedAudioCtx.resume().catch(() => {});
+    } catch (e) { /* non-fatal — playAlarmSound will retry on its own */ }
+    document.removeEventListener("click", unlockAudioOnce);
+    document.removeEventListener("keydown", unlockAudioOnce);
+    document.removeEventListener("touchstart", unlockAudioOnce);
+}
+document.addEventListener("click", unlockAudioOnce);
+document.addEventListener("keydown", unlockAudioOnce);
+document.addEventListener("touchstart", unlockAudioOnce);
 
 let alarmInterval = null;
 let isAlarmActive = false;
@@ -248,10 +295,25 @@ export function runNotificationChecks() {
         }
     }
 
-    // Revision reminder: user-configurable time (default 9:00 PM), once/day
+    // Revision reminder: user-configurable time (default 9:00 PM), once/day.
+    // BUG FIX: this used to require `h === rh && m === rm` — an exact
+    // single-minute match. runNotificationChecks() only runs when
+    // tickCountdowns' setInterval fires, and Chrome (and most browsers)
+    // throttle timers in background/hidden tabs to roughly once a minute —
+    // exactly the "studying with the tab in the background" case reported.
+    // Under that throttling the one tick that lands in a given minute can
+    // easily drift a few seconds either side of when the browser *would*
+    // have fired at the top of the target minute, and on a rough minute it
+    // can skip a whole minute's tick entirely — so the single exact-minute
+    // window this depended on is missed and the reminder silently never
+    // fires that day. Switched to the same "at-or-past the target time,
+    // fire once, flag it" catch-up pattern already used by the planner and
+    // sleep reminders above: any check that runs at or after the target
+    // minute (even if the exact minute was skipped) still fires it once.
     if (s.revisionReminder) {
         let [rh, rm] = (s.revisionReminderTime || "21:00").split(":").map(n => parseInt(n, 10));
-        if (h === rh && m === rm) {
+        let targetMin = rh * 60 + rm;
+        if (minOfDay >= targetMin) {
             let flagKey = "jee_revision_reminder_" + getTodayKey();
             if (!getRawFlag(flagKey)) {
                 notify("Revision reminder", `${s.revisionReminderTime} - Quick revision pass!`);
@@ -260,10 +322,12 @@ export function runNotificationChecks() {
         }
     }
 
-    // Parent log reminder: user-configurable time (default 10:30 PM), once/day
+    // Parent log reminder: user-configurable time (default 10:30 PM), once/day.
+    // Same exact-minute → catch-up fix as the revision reminder above.
     if (s.parentLogReminder) {
         let [lh, lm] = (s.parentLogReminderTime || "22:30").split(":").map(n => parseInt(n, 10));
-        if (h === lh && m === lm) {
+        let targetMin = lh * 60 + lm;
+        if (minOfDay >= targetMin) {
             let flagKey = "jee_parentlog_reminder_" + getTodayKey();
             if (!getRawFlag(flagKey)) {
                 notify("Daily log", "Send today's study log to your parent.");
