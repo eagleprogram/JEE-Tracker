@@ -36,7 +36,8 @@ Tracker/
 ├── index.html                    — page shell, all markup
 ├── manifest.json                 — PWA manifest
 ├── sw.js                         — service worker (offline app-shell caching)
-├── icon-192.png / icon-512.png   — PWA icons (repo root, not an icons/ subfolder)
+├── icon-192.png / icon-512.png   — PWA icons (repo root)
+├── target-icon                   — Target icons (repo root & used for Title icon)
 ├── css/
 │   ├── variables.css   — color/spacing tokens only
 │   ├── base.css        — layout, sidebar, scrollbars
