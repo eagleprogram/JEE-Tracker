@@ -192,11 +192,12 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
     flex-wrap: wrap;
 }
 
-.app-title-wrap { display: flex; align-items: center; gap: 14px; }
-/* Dartboard-style target mark (true red/white rings, see index.html) —
-   a crisp SVG vector rather than a raster emoji/clip-art import, so it
-   stays sharp at any size and scales cleanly with .app-title-icon. */
-.app-title-icon { width: 44px; height: 44px; flex-shrink: 0; }
+.app-title-wrap { display: flex; align-items: flex-start; gap: 14px; }
+/* Real target+dart icon (target-icon.png, from the user's supplied source
+   image with its background keyed out to transparent) — top-aligned via
+   .app-title-wrap's align-items so its top edge lines up with the cap-height
+   of the "J" in "JEE 2027", not centered against the whole two-line block. */
+.app-title-icon { width: 44px; height: 44px; flex-shrink: 0; object-fit: contain; margin-top: 3px; }
 .app-title-text { display: flex; flex-direction: column; line-height: 1.05; }
 .app-title-main {
     font-family: 'Sora', sans-serif;

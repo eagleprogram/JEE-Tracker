@@ -66,12 +66,16 @@ export function showToast(msg) {
 // (same mechanism notifications.js uses for its own cooldown flags) rather
 // than new dedicated storage.js functions, since this is the same shape of
 // "one-off flag" data.
-const GUEST_REMINDER_DISMISSED_KEY = "jee_guestReminderDismissed";
+// "Ignore" is day-scoped, not permanent — it stores TODAY's date key, so
+// the reminder goes quiet for the rest of today but comes back tomorrow
+// (compared against getTodayKey(), the same day-boundary logic the rest of
+// the app already uses for rollover).
+const GUEST_REMINDER_IGNORED_DATE_KEY = "jee_guestReminderIgnoredDate";
 const GUEST_REMINDER_SNOOZE_KEY = "jee_guestReminderSnoozeUntil";
 const GUEST_REMINDER_SNOOZE_MS = 5 * 60 * 1000;
 
 export function maybeShowGuestSignInReminder() {
-    if (getRawFlag(GUEST_REMINDER_DISMISSED_KEY) === "1") return;
+    if (getRawFlag(GUEST_REMINDER_IGNORED_DATE_KEY) === getTodayKey()) return;
     let snoozeUntil = parseInt(getRawFlag(GUEST_REMINDER_SNOOZE_KEY) || "0", 10);
     let remaining = snoozeUntil - Date.now();
     if (remaining > 0) {
@@ -90,7 +94,7 @@ export function hideGuestSignInReminder() {
 }
 
 export function guestReminderIgnore() {
-    setRawFlag(GUEST_REMINDER_DISMISSED_KEY, "1");
+    setRawFlag(GUEST_REMINDER_IGNORED_DATE_KEY, getTodayKey());
     hideGuestSignInReminder();
 }
 

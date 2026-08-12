@@ -91,8 +91,6 @@ button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radiu
 .btn-export { background: var(--primary); color: #04121f; font-weight: 700; }
 .btn-stop { background: var(--danger); color: white; }
 .btn-yellow { background: #eab308; color: #1a1400; }
-.btn-ghost { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
-.btn-ghost:hover { color: var(--text); border-color: var(--primary); }
 .btn:hover { opacity: 0.9; transform: translateY(-1px); }
 .btn-small { padding: 8px 12px; font-size: 12px; }
 .btn-compact { padding: 7px 10px; font-size: 11px; }
@@ -204,8 +202,14 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    is meant to fade into the background) since this explains how the
    streak itself works and is worth actually reading. "Goal:" gets the
    strongest emphasis of the line; the rest is a step down from that but
-   still a step up from the old --muted-only note styling. */
-.goal-note { font-size: 12px; color: #94a3b8; margin-top: 6px; margin-bottom: 10px; line-height: 1.5; text-wrap: balance; }
+   still a step up from the old --muted-only note styling.
+   Forced onto a single line (white-space: nowrap) with the font scaling
+   down via clamp() as the viewport narrows, so it keeps fitting on one
+   line without wrapping through most desktop/tablet widths. Below the
+   width where even the clamp() floor (9px) can't fit the full sentence,
+   overflow-x falls back to a thin horizontal scroll rather than wrapping
+   or truncating — the full text stays intact and on one line either way. */
+.goal-note { font-size: clamp(9px, 1.4vw, 10.5px); color: #94a3b8; margin-top: 6px; margin-bottom: 10px; line-height: 1.5; white-space: nowrap; overflow-x: auto; padding-bottom: 2px; }
 .goal-note-emphasis { color: var(--text); font-weight: 800; }
 .session-log-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); padding: 6px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; }
 
