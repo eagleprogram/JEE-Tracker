@@ -38,6 +38,7 @@ Tracker/
 ├── sw.js                         — service worker (offline app-shell caching)
 ├── icon-192.png / icon-512.png   — PWA icons (repo root)
 ├── target-icon                   — Target icons (repo root & used for Title icon)
+├── icon-user                     — user icon (repo root & used for account icon)
 ├── css/
 │   ├── variables.css   — color/spacing tokens only
 │   ├── base.css        — layout, sidebar, scrollbars

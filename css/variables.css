@@ -8,4 +8,9 @@
     --danger: #ef4444;
     --text: #f1f5f9;
     --muted: #64748b;
+    /* Solid single-tone accent for the "JEE 2027" title — a cool
+       periwinkle-blue that reads as one unified color against the deep
+       navy --bg, distinct from --primary (used everywhere on buttons/
+       links) so the title doesn't visually blend into ordinary UI chrome. */
+    --title: #7c9eff;
 }

@@ -86,22 +86,26 @@ export function maybeShowGuestSignInReminder() {
     }
     let modal = document.getElementById("guest-reminder-modal");
     if (modal) modal.style.display = "flex";
+    document.body.style.overflow = "hidden"; // block background scroll while it's up
 }
 
 export function hideGuestSignInReminder() {
     let modal = document.getElementById("guest-reminder-modal");
     if (modal) modal.style.display = "none";
+    document.body.style.overflow = "";
 }
 
 export function guestReminderIgnore() {
     setRawFlag(GUEST_REMINDER_IGNORED_DATE_KEY, getTodayKey());
     hideGuestSignInReminder();
+    showToast("Reminder ignored for today.");
 }
 
 export function guestReminderSnooze() {
     setRawFlag(GUEST_REMINDER_SNOOZE_KEY, String(Date.now() + GUEST_REMINDER_SNOOZE_MS));
     hideGuestSignInReminder();
     setTimeout(maybeShowGuestSignInReminder, GUEST_REMINDER_SNOOZE_MS + 500);
+    showToast("We'll remind you again in 5 minutes.");
 }
 
 // ----------------- ZEN / FOCUS MODE -----------------
@@ -117,15 +121,20 @@ export function toggleZenMode() {
     let active = document.body.classList.toggle("zen-mode");
     let btn = document.getElementById("zen-toggle-btn");
     if (btn) btn.title = active ? "Exit Zen Mode" : "Zen Mode — hide distractions and focus on the timer";
+    document.body.style.overflow = active ? "hidden" : ""; // block background scroll while zen is up
+    showToast(active ? "Zen mode enabled." : "Zen mode disabled.");
 }
 
 // Wired to #zen-backdrop's own click handler — clicking the dim area around
 // the timer card exits zen mode (a click ON the card itself never reaches
 // the backdrop, since the card sits visually and structurally above it).
 export function exitZenMode() {
+    if (!document.body.classList.contains("zen-mode")) return; // avoid a stray toast if already off
     document.body.classList.remove("zen-mode");
+    document.body.style.overflow = "";
     let btn = document.getElementById("zen-toggle-btn");
     if (btn) btn.title = "Zen Mode — hide distractions and focus on the timer";
+    showToast("Zen mode disabled.");
 }
 
 // ----------------- SIDEBAR -----------------

@@ -62,6 +62,8 @@ export function renderSidebarTools() {
     let order = sortTaskIndices(tasks, sortSelect ? sortSelect.value : "priority-desc");
     order.forEach(i => { let t = tasks[i]; todoHtml += `<div class="todo-item"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${i})"><span style="flex:1; ${t.done?'text-decoration:line-through;color:var(--muted);':''}">${getPriorityEmoji(t.priority)} ${escapeHtml(t.text)}</span><button class="del" onclick="deleteTodo(${i})">✕</button></div>`; });
     document.getElementById("todo-list").innerHTML = todoHtml;
+    let countBadge = document.getElementById("todo-count-badge");
+    if (countBadge) countBadge.textContent = tasks.filter(t => !t.done).length;
 }
 
 export function toggleTodo(idx) {

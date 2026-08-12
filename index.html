@@ -51,7 +51,7 @@
 
                 <div class="card" style="padding: 12px;">
     <div class="section-header-row" style="margin-top:0;">
-        <h4 class="section-subtitle">📌 Today's To-Do</h4>
+        <h4 class="section-subtitle">📌 Today's To-Do <span class="todo-count-badge" id="todo-count-badge" title="Tasks left">0</span></h4>
         <select id="todo-sort-select" class="sort-select" onchange="renderSidebarTools()" title="Sort tasks">
             <option value="added">Added order</option>
             <option value="priority-desc" selected>High → Low</option>
@@ -210,7 +210,7 @@
         </div>
 
         <div class="card" style="padding: 12px; margin-bottom: 30px;">
-            <h4 style="margin:0 0 6px 0;">☁️ Account & Sync</h4>
+            <h4 style="margin:0 0 6px 0; display:flex; align-items:center; gap:7px;"><span class="account-header-icon" aria-hidden="true"></span> Account & Sync</h4>
             <div id="sync-setup-note" class="small-note" style="color:var(--warning); margin-bottom:8px;">Cloud sync is not configured. To enable, add your Firebase keys in the code (search `FIREBASE_CONFIG`).</div>
                         <div id="signed-out-block">
                 <!-- TOP: Sign in (Remains untouched at the top) -->
@@ -353,9 +353,11 @@
 <div class="main-wrapper">
     <div class="header">
         <div class="app-title-wrap">
-            <img class="app-title-icon" src="target-icon.png" alt="Target" width="44" height="44"/>
-            <div class="app-title-text">
+            <div class="app-title-row">
+                <img class="app-title-icon" src="target-icon.png" alt="Target" width="42" height="42"/>
                 <span class="app-title-main" id="app-title-main">JEE 2027</span>
+            </div>
+            <div class="app-title-text">
                 <span class="app-title-sub">Study Tracker</span>
                 <select id="exam-year-select" onchange="setExamYear(this.value)" title="Exam year — shifts the countdowns and title. Dates are approximated by shifting the 2027 dates by whole years; check official JEE dates once announced for your year." style="margin-top:4px; background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:11px; padding:2px 4px;">
                 </select>
@@ -479,12 +481,12 @@
         <div style="border-top:1px solid var(--border); padding-top:10px;">
             <h4 style="margin:0 0 4px 0;">📊 Weekly / Monthly Reports</h4>
             <div class="btn-row-fit">
-                <button class="btn btn-break btn-compact" onclick="downloadReport('weekly')">Download Weekly Report</button>
-                <button class="btn btn-break btn-compact" onclick="downloadReport('monthly')">Download Monthly Report</button>
-                <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('weekly', false)">Send Weekly Report (Email)</button>
-                <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('monthly', false)">Send Monthly Report (Email)</button>
-                <button class="btn btn-pause btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
-                <button class="btn btn-pause btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
+                <button class="btn btn-report-download btn-compact" onclick="downloadReport('weekly')">Download Weekly Report</button>
+                <button class="btn btn-report-download btn-compact" onclick="downloadReport('monthly')">Download Monthly Report</button>
+                <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('weekly', false)">Send Weekly Report (Email)</button>
+                <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('monthly', false)">Send Monthly Report (Email)</button>
+                <button class="btn btn-report-share btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
+                <button class="btn btn-report-share btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
             </div>
             <div class="small-note" style="margin-top:4px; color:var(--warning);">NOTE: Emails are automatically sent on Sundays and at month-ends if signed in. Use the buttons above to send manually.</div>
         </div>
@@ -500,9 +502,9 @@
         <div class="btn-row-nowrap" style="margin-top:10px;">
             <button class="btn btn-stop btn-compact" onclick="deleteStudyLog()">🗑 Delete Study Log</button>
             <button class="btn btn-stop btn-compact" onclick="deleteBreakLog()">🗑 Delete Break Log</button>
-            <button class="btn btn-start btn-compact" onclick="sendReportViaEmail('daily', false)">Send Daily Report (Email)</button>
-            <button class="btn btn-pause btn-compact" onclick="downloadDayLog()">💾 Download Log</button>
-            <button class="btn btn-pause btn-compact" onclick="shareDayLog()">📤 Share Log</button>
+            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('daily', false)">Send Daily Report (Email)</button>
+            <button class="btn btn-report-download btn-compact" onclick="downloadDayLog()">💾 Download Log</button>
+            <button class="btn btn-report-share btn-compact" onclick="shareDayLog()">📤 Share Log</button>
         </div>
             <div class="grid-2" style="margin-top:15px;">
         <div>
@@ -598,14 +600,14 @@
          triggered from firebase-sync.js's onAuthStateChanged once the
          first guest/signed-in check resolves. -->
 <div class="modal" id="guest-reminder-modal" style="z-index: 998;">
-    <div class="modal-content" style="text-align: center; padding: 32px 26px;">
-        <div style="font-size: 48px; margin-bottom: 6px;">👤</div>
+    <div class="modal-content" style="text-align: center; padding: 32px 26px; width: 380px; max-width: 92vw;">
+        <span class="guest-modal-icon" aria-hidden="true"></span>
         <h3 style="color: var(--text); margin: 0 0 8px 0; font-size: 19px;">You're browsing as a guest</h3>
         <p style="color: var(--muted); margin: 0 0 22px 0; font-size: 13px; line-height: 1.5;">Your study logs are only saved on this device right now. Signing in backs them up to the cloud and keeps them safe if you clear your browser data or switch devices.</p>
         <button class="btn btn-start" onclick="hideGuestSignInReminder(); signInWithGoogle();" style="width: 100%; margin-bottom: 8px;">Sign In</button>
         <div style="display: flex; gap: 8px;">
-            <button class="btn btn-stop btn-small" onclick="guestReminderSnooze()" style="flex: 1; line-height: 1.3;">Remind Later<br>(5 min)</button>
-            <button class="btn btn-stop btn-small" onclick="guestReminderIgnore()" style="flex: 1;">Ignore for Today</button>
+            <button class="btn btn-stop btn-guest-small" onclick="guestReminderSnooze()">Remind Later (5 min)</button>
+            <button class="btn btn-stop btn-guest-small" onclick="guestReminderIgnore()">Ignore for Today</button>
         </div>
     </div>
 </div>

@@ -114,7 +114,10 @@ export function addMissedBreak() {
     if (!db[dt]) db[dt] = blankDay();
     let day = ensureDayShape(db[dt]);
 
-    let stamp = new Date(2000, 0, 1, eh, em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Stamp with the START time (unlike the timer's own live break commits,
+    // which stamp the end) — for a break you're logging after the fact,
+    // "started at X" is what you actually remember and want listed.
+    let stamp = new Date(2000, 0, 1, sh, sm).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     day.breaks.push({ id: generateId(), time: stamp, reason, duration: durationSec });
     day.totalBreak += durationSec;
     saveDB(db);

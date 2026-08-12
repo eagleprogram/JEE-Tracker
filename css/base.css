@@ -192,25 +192,24 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
     flex-wrap: wrap;
 }
 
-.app-title-wrap { display: flex; align-items: flex-start; gap: 14px; }
-/* Real target+dart icon (target-icon.png, from the user's supplied source
-   image with its background keyed out to transparent) — top-aligned via
-   .app-title-wrap's align-items so its top edge lines up with the cap-height
-   of the "J" in "JEE 2027", not centered against the whole two-line block. */
-.app-title-icon { width: 44px; height: 44px; flex-shrink: 0; object-fit: contain; margin-top: 3px; }
+/* Restructured so the icon sits in its OWN row alongside just the
+   "JEE 2027" text (.app-title-row), with align-items:center on that row —
+   this centers the icon exactly against the cap-height of the "J", rather
+   than against the whole 3-line block (title + subtitle + year select).
+   The subtitle/select sit below, outside the row, in normal document flow. */
+.app-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+.app-title-row { display: flex; align-items: center; gap: 10px; }
+.app-title-icon { width: 42px; height: 42px; flex-shrink: 0; object-fit: contain; }
 .app-title-text { display: flex; flex-direction: column; line-height: 1.05; }
+/* Single, solid title color (--title) instead of the old multicolor
+   gradient — one unified tone that still stands out against --bg without
+   competing with it. */
 .app-title-main {
     font-family: 'Sora', sans-serif;
     font-weight: 800;
     font-size: 38px;
     letter-spacing: -0.5px;
-    background: linear-gradient(100deg, #38bdf8 0%, #818cf8 55%, #34d399 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    color: var(--title);
 }
 .app-title-sub {
     font-family: 'Space Grotesk', monospace;
@@ -221,7 +220,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
     margin-top: 4px;
     text-transform: uppercase;
 }
-@media (max-width: 850px) { .app-title-main { font-size: 26px; } .app-title-icon { width: 34px; height: 34px; } .header { gap: 20px; } }
+@media (max-width: 850px) { .app-title-main { font-size: 26px; } .app-title-icon { width: 32px; height: 32px; } .header { gap: 20px; } }
 
 .countdown-chip {
     background: var(--bg);
