@@ -353,19 +353,21 @@
 <div class="main-wrapper">
     <div class="header">
         <div class="app-title-wrap">
-            <svg class="app-title-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <svg class="app-title-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
-                    <linearGradient id="titleIconGrad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stop-color="#38bdf8"/>
-                        <stop offset="55%" stop-color="#818cf8"/>
-                        <stop offset="100%" stop-color="#34d399"/>
-                    </linearGradient>
+                    <radialGradient id="targetShine" cx="35%" cy="30%" r="75%">
+                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+                        <stop offset="40%" stop-color="#ffffff" stop-opacity="0"/>
+                    </radialGradient>
                 </defs>
-                <circle cx="24" cy="24" r="19" stroke="url(#titleIconGrad)" stroke-width="3"/>
-                <circle cx="24" cy="24" r="12" stroke="url(#titleIconGrad)" stroke-width="3"/>
-                <circle cx="24" cy="24" r="5" fill="url(#titleIconGrad)"/>
-                <path d="M40 8 L25.5 22.5" stroke="url(#titleIconGrad)" stroke-width="3" stroke-linecap="round"/>
-                <path d="M40 8 L33 8.5 L39.5 15 Z" fill="url(#titleIconGrad)"/>
+                <!-- dartboard-style target: true red/white rings, crisp at any size since it's a vector, not a raster clip-art import -->
+                <circle cx="24" cy="24" r="21" fill="#ef4444"/>
+                <circle cx="24" cy="24" r="21" fill="none" stroke="#0f172a" stroke-width="1"/>
+                <circle cx="24" cy="24" r="16.2" fill="#f8fafc"/>
+                <circle cx="24" cy="24" r="11.4" fill="#ef4444"/>
+                <circle cx="24" cy="24" r="6.6" fill="#f8fafc"/>
+                <circle cx="24" cy="24" r="2.4" fill="#ef4444"/>
+                <circle cx="24" cy="24" r="21" fill="url(#targetShine)"/>
             </svg>
             <div class="app-title-text">
                 <span class="app-title-main" id="app-title-main">JEE 2027</span>
@@ -397,12 +399,15 @@
 
     <div class="grid-2">
         <div class="card timer-card" id="timer-card">
-            <button class="zen-toggle-btn" id="zen-toggle-btn" onclick="toggleZenMode()" title="Zen Mode — hide distractions and focus on the timer">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/>
-                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
-                </svg>
-            </button>
+            <div class="zen-toggle-wrap">
+                <button class="zen-toggle-btn" id="zen-toggle-btn" onclick="toggleZenMode()" title="Zen Mode — hide distractions and focus on the timer">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/>
+                        <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
+                    </svg>
+                </button>
+                <span class="zen-toggle-label">Zen Mode</span>
+            </div>
             <div id="status-badge" class="badge badge-idle">STATUS: IDLE</div>
             <div class="timer-box">
                 <div style="font-size:13px; color:var(--muted);" id="session-label">CURRENT SESSION</div>
