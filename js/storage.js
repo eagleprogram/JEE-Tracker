@@ -2,7 +2,7 @@ import { getTodayKey, generateId } from './utils.js';
 
 // ----------------- KEYS / CONSTANTS -----------------
 const SYLLABUS_KEY = "jee_syllabus_progress";
-const NOTIF_DEFAULTS = { enabled: false, breakOverrun: true, breakThresholdMin: 45, plannerReminder: true, examMilestones: true, idleNudge: true, idleThresholdMin: 30, revisionReminder: true, sleepReminder: true, parentLogReminder: true, backupReminder: true };
+const NOTIF_DEFAULTS = { enabled: false, breakOverrun: true, breakThresholdMin: 45, plannerReminder: true, examMilestones: true, idleNudge: true, idleThresholdMin: 30, revisionReminder: true, revisionReminderTime: "21:00", sleepReminder: true, parentLogReminder: true, backupReminder: true };
 const YT_HISTORY_KEY = "jee_yt_history";
 const YT_HISTORY_MAX = 20;
 export const MOCK_DB_NAME = "jee_mocktest_db";

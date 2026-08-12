@@ -16,6 +16,12 @@ body.panel-open { padding-left: 440px; }
     body.panel-open { padding-left: 64px; }
     .sidebar { width: 48px; }
     .sidebar.expanded { width: 88vw; max-width: 340px; }
+    /* .timer-screen has no mobile override anywhere else — its 72px desktop
+       size (defined in components.css) has no headroom against a ~360-400px
+       phone viewport once the card's own padding is subtracted, so the
+       "00:00:00" digits can crowd right up against (or past) the card's
+       rounded border. Scoped to mobile only — desktop stays untouched. */
+    .timer-screen { font-size: 48px; }
 }
 
 /* ===== Scrollbars (themed dark, matches the UI everywhere) ===== */

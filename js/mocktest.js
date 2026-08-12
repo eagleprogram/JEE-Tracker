@@ -173,12 +173,26 @@ export function closeMockFileModal() {
     currentModalFile = null;
 }
 
+// Renames an attachment for the flat export below — same pattern as
+// mistakes.js's tagFileName: "scan.jpg" attached to mock test #3 becomes
+// "scan (Mock 3).jpg", disambiguated with a "-N" file index if that entry
+// has more than one attachment (Mock 3-1, Mock 3-2, ...) so same-named
+// files from one entry don't overwrite each other in the zip.
+function tagFileName(name, entryNum, fileIdx, fileCount) {
+    let dot = name.lastIndexOf(".");
+    let base = dot > 0 ? name.slice(0, dot) : name;
+    let ext = dot > 0 ? name.slice(dot) : "";
+    let tag = fileCount > 1 ? `Mock ${entryNum}-${fileIdx + 1}` : `Mock ${entryNum}`;
+    return `${base} (${tag})${ext}`;
+}
+
 // Bundles every mock-test entry into one .zip: a top-level Mock-Tests-
 // Summary.md overview (score, tags, notes, in order) for quick browsing,
-// PLUS a per-entry folder ("1. Physics (date)", ...) containing that
-// entry's own Notes.md alongside its own attached files, so each test's
-// notes stay paired with its own files instead of only living in the
-// shared summary. Uses JSZip (loaded via CDN in index.html) since browsers
+// PLUS every entry's own notes file and attachments sitting flat at the
+// zip root — no per-entry folder — disambiguated by "N. Subject (date)"
+// in the notes filename and "(Mock N)" tagged onto each attachment's own
+// name, so each test's notes stay identifiable next to its files without
+// a folder each. Uses JSZip (loaded via CDN in index.html) since browsers
 // can't build a real zip archive on their own — only one file per click
 // without it.
 export async function exportAllMockTests() {
@@ -199,9 +213,6 @@ export async function exportAllMockTests() {
         lines.push("");
         lines.push(e.notes ? e.notes : "_(no notes)_");
 
-        // Per-entry notes file, kept in the SAME folder as this entry's own
-        // attachments — so opening one test's folder gives the score/tags/
-        // notes right next to its files, not just a shared summary elsewhere.
         let entryNoteLines = [
             `# ${e.subject || "Untitled"} · ${formatDateDDMMYYYY(e.date)}`,
             `Score: ${e.score || "—"}${e.maxScore ? " / " + e.maxScore : ""}`,
@@ -209,14 +220,14 @@ export async function exportAllMockTests() {
             "",
             e.notes ? e.notes : "_(no notes)_"
         ].filter(l => l !== "");
-        zip.file(`${safeName}/Notes.md`, entryNoteLines.join("\n"));
+        zip.file(`${safeName} - Notes.md`, entryNoteLines.join("\n"));
 
         if (e.files && e.files.length) {
             lines.push("");
             lines.push(`Attachments: ${e.files.map(f => f.name).join(", ")}`);
-            e.files.forEach(f => {
+            e.files.forEach((f, fi) => {
                 let base64 = (f.dataUrl || "").split(",")[1];
-                if (base64) zip.file(`${safeName}/${f.name}`, base64, { base64: true });
+                if (base64) zip.file(tagFileName(f.name, num, fi, e.files.length), base64, { base64: true });
             });
         } else if (e.hasFiles) {
             lines.push("");

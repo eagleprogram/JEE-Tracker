@@ -77,12 +77,28 @@ export function loadYoutubeLink() {
 // getYtHistory/saveYtHistory, and this module (the only caller) owns the
 // re-render + title-fetch behavior that goes with adding/removing an entry.
 export function addToYtHistory(id, url) {
+    let existing = getYtHistory().find(v => v.id === id);
     let hist = getYtHistory().filter(v => v.id !== id);
-    hist.unshift({ id, url, title: null, addedAt: Date.now() });
+    // Carry the starred flag (and known title) forward when a video already
+    // in history gets reloaded — re-loading a bookmarked video shouldn't
+    // silently un-star it.
+    hist.unshift({ id, url, title: existing ? existing.title : null, addedAt: Date.now(), starred: existing ? !!existing.starred : false });
     if (hist.length > YT_HISTORY_MAX_ENTRIES) hist = hist.slice(0, YT_HISTORY_MAX_ENTRIES);
     saveYtHistory(hist);
     renderYtHistory();
     fetchYtTitle(id);
+}
+
+// Starred videos are pinned to the top of the history list (bookmark),
+// keeping insertion order within each group (starred-first, then the rest
+// newest-first as before).
+export function toggleYtHistoryStar(id) {
+    let hist = getYtHistory();
+    let entry = hist.find(v => v.id === id);
+    if (!entry) return;
+    entry.starred = !entry.starred;
+    saveYtHistory(hist);
+    renderYtHistory();
 }
 
 export function deleteYtHistoryEntry(id) {
@@ -108,10 +124,14 @@ export function renderYtHistory() {
     let panel = document.getElementById("yt-history-panel");
     let hist = getYtHistory();
     if (hist.length === 0) { panel.innerHTML = `<div class="yt-history-empty">No videos loaded yet.</div>`; return; }
-    panel.innerHTML = hist.map(v =>
+    // Starred (bookmarked) videos float to the top; within each group,
+    // original order (newest-loaded-first) is preserved.
+    let ordered = hist.slice().sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
+    panel.innerHTML = ordered.map(v =>
         `<div class="yt-history-item" onclick="loadFromYtHistory('${v.id}')">
             <img src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" alt="" loading="lazy">
             <span class="yt-history-label">${escapeHtml(v.title || v.id)}</span>
+            <button class="yt-star-btn ${v.starred ? 'starred' : ''}" onclick="event.stopPropagation(); toggleYtHistoryStar('${v.id}')" title="${v.starred ? 'Unbookmark' : 'Bookmark'}">${v.starred ? '★' : '☆'}</button>
             <button class="del" onclick="event.stopPropagation(); deleteYtHistoryEntry('${v.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px; padding:0; flex-shrink:0;">✕</button>
         </div>`
     ).join("");

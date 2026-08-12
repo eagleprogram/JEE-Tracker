@@ -56,7 +56,7 @@ import {
 
 import {
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
-    ytSetVolume, ytToggleLoop, deleteYtHistoryEntry
+    ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar
 } from './youtube.js';
 
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
@@ -115,7 +115,7 @@ Object.assign(window, {
     closeMockFileModal, renderMockTestList, downloadCurrentMockFile, exportAllMockTests,
     // youtube.js
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
-    ytSetVolume, ytToggleLoop, deleteYtHistoryEntry,
+    ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
     // reports.js
     downloadDayLog, shareDayLog, sendReportViaEmail, downloadReport, shareReport,
     // backup.js

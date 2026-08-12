@@ -376,29 +376,65 @@ function sortChapterRows(rows, mode) {
 // consecutive keystrokes (e.g. "k" "i" "n" -> "Kinematics") and resets the
 // buffer after a short pause, same as native typeahead behaves.
 let typeaheadBuffer = "";
+let typeaheadLastKey = "";
 let typeaheadTimer = null;
+function typeaheadTextMatches(text, needle) {
+    return text.includes(" " + needle) || text.startsWith(needle);
+}
+// Brief highlight flash so a typeahead jump reads as an intentional move
+// rather than the value silently snapping — the select gets a short
+// CSS transition (see .typeahead-jump in components.css) that clears
+// itself automatically.
+function flashTypeaheadJump(select) {
+    select.classList.remove("typeahead-jump");
+    // Force reflow so re-adding the class restarts the transition even if
+    // the previous flash hasn't finished (fast repeated jumps).
+    void select.offsetWidth;
+    select.classList.add("typeahead-jump");
+    clearTimeout(select._typeaheadFlashTimer);
+    select._typeaheadFlashTimer = setTimeout(() => select.classList.remove("typeahead-jump"), 350);
+}
 function wireChapterTypeahead(select) {
     if (!select || select.dataset.typeaheadWired) return;
     select.dataset.typeaheadWired = "1";
     select.addEventListener("keydown", (e) => {
         if (e.key.length !== 1 || !/[a-z0-9]/i.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
-        typeaheadBuffer += e.key.toLowerCase();
-        clearTimeout(typeaheadTimer);
-        typeaheadTimer = setTimeout(() => { typeaheadBuffer = ""; }, 800);
+        e.preventDefault();
+        let key = e.key.toLowerCase();
         let options = Array.from(select.options);
-        let match = options.find(o => o.textContent.toLowerCase().includes(" " + typeaheadBuffer) || o.textContent.toLowerCase().startsWith(typeaheadBuffer));
-        if (!match) {
-            // No match for the full buffer (e.g. mistyped) — fall back to
-            // just the newest keystroke, matching how native typeahead
-            // recovers instead of getting stuck.
-            typeaheadBuffer = e.key.toLowerCase();
-            match = options.find(o => o.textContent.toLowerCase().includes(" " + typeaheadBuffer) || o.textContent.toLowerCase().startsWith(typeaheadBuffer));
+        // Repeating the SAME single key (e.g. "w","w","w") cycles through
+        // every match starting from the option after the current one —
+        // matches native <select> typeahead. Typing a DIFFERENT key builds
+        // a fresh prefix buffer ("k","i" -> "ki") like before.
+        let isSameKeyRepeat = typeaheadLastKey === key && typeaheadBuffer.length > 0 && typeaheadBuffer.split("").every(c => c === key);
+        typeaheadLastKey = key;
+        clearTimeout(typeaheadTimer);
+        typeaheadTimer = setTimeout(() => { typeaheadBuffer = ""; typeaheadLastKey = ""; }, 800);
+
+        let match = null;
+        if (isSameKeyRepeat) {
+            typeaheadBuffer += key;
+            let matches = options.filter(o => typeaheadTextMatches(o.textContent.toLowerCase(), key));
+            if (matches.length) {
+                let curIdx = matches.findIndex(o => o.value === select.value);
+                match = matches[(curIdx + 1) % matches.length];
+            }
+        } else {
+            typeaheadBuffer += key;
+            match = options.find(o => typeaheadTextMatches(o.textContent.toLowerCase(), typeaheadBuffer));
+            if (!match) {
+                // No match for the full buffer (e.g. mistyped) — fall back to
+                // just the newest keystroke, matching how native typeahead
+                // recovers instead of getting stuck.
+                typeaheadBuffer = key;
+                match = options.find(o => typeaheadTextMatches(o.textContent.toLowerCase(), key));
+            }
         }
         if (match && match.value !== select.value) {
             select.value = match.value;
             select.dispatchEvent(new Event("change"));
+            flashTypeaheadJump(select);
         }
-        e.preventDefault();
     });
 }
 
@@ -571,13 +607,30 @@ export async function renderMistakesTracker() {
     else renderViewList();
 }
 
+// Renames an attachment for the flattened per-chapter export below: e.g.
+// "Mock Test 3.pdf" logged as this chapter's 2nd mistake becomes
+// "Mock Test 3 (Mistake 2).pdf" — keeps the original filename recognizable
+// while making clear which mistake entry it belongs to now that there's no
+// per-mistake subfolder. When one entry has more than one attachment, a
+// "-N" file index is appended too (Mistake 2-1, Mistake 2-2, ...) so two
+// same-named files from the same entry (e.g. two screenshots both named
+// "image.png") don't collide and overwrite each other in the zip.
+function tagFileName(name, mistakeNum, fileIdx, fileCount) {
+    let dot = name.lastIndexOf(".");
+    let base = dot > 0 ? name.slice(0, dot) : name;
+    let ext = dot > 0 ? name.slice(dot) : "";
+    let tag = fileCount > 1 ? `Mistake ${mistakeNum}-${fileIdx + 1}` : `Mistake ${mistakeNum}`;
+    return `${base} (${tag})${ext}`;
+}
+
 // Bundles every logged mistake, across every subject and chapter, into one
 // .zip: a top-level Mistakes-Summary.md overview (grouped by subject >
 // chapter, same order as the on-screen tabs) for quick browsing, PLUS a
-// Subject/Chapter/Mistake N/ folder per entry containing that entry's own
-// Notes.md alongside its own attachments — so revising doesn't mean opening
-// chapter after chapter one at a time, and each mistake's files stay paired
-// with its own notes rather than only living in the shared summary.
+// flat Subject/Chapter/ folder holding every entry's own notes file and
+// attachments side by side — no per-mistake subfolder — so opening one
+// chapter's folder shows everything at once instead of clicking into a
+// separate folder per mistake. Each entry's notes file and attachments are
+// disambiguated by "Mistake N" in their filenames instead of a folder each.
 export async function exportAllMistakes() {
     let records = await getAllMistakeChapters();
     let totalEntries = records.reduce((sum, r) => sum + ((r.entries || []).length), 0);
@@ -604,6 +657,11 @@ export async function exportAllMistakes() {
             let sortedEntries = rec.entries.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
             lines.push(`## ${rec.chapter} (${sortedEntries.length})`, "");
             let safeChapter = rec.chapter.replace(/[\\/:*?"<>|]/g, "_");
+            // Flat per-chapter folder — no per-mistake subfolder. Every
+            // entry's notes file and attachments live side by side directly
+            // in Subject/Chapter/, disambiguated by "Mistake N" in their
+            // filenames instead of a folder each (see tagFileName above).
+            let chapterFolder = `${subject}/${safeChapter}`;
 
             sortedEntries.forEach((entry, idx) => {
                 let num = idx + 1;
@@ -612,12 +670,6 @@ export async function exportAllMistakes() {
                 lines.push("");
                 lines.push(entry.notes ? entry.notes : "_(no notes)_");
 
-                // Per-entry folder — "Mistake 1", "Mistake 2", ... — so each
-                // mistake's own note text lives in the SAME folder as its own
-                // attachments, instead of every entry's attachments sitting
-                // loose in one shared chapter folder with only the combined
-                // top-level summary to reference them by.
-                let entryFolder = `${subject}/${safeChapter}/Mistake ${num}`;
                 let entryNoteLines = [
                     `# ${subject} · ${rec.chapter} · Mistake ${num}`,
                     stamp ? `Logged: ${stamp}` : "",
@@ -625,14 +677,14 @@ export async function exportAllMistakes() {
                     "",
                     entry.notes ? entry.notes : "_(no notes)_"
                 ].filter(l => l !== "");
-                zip.file(`${entryFolder}/Notes.md`, entryNoteLines.join("\n"));
+                zip.file(`${chapterFolder}/Mistake ${num} - Notes.md`, entryNoteLines.join("\n"));
 
                 if (entry.files && entry.files.length) {
                     lines.push("");
                     lines.push(`Attachments: ${entry.files.map(f => f.name).join(", ")}`);
-                    entry.files.forEach(f => {
+                    entry.files.forEach((f, fi) => {
                         let base64 = (f.dataUrl || "").split(",")[1];
-                        if (base64) zip.file(`${entryFolder}/${f.name}`, base64, { base64: true });
+                        if (base64) zip.file(`${chapterFolder}/${tagFileName(f.name, num, fi, entry.files.length)}`, base64, { base64: true });
                     });
                 } else if (entry.hasFiles) {
                     lines.push("");

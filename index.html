@@ -161,8 +161,12 @@
                     <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Revision reminder (9pm, once)</label>
+                    <label>Revision reminder (once/day)</label>
                     <input type="checkbox" id="notif-revisionReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-sub">
+                    <span style="font-size:12px; color:var(--muted);">Remind at</span>
+                    <input type="time" id="notif-revisionReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
                     <label>Sleep reminder (10:30–11pm, every 5min)</label>

@@ -49,7 +49,10 @@ button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radiu
 }
 
 /* ===== Form inputs ===== */
-select, input[type="text"], input[type="date"] { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin-top: 5px; box-sizing: border-box; }
+select, input[type="text"], input[type="date"] { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin-top: 5px; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; }
+/* Brief highlight when the chapter typeahead jumps the <select> to a new
+   match (mistakes.js) — makes the jump read as an intentional move. */
+select.typeahead-jump { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3); }
 
 .date-field-wrap { position: relative; }
 .date-field-wrap input[type="date"] { padding-right: 42px; }
@@ -79,7 +82,12 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 .settings-row label { flex: 1; }
 .settings-row input[type="checkbox"] { width: 18px; height: 18px; }
 .settings-sub { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
-.settings-sub input[type="number"] { width: 60px; margin-top: 0; padding: 6px; }
+/* These were previously left with only width/padding set — with no
+   background/border/color of their own, they fell back to the browser's
+   native (light, larger) number-input chrome, which is why they looked
+   like an oversized white box against the dark theme. */
+.settings-sub input[type="number"] { width: 52px; margin-top: 0; padding: 5px 6px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
+.settings-sub input[type="time"] { width: auto; margin-top: 0; padding: 5px 8px; font-size: 13px; }
 .small-note { font-size: 11px; color: var(--muted); margin-top: 6px; }
 .session-log-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); padding: 6px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; }
 
@@ -138,6 +146,9 @@ button.del:hover { color: #fca5a5; }
 .yt-history-item:hover { background: var(--bg); }
 .yt-history-item img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
 .yt-history-item .yt-history-label { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.yt-star-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; flex-shrink: 0; width: 16px; text-align: center; }
+.yt-star-btn.starred { color: #facc15; }
+.yt-star-btn:hover { color: #facc15; }
 .yt-history-empty { font-size: 12px; color: var(--muted); padding: 6px; }
 
 /* ===== Sleep / Wake log ===== */

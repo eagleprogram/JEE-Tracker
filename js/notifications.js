@@ -15,6 +15,7 @@ export function renderNotifSettingsUI() {
     document.getElementById("notif-idleNudge").checked = s.idleNudge;
     document.getElementById("notif-idleThreshold").value = s.idleThresholdMin;
     document.getElementById("notif-revisionReminder").checked = s.revisionReminder;
+    document.getElementById("notif-revisionReminderTime").value = s.revisionReminderTime;
     document.getElementById("notif-sleepReminder").checked = s.sleepReminder;
     document.getElementById("notif-parentLogReminder").checked = s.parentLogReminder;
     document.getElementById("notif-backupReminder").checked = s.backupReminder;
@@ -31,6 +32,7 @@ export function saveNotifSettingsFromUI() {
         idleNudge: document.getElementById("notif-idleNudge").checked,
         idleThresholdMin: Math.max(10, parseInt(document.getElementById("notif-idleThreshold").value) || 30),
         revisionReminder: document.getElementById("notif-revisionReminder").checked,
+        revisionReminderTime: document.getElementById("notif-revisionReminderTime").value || "21:00",
         sleepReminder: document.getElementById("notif-sleepReminder").checked,
         parentLogReminder: document.getElementById("notif-parentLogReminder").checked,
         backupReminder: document.getElementById("notif-backupReminder").checked
@@ -228,12 +230,15 @@ export function runNotificationChecks() {
         }
     }
 
-    // Revision reminder: 9:00 PM exactly
-    if (s.revisionReminder && h === 21 && m === 0) {
-        let flagKey = "jee_revision_reminder_" + getTodayKey();
-        if (!getRawFlag(flagKey)) {
-            notify("Revision reminder", "9 PM - Quick revision pass!");
-            setRawFlag(flagKey, "1");
+    // Revision reminder: user-configurable time (default 9:00 PM), once/day
+    if (s.revisionReminder) {
+        let [rh, rm] = (s.revisionReminderTime || "21:00").split(":").map(n => parseInt(n, 10));
+        if (h === rh && m === rm) {
+            let flagKey = "jee_revision_reminder_" + getTodayKey();
+            if (!getRawFlag(flagKey)) {
+                notify("Revision reminder", `${s.revisionReminderTime} - Quick revision pass!`);
+                setRawFlag(flagKey, "1");
+            }
         }
     }
 
