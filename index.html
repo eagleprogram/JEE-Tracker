@@ -157,8 +157,12 @@
                     <span style="font-size:12px; color:var(--muted);">min on break</span>
                 </div>
                 <div class="settings-row">
-                    <label>Planner task reminder (every 30min from 8pm)</label>
+                    <label>Planner task reminder (every 30min from start)</label>
                     <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-sub">
+                    <span style="font-size:12px; color:var(--muted);">Start at</span>
+                    <input type="time" id="notif-plannerReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
                     <label>Revision reminder (once/day)</label>
@@ -169,12 +173,20 @@
                     <input type="time" id="notif-revisionReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Sleep reminder (10:30–11pm, every 5min)</label>
+                    <label>Sleep reminder (30-min window, every 5min)</label>
                     <input type="checkbox" id="notif-sleepReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
+                <div class="settings-sub">
+                    <span style="font-size:12px; color:var(--muted);">Start at</span>
+                    <input type="time" id="notif-sleepReminderStartTime" onchange="saveNotifSettingsFromUI()">
+                </div>
                 <div class="settings-row">
-                    <label>Send daily log to parent (10:30pm, once)</label>
+                    <label>Send daily log to parent (once/day)</label>
                     <input type="checkbox" id="notif-parentLogReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-sub">
+                    <span style="font-size:12px; color:var(--muted);">Send at</span>
+                    <input type="time" id="notif-parentLogReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
                     <label>Export local backup reminder (every 2 days)</label>
@@ -420,7 +432,7 @@
             <h3 style="margin:0;">🌱 This Week's Garden</h3>
             <span class="streak-pill" id="streak-pill">🔥 0 day streak</span>
         </div>
-        <div class="small-note" style="margin-bottom:10px;">Goal: 10 hrs/day counts toward your streak.</div>
+        <div class="small-note" style="margin-bottom:10px;">Goal: 10 hrs/day counts toward your streak. A missed day gets one ❄️ freeze per calendar week (Monday–Sunday) to protect your streak; a second missed day in the same week breaks it.</div>
         <div class="garden-row" id="garden-row"></div>
     </div>
 

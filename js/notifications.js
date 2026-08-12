@@ -11,13 +11,16 @@ export function renderNotifSettingsUI() {
     document.getElementById("notif-breakOverrun").checked = s.breakOverrun;
     document.getElementById("notif-breakThreshold").value = s.breakThresholdMin;
     document.getElementById("notif-plannerReminder").checked = s.plannerReminder;
+    document.getElementById("notif-plannerReminderStartTime").value = s.plannerReminderStartTime;
     document.getElementById("notif-examMilestones").checked = s.examMilestones;
     document.getElementById("notif-idleNudge").checked = s.idleNudge;
     document.getElementById("notif-idleThreshold").value = s.idleThresholdMin;
     document.getElementById("notif-revisionReminder").checked = s.revisionReminder;
     document.getElementById("notif-revisionReminderTime").value = s.revisionReminderTime;
     document.getElementById("notif-sleepReminder").checked = s.sleepReminder;
+    document.getElementById("notif-sleepReminderStartTime").value = s.sleepReminderStartTime;
     document.getElementById("notif-parentLogReminder").checked = s.parentLogReminder;
+    document.getElementById("notif-parentLogReminderTime").value = s.parentLogReminderTime;
     document.getElementById("notif-backupReminder").checked = s.backupReminder;
     updateNotifPermissionStatus();
 }
@@ -28,13 +31,16 @@ export function saveNotifSettingsFromUI() {
         breakOverrun: document.getElementById("notif-breakOverrun").checked,
         breakThresholdMin: Math.max(5, parseInt(document.getElementById("notif-breakThreshold").value) || 45),
         plannerReminder: document.getElementById("notif-plannerReminder").checked,
+        plannerReminderStartTime: document.getElementById("notif-plannerReminderStartTime").value || "20:00",
         examMilestones: document.getElementById("notif-examMilestones").checked,
         idleNudge: document.getElementById("notif-idleNudge").checked,
         idleThresholdMin: Math.max(10, parseInt(document.getElementById("notif-idleThreshold").value) || 30),
         revisionReminder: document.getElementById("notif-revisionReminder").checked,
         revisionReminderTime: document.getElementById("notif-revisionReminderTime").value || "21:00",
         sleepReminder: document.getElementById("notif-sleepReminder").checked,
+        sleepReminderStartTime: document.getElementById("notif-sleepReminderStartTime").value || "22:30",
         parentLogReminder: document.getElementById("notif-parentLogReminder").checked,
+        parentLogReminderTime: document.getElementById("notif-parentLogReminderTime").value || "22:30",
         backupReminder: document.getElementById("notif-backupReminder").checked
     };
     saveNotifSettings(s); showToast("Notification settings saved.");
@@ -205,28 +211,37 @@ export function runNotificationChecks() {
     let m = now.getMinutes();
     let minOfDay = h * 60 + m;
 
-    // Planner reminder: 8:00 PM onward, every 30 min
-    if (s.plannerReminder && h >= 20 && m % 30 === 0) {
-        let lastKey = "jee_planner_reminder_last_" + getTodayKey();
-        let last = parseInt(getRawFlag(lastKey) || "0", 10);
-        if (Date.now() - last > 30 * 60 * 1000) {
-            let plannerDB = getPlannerDB();
-            let tasks = plannerDB[getTodayKey()] || [];
-            let pending = tasks.filter(t => !t.done).length;
-            if (pending > 0) {
-                notify("Today's tasks", `${pending} task(s) pending!`);
-                setRawFlag(lastKey, String(Date.now()));
+    // Planner reminder: user-configurable start time (default 8:00 PM), every 30 min after that
+    if (s.plannerReminder) {
+        let [ph, pm2] = (s.plannerReminderStartTime || "20:00").split(":").map(n => parseInt(n, 10));
+        let startMin = ph * 60 + pm2;
+        if (minOfDay >= startMin && (minOfDay - startMin) % 30 === 0) {
+            let lastKey = "jee_planner_reminder_last_" + getTodayKey();
+            let last = parseInt(getRawFlag(lastKey) || "0", 10);
+            if (Date.now() - last > 30 * 60 * 1000) {
+                let plannerDB = getPlannerDB();
+                let tasks = plannerDB[getTodayKey()] || [];
+                let pending = tasks.filter(t => !t.done).length;
+                if (pending > 0) {
+                    notify("Today's tasks", `${pending} task(s) pending!`);
+                    setRawFlag(lastKey, String(Date.now()));
+                }
             }
         }
     }
 
-    // Sleep reminder: 10:30 to 11:00 PM, every 5 minutes
-    if (s.sleepReminder && minOfDay >= (22*60+30) && minOfDay <= (23*60) && m % 5 === 0) {
-        let lastKey = "jee_sleep_reminder_last_" + getTodayKey();
-        let last = parseInt(getRawFlag(lastKey) || "0", 10);
-        if (Date.now() - last > 5 * 60 * 1000) {
-            notify("Wind down", "Past 10:30 PM - start winding down!");
-            setRawFlag(lastKey, String(Date.now()));
+    // Sleep reminder: user-configurable start time (default 10:30 PM), 30-min window, every 5 min
+    if (s.sleepReminder) {
+        let [sh, sm] = (s.sleepReminderStartTime || "22:30").split(":").map(n => parseInt(n, 10));
+        let sleepStartMin = sh * 60 + sm;
+        let sleepEndMin = sleepStartMin + 30;
+        if (minOfDay >= sleepStartMin && minOfDay <= sleepEndMin && (minOfDay - sleepStartMin) % 5 === 0) {
+            let lastKey = "jee_sleep_reminder_last_" + getTodayKey();
+            let last = parseInt(getRawFlag(lastKey) || "0", 10);
+            if (Date.now() - last > 5 * 60 * 1000) {
+                notify("Wind down", `Past ${s.sleepReminderStartTime} - start winding down!`);
+                setRawFlag(lastKey, String(Date.now()));
+            }
         }
     }
 
@@ -242,12 +257,15 @@ export function runNotificationChecks() {
         }
     }
 
-    // Parent log reminder: 10:30 PM exactly
-    if (s.parentLogReminder && h === 22 && m === 30) {
-        let flagKey = "jee_parentlog_reminder_" + getTodayKey();
-        if (!getRawFlag(flagKey)) {
-            notify("Daily log", "Send today's study log to your parent.");
-            setRawFlag(flagKey, "1");
+    // Parent log reminder: user-configurable time (default 10:30 PM), once/day
+    if (s.parentLogReminder) {
+        let [lh, lm] = (s.parentLogReminderTime || "22:30").split(":").map(n => parseInt(n, 10));
+        if (h === lh && m === lm) {
+            let flagKey = "jee_parentlog_reminder_" + getTodayKey();
+            if (!getRawFlag(flagKey)) {
+                notify("Daily log", "Send today's study log to your parent.");
+                setRawFlag(flagKey, "1");
+            }
         }
     }
 

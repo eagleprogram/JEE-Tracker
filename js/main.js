@@ -10,7 +10,7 @@ import { getLastBackupAt, markBackupDone, resetAllData } from './storage.js';
 import {
     openSubjectModal, cancelSubjectModal, confirmStartStudy,
     pauseStudy, resumeStudy, takeBreak, changeSubjectMidSession, endDay,
-    setCurrentDayKey, tryRestoreActiveSession, startAutosave,
+    setCurrentDayKey, getPersistedDayKey, tryRestoreActiveSession, startAutosave,
     updateUIState, updateLiveSummary, flushAndRestartSegment
 } from './timer.js';
 
@@ -136,7 +136,7 @@ Object.assign(window, {
 // finishes loading and evaluates).
 // -----------------------------------------------------------------------
 async function initApp() {
-    setCurrentDayKey(getTodayKey());
+    setCurrentDayKey(getPersistedDayKey());
 
     // Redeem any toast that was queued right before a reload triggered by
     // cloud auto-load or the real-time sync listener — see
@@ -164,19 +164,24 @@ async function initApp() {
     updateLiveSummary();
     startAutosave();
 
+    // Sidebar tools.
+    // initPlannerCalendar() must run before tickCountdowns() below —
+    // checkDayRollover() (called from inside tickCountdowns) can now call
+    // renderPlannerCalendar() on the very first tick if a day actually
+    // rolled over while the app was closed (see the setCurrentDayKey fix
+    // in timer.js), and that needs calViewYear/calViewMonth set first.
+    initPlannerCalendar();
+    renderSidebarTools();
+    renderMistakeTagPicker();
+    renderSleepPendingBanner();
+    renderNotifSettingsUI();
+    updateNotifPermissionStatus();
+
     // Header / quote / countdowns.
     renderQuoteOfDay();
     renderExamYearUI();
     tickCountdowns();                 // also runs checkDayRollover + notif checks + renderGarden
     setInterval(tickCountdowns, 1000);
-
-    // Sidebar tools.
-    renderSidebarTools();
-    initPlannerCalendar();
-    renderMistakeTagPicker();
-    renderSleepPendingBanner();
-    renderNotifSettingsUI();
-    updateNotifPermissionStatus();
 
     // Charts.
     renderHeatmap();

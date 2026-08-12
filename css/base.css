@@ -18,10 +18,14 @@ body.panel-open { padding-left: 440px; }
     .sidebar.expanded { width: 88vw; max-width: 340px; }
     /* .timer-screen has no mobile override anywhere else — its 72px desktop
        size (defined in components.css) has no headroom against a ~360-400px
-       phone viewport once the card's own padding is subtracted, so the
-       "00:00:00" digits can crowd right up against (or past) the card's
-       rounded border. Scoped to mobile only — desktop stays untouched. */
-    .timer-screen { font-size: 48px; }
+       phone viewport once the card's own 24px side padding is subtracted,
+       and .card has no overflow:hidden, so the digits can render wider than
+       the card and visually spill out past its rounded border on the sides.
+       clamp() scales the size down with the actual viewport width instead
+       of one fixed px value, so it stays safely inside the card on any
+       phone width this media query covers (not just one tested size).
+       Desktop (>700px) is untouched. */
+    .timer-screen { font-size: clamp(32px, 11vw, 48px); }
 }
 
 /* ===== Scrollbars (themed dark, matches the UI everywhere) ===== */

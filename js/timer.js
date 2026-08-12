@@ -1,5 +1,5 @@
 import { formatHMS, formatReadable, dateKeyFromWall, getTodayKey, generateId } from './utils.js';
-import { getDB, saveDB, blankDay, ensureDayShape, initToday, saveActiveSessionRaw, readActiveSessionRaw, clearActiveSessionRaw } from './storage.js';
+import { getDB, saveDB, blankDay, ensureDayShape, initToday, saveActiveSessionRaw, readActiveSessionRaw, clearActiveSessionRaw, getRawFlag, setRawFlag } from './storage.js';
 // Forward references to modules landing in later steps — safe because these
 // are only invoked inside function bodies, after the full module graph
 // (wired together in main.js, Step 7) has loaded.
@@ -65,8 +65,27 @@ function refreshCachedTodayDay() {
 // main.js (window.onload) — both live in other modules, so they call this
 // setter rather than reassigning an imported binding (ES module imports are
 // read-only in the importing module).
-export function setCurrentDayKey(key) { currentDayKey = key; }
+//
+// BUG FIX: setCurrentDayKey() used to only ever set the in-memory variable
+// above. main.js's boot sequence called setCurrentDayKey(getTodayKey()) on
+// EVERY page load, which meant checkDayRollover()'s very first comparison
+// (nowKey === getCurrentDayKey()) was always true right after a fresh
+// load/reopen — so a rollover that happened while the tab was closed
+// overnight (the normal case: close the app at night, reopen the next
+// morning) was never detected, and carryOverIncompleteTodos() never ran.
+// It only ever worked if the tab was left open and running continuously
+// through the actual midnight tick. Now every call to setCurrentDayKey()
+// also persists the day key to localStorage, and main.js restores FROM
+// that persisted value at boot (see getPersistedDayKey()) instead of
+// blindly stamping "today" — so a genuine overnight rollover is correctly
+// detected and caught up on the next time the app is opened.
+const LAST_ACTIVE_DAY_FLAG = "jee_last_active_day";
+export function setCurrentDayKey(key) { currentDayKey = key; setRawFlag(LAST_ACTIVE_DAY_FLAG, key); }
 export function getCurrentDayKey() { return currentDayKey; }
+// Boot-time restore only — falls back to today on a brand-new install
+// (nothing to compare against yet; using today there would make the first
+// rollover check silently skip since there's no prior day to catch up).
+export function getPersistedDayKey() { return getRawFlag(LAST_ACTIVE_DAY_FLAG) || getTodayKey(); }
 export function getTimerState() { return timerState; }
 export function getActiveSubject() { return activeSubject; }
 export function getSegmentElapsedMs() { return segmentElapsedMs; }

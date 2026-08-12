@@ -397,6 +397,7 @@ function flashTypeaheadJump(select) {
 function wireChapterTypeahead(select) {
     if (!select || select.dataset.typeaheadWired) return;
     select.dataset.typeaheadWired = "1";
+    let selectId = select.id;
     select.addEventListener("keydown", (e) => {
         if (e.key.length !== 1 || !/[a-z0-9]/i.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
         e.preventDefault();
@@ -432,8 +433,22 @@ function wireChapterTypeahead(select) {
         }
         if (match && match.value !== select.value) {
             select.value = match.value;
+            // BUG FIX (real root cause of "typing doesn't work"): this
+            // dispatchEvent() synchronously runs onAddChapterChange(), which
+            // calls renderAddForm() to refresh the "already logged" badge —
+            // and that replaces #mistake-add-chapter's whole innerHTML,
+            // destroying THIS <select> DOM node and creating a brand new
+            // one in its place. The new node never had focus, so every
+            // keystroke after the very first successful jump silently went
+            // nowhere (nothing was focused to receive it) — only the first
+            // letter ever appeared to work. Re-finding the (new) element by
+            // id afterwards and restoring focus to it fixes that; the flash
+            // animation is applied to whichever node is now actually in the
+            // DOM.
             select.dispatchEvent(new Event("change"));
-            flashTypeaheadJump(select);
+            let fresh = selectId ? document.getElementById(selectId) : select;
+            flashTypeaheadJump(fresh || select);
+            if (fresh && fresh !== select) fresh.focus();
         }
     });
 }
