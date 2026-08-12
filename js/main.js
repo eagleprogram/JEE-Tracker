@@ -137,7 +137,25 @@ Object.assign(window, {
 // late, since the event may already have passed by the time this module
 // finishes loading and evaluates).
 // -----------------------------------------------------------------------
+// The cache-busted reload in ui.js's deleteCookiesAndReload() navigates to
+// a URL with a ?_cb=<timestamp> param tacked on — that's the only way to
+// force a real network fetch instead of a stale disk-cache hit (see that
+// function's own comment for why a plain reload isn't enough). But it's a
+// one-time internal trick, not something that should stick around visibly
+// in the address bar afterwards, or look like a "different" URL to the
+// user. history.replaceState() strips it back to the clean URL in place —
+// no navigation, no reload, nothing re-fetched — it just fixes what's
+// displayed. This has to run before anything below touches the DOM/URL, so
+// it's the very first thing initApp() does.
+function stripCacheBustParam() {
+    if (!location.search.includes("_cb=")) return;
+    let url = new URL(location.href);
+    url.searchParams.delete("_cb");
+    history.replaceState(null, "", url.pathname + (url.search ? url.search : "") + url.hash);
+}
+
 async function initApp() {
+    stripCacheBustParam();
     setCurrentDayKey(getPersistedDayKey());
 
     // Redeem any toast that was queued right before a reload triggered by

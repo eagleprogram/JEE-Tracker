@@ -5,7 +5,7 @@
 // thing that makes the activate handler below delete the old cache and let
 // the new files be fetched fresh. Forgetting this step means fixes silently
 // never reach anyone who doesn't manually hard-refresh.
-const CACHE_NAME = "jee-tracker-v2.4.3";
+const CACHE_NAME = "jee-tracker-v2.4.4";
 const APP_SHELL = [
   "./",
   "./index.html",
