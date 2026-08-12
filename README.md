@@ -33,17 +33,17 @@ For multi-device users, Firebase Firestore provides effortless, cross-device syn
 
 ```text
 Tracker/
-├── index.html                    — page shell, all markup
-├── manifest.json                 — PWA manifest
-├── sw.js                         — service worker (offline app-shell caching)
+├── index.html                       — page shell, all markup
+├── manifest.json                    — PWA manifest
+├── sw.js                            — service worker (offline app-shell caching)
 ├── assets/
 │   ├── icon-192.png / icon-512.png  — PWA icons
 │   └── target-icon.png              — used for the header title icon
 ├── css/
-│   ├── variables.css   — color/spacing tokens + shared --tint-* button palette
-│   ├── base.css        — layout, sidebar, scrollbars
-│   ├── components.css  — cards, buttons, modals, inputs, badges
-│   └── charts.css      — garden, heatmap, pie, trend chart styling
+│   ├── variables.css    — color/spacing tokens + shared --tint-* button palette
+│   ├── base.css         — layout, sidebar, scrollbars
+│   ├── components.css   — cards, buttons, modals, inputs, badges
+│   └── charts.css       — garden, heatmap, pie, trend chart styling
 └── js/
     ├── utils.js         — pure helper functions, no DOM/storage
     ├── storage.js       — the only file that touches localStorage/IndexedDB

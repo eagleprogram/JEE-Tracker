@@ -362,10 +362,16 @@ export function renderSyncUI() {
     document.getElementById("sync-setup-note").innerText = firebaseConfigured() ? "" : "Cloud sync is not configured. To enable, add your Firebase keys in the code (search `FIREBASE_CONFIG`).";
     let signedOutBlock = document.getElementById("signed-out-block");
     let signedInBlock = document.getElementById("signed-in-block");
+    // Avatar + display name now live in the "Account & Sync:" header row
+    // itself (right-aligned next to the title) instead of their own row
+    // inside the signed-in block — toggled in lockstep with signedInBlock
+    // since they only make sense to show once signed in.
+    let headerUser = document.getElementById("account-header-user");
     if (!signedOutBlock) return;
     if (currentUser) {
         signedOutBlock.style.display = "none";
         signedInBlock.style.display = "block";
+        if (headerUser) headerUser.style.display = "flex";
         document.getElementById("account-name").innerText = currentUser.displayName || currentUser.email;
         let avatar = document.getElementById("account-avatar");
         if (currentUser.photoURL) { avatar.src = currentUser.photoURL; avatar.style.display = "block"; }
@@ -374,6 +380,7 @@ export function renderSyncUI() {
     } else {
         signedOutBlock.style.display = "block";
         signedInBlock.style.display = "none";
+        if (headerUser) headerUser.style.display = "none";
     }
 }
 

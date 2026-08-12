@@ -210,7 +210,13 @@
         </div>
 
         <div class="card" style="padding: 12px; margin-bottom: 30px;">
-            <h4 style="margin:0 0 6px 0; display:flex; align-items:center; gap:7px;"><span class="account-header-icon" aria-hidden="true"></span> Account & Sync</h4>
+            <h4 style="margin:0 0 6px 0; display:flex; align-items:center; justify-content:space-between; gap:7px;">
+                <span style="display:flex; align-items:center; gap:7px;"><span class="account-header-icon" aria-hidden="true"></span> Account &amp; Sync:</span>
+                <span id="account-header-user" style="display:none; align-items:center; gap:6px;">
+                    <img id="account-avatar" src="" style="width:24px; height:24px; border-radius:50%; display:none;">
+                    <span style="font-size:13px; font-weight:700;" id="account-name"></span>
+                </span>
+            </h4>
             <div id="sync-setup-note" class="small-note" style="color:var(--warning); margin-bottom:8px;">Cloud sync is not configured. To enable, add your Firebase keys in the code (search `FIREBASE_CONFIG`).</div>
                         <div id="signed-out-block">
                 <!-- TOP: Sign in (Remains untouched at the top) -->
@@ -226,10 +232,6 @@
                 <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="clearCacheAndReload()" title="Clears cached app files and reloads — doesn't touch your study data">🧹 Delete Cache & Reload Website</button>
             </div>
             <div id="signed-in-block" style="display:none;">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                    <img id="account-avatar" src="" style="width:32px; height:32px; border-radius:50%; display:none;">
-                    <div style="font-size:13px; font-weight:700;" id="account-name"></div>
-                </div>
                 <div id="sync-last" class="small-note"></div>
                 <div style="display:flex; gap:6px; margin-top:6px;">
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="pushToCloud()">Save to Cloud ⬆</button>
@@ -516,7 +518,7 @@
         <div>
             <h4>Logged Breaks</h4>
             <div class="missed-break-form">
-                <input type="text" id="missed-break-reason" placeholder="What was it? (e.g. Bath)">
+                <input type="text" id="missed-break-reason" placeholder="What was the missed break?">
                 <div class="missed-break-times">
                     <input type="time" id="missed-break-start" title="Start time">
                     <span>&ndash;</span>
