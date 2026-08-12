@@ -74,7 +74,7 @@
         </select>
         <button class="btn btn-start" onclick="addTodo()" title="Add task" style="height:44px; width:44px; padding:0; font-size:20px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; border-radius:8px;">+</button>
     </div>
-    <div id="todo-list" style="max-height: 180px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--card);"></div>
+    <div id="todo-list" style="max-height: 180px; overflow-y: auto; margin-top: 4px; padding-top: 4px; padding-right: 4px; padding-bottom: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--card);"></div>
 </div>
 
         <div class="card" style="padding: 12px;">
@@ -237,10 +237,10 @@
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="pushToCloud()">Save to Cloud ⬆</button>
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="pullFromCloud()">Load from Cloud ⬇</button>
                 </div>
-                <div style="display:flex; gap:4px; margin-top:6px;">
-                    <button class="btn btn-stop btn-compact" style="flex:1; white-space:nowrap;" onclick="deleteCloudData()">Delete Cloud Data</button>
-                    <button class="btn btn-stop btn-compact" style="flex:1; white-space:nowrap;" onclick="resetAllData()">Reset All Data</button>
-                    <button class="btn btn-stop btn-compact" style="flex:1; white-space:nowrap;" onclick="signOutOfGoogle()">Sign Out</button>
+                <div style="display:flex; gap:4px; margin-top:6px; justify-content:space-between;">
+                    <button class="btn btn-stop btn-compact" onclick="deleteCloudData()">Delete Cloud Data</button>
+                    <button class="btn btn-stop btn-compact" onclick="resetAllData()">Reset All Data</button>
+                    <button class="btn btn-stop btn-compact" onclick="signOutOfGoogle()">Sign Out</button>
                 </div>
                 <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: auto-saves to cloud (if signed in), signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
             </div>

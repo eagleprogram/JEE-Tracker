@@ -45,13 +45,14 @@ import { signOutOfGoogle, getCurrentUser, pushToCloud } from './firebase-sync.js
 // firebase-sync.js already offers to restore it the moment they do.
 export async function deleteCookiesAndReload() {
     if (!confirm(
-        "This fully resets the app on THIS browser — the same as manually deleting cookies and site data. It will:\n\n" +
+        "This fully resets the app on THIS browser — deleting cookies & site data.\n\n" +
+        "It will:\n\n" +
         "• Auto-save your current data to the cloud (if signed in)\n" +
         "• Sign you out of your account\n" +
-        "• Erase all study logs, planner tasks, sleep logs, syllabus progress, and mock tests on this device\n" +
-        "• Clear cached app files and reload the latest version from GitHub\n\n" +
-        "This cannot be undone on this device — but if you're signed in, your data is synced to the cloud first, so all you need to get it back is signing in again after this reload.\n\n" +
-        "Continue?"
+        "• Erase all data on this device\n" +
+        "• Clear cached app files & reload the latest version of this website.\n\n" +
+        "If you're signed in, your data is synced to the cloud first, so you will not lose any data & all you need to get it back is signing in again after this reload.\n\n" +
+        "To proceed, click OK."
     )) return;
     try {
         if (getCurrentUser()) await pushToCloud(true);

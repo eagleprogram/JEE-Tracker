@@ -115,17 +115,19 @@ button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radiu
 
 .btn-small { padding: 8px 12px; font-size: 12px; }
 /* .btn-compact: the 3-across "Delete Cloud Data / Reset All Data / Sign Out"
-   row. These sit in a `flex:1` row with white-space:nowrap, but flex items
-   default to min-width:auto — meaning a flex item is never allowed to
-   shrink below its own text's intrinsic width, no matter how little room
-   flex:1 gives it. With 3 fairly long labels that made the row overflow its
-   card (or crush against each other) instead of actually fitting on one
-   line. min-width:0 lifts that floor so flex:1 can size them down for real;
-   overflow/text-overflow give a graceful ellipsis instead of a raw clip on
-   the rare viewport where even that isn't enough room. Padding is tightened
-   (not font-size, which stays matched across all three buttons) to keep
-   them from feeling cramped once they're this narrow. */
-.btn-compact { padding: 7px 6px; font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+   row. These used to be `flex:1` (forced to equal thirds), which meant the
+   row's usable width was really "3 × the longest label" — so on narrow
+   (mobile) screens the two longer labels always overflowed and got
+   ellipsis-clipped ("Delete Clo…", "Reset All …") even though "Sign Out"
+   had plenty of room to spare. The row is now `justify-content:space-between`
+   with these left at their natural (`flex: 0 0 auto`) content width instead,
+   so each button only takes the room its own text needs — the SUM of the
+   three labels fits the row even though the longest one alone couldn't fill
+   a forced third. white-space:nowrap keeps each label on one line; the
+   tightened padding + slightly negative letter-spacing claw back a little
+   extra room without touching font-size, which stays matched across all
+   three buttons and identical to every other .btn on the page. */
+.btn-compact { flex: 0 0 auto; padding: 7px 7px; font-size: 11px; letter-spacing: -0.2px; white-space: nowrap; }
 
 /* ===== Single-line button rows (no wrapping to a 2nd row) ===== */
 .btn-row-nowrap {
@@ -186,7 +188,12 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 
 /* ===== Misc shared rows/lists ===== */
 .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 14px; }
-.todo-item { display: flex; align-items: center; gap: 8px; background: var(--bg); padding: 8px; border-radius: 6px; margin-top: 6px; font-size: 13px; word-break: break-word; overflow-wrap: break-word; }
+/* margin: 6px 0 (not just margin-top) so items get breathing room both
+   above AND below — previously only margin-top was set, so the very last
+   item in the scrollable #todo-list had nothing separating it from the
+   container's bottom edge, and the first item's gap depended entirely on
+   #todo-list's own top padding rather than the item itself. */
+.todo-item { display: flex; align-items: center; gap: 8px; background: var(--bg); padding: 8px; border-radius: 6px; margin: 6px 0; font-size: 13px; word-break: break-word; overflow-wrap: break-word; }
 .log-box { max-height: 200px; overflow-y: auto; background: var(--bg); border-radius: 8px; padding: 8px; }
 .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; }
 .settings-row label { flex: 1; }
@@ -369,10 +376,21 @@ button.del:hover { color: #fca5a5; }
 .yt-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 .yt-controls button { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
 .yt-controls input[type="range"] { flex: 1; }
-.yt-history-panel { margin-top: 8px; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px; display: none; }
+/* scrollbar-width/color + the ::-webkit-scrollbar rules below match the
+   thin track used by #todo-list and .sidebar — without them this panel
+   fell back to the browser's default (much thicker) scrollbar, which is
+   why it looked out of place next to the To-Do list's slim one. */
+.yt-history-panel { margin-top: 8px; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px; display: none; scrollbar-width: thin; scrollbar-color: var(--border) var(--card); }
 .yt-history-panel.open { display: block; }
-.yt-history-item { display: flex; gap: 8px; align-items: center; padding: 5px; border-radius: 6px; cursor: pointer; }
-.yt-history-item:hover { background: var(--bg); }
+.yt-history-panel::-webkit-scrollbar { width: 6px; }
+.yt-history-panel::-webkit-scrollbar-track { background: var(--card); }
+.yt-history-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+/* background now lives on the base rule (matching .todo-item's constant
+   var(--bg) fill) instead of only appearing on :hover, so each entry reads
+   as a distinct row at rest, the same way To-Do items already do. */
+.yt-history-item { display: flex; gap: 8px; align-items: center; padding: 5px; border-radius: 6px; cursor: pointer; background: var(--bg); margin-top: 6px; }
+.yt-history-item:first-child { margin-top: 0; }
+.yt-history-item:hover { background: var(--card); }
 .yt-history-item img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
 .yt-history-item .yt-history-label { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .yt-star-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; flex-shrink: 0; width: 16px; text-align: center; }
