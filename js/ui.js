@@ -46,13 +46,12 @@ import { signOutOfGoogle, getCurrentUser, pushToCloud } from './firebase-sync.js
 export async function deleteCookiesAndReload() {
     if (!confirm(
         "This fully resets the app on THIS browser — deleting cookies & site data.\n\n" +
-        "It will:\n\n" +
-        "• Auto-save your current data to the cloud (if signed in)\n" +
-        "• Sign you out of your account\n" +
+        "It will:\n" +
+        "• Auto-save your data to the cloud (if signed in)\n" +
+        "• Sign you out\n" +
         "• Erase all data on this device\n" +
-        "• Clear cached app files & reload the latest version of this website.\n\n" +
-        "If you're signed in, your data is synced to the cloud first, so you will not lose any data & all you need to get it back is signing in again after this reload.\n\n" +
-        "To proceed, click OK."
+        "• Clear cached files & reload the latest version\n\n" +
+        "If signed in, you won't lose data — just sign in again after reload."
     )) return;
     try {
         if (getCurrentUser()) await pushToCloud(true);

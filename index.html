@@ -237,10 +237,10 @@
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="pushToCloud()">Save to Cloud ⬆</button>
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="pullFromCloud()">Load from Cloud ⬇</button>
                 </div>
-                <div style="display:flex; gap:4px; margin-top:6px; justify-content:space-between;">
-                    <button class="btn btn-stop btn-compact" onclick="deleteCloudData()">Delete Cloud Data</button>
-                    <button class="btn btn-stop btn-compact" onclick="resetAllData()">Reset All Data</button>
-                    <button class="btn btn-stop btn-compact" onclick="signOutOfGoogle()">Sign Out</button>
+                <div class="btn-row-fit" style="margin-top:6px;">
+                    <button class="btn btn-stop" onclick="deleteCloudData()">Delete Cloud Data</button>
+                    <button class="btn btn-stop" onclick="resetAllData()">Reset All Data</button>
+                    <button class="btn btn-stop" onclick="signOutOfGoogle()">Sign Out</button>
                 </div>
                 <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: auto-saves to cloud (if signed in), signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
             </div>

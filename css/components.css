@@ -114,19 +114,11 @@ button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radiu
 .btn-report-share:hover { background: rgba(var(--tint-indigo), 0.2); }
 
 .btn-small { padding: 8px 12px; font-size: 12px; }
-/* .btn-compact: the 3-across "Delete Cloud Data / Reset All Data / Sign Out"
-   row. These used to be `flex:1` (forced to equal thirds), which meant the
-   row's usable width was really "3 × the longest label" — so on narrow
-   (mobile) screens the two longer labels always overflowed and got
-   ellipsis-clipped ("Delete Clo…", "Reset All …") even though "Sign Out"
-   had plenty of room to spare. The row is now `justify-content:space-between`
-   with these left at their natural (`flex: 0 0 auto`) content width instead,
-   so each button only takes the room its own text needs — the SUM of the
-   three labels fits the row even though the longest one alone couldn't fill
-   a forced third. white-space:nowrap keeps each label on one line; the
-   tightened padding + slightly negative letter-spacing claw back a little
-   extra room without touching font-size, which stays matched across all
-   three buttons and identical to every other .btn on the page. */
+/* .btn-compact: small dense buttons used for report/log/missed-break
+   actions (each sized to its own row via btn-row-nowrap/btn-row-fit or a
+   flex wrapper elsewhere). Not used for the account & sync 3-button row
+   anymore — that row now uses .btn-row-fit below for equal-width buttons
+   matching the Save/Load row above it. */
 .btn-compact { flex: 0 0 auto; padding: 7px 7px; font-size: 11px; letter-spacing: -0.2px; white-space: nowrap; }
 
 /* ===== Single-line button rows (no wrapping to a 2nd row) ===== */
