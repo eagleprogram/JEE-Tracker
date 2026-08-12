@@ -1,4 +1,4 @@
-import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml, formatDateDDMMYYYY } from './utils.js';
+import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml, formatDateDDMMYYYY, generateId } from './utils.js';
 import { getDB, saveDB, ensureDayShape, blankDay } from './storage.js';
 import { updateLiveSummary, resetOpenEntryRefs } from './timer.js';
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
@@ -83,6 +83,45 @@ export function deleteStudyLog() {
     db[dt].subjects = { ...blankDay().subjects };
     db[dt].totalStudy = 0; db[dt].studySessions = [];
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
+}
+
+// Manually add a break entry for a time range that was never tracked live
+// (e.g. logged after the fact from memory). Same shape/consequences as a
+// break the timer commits itself: pushed into day.breaks, added to
+// day.totalBreak, sorted into place next render by loadHistoryData()'s
+// existing timeToMinutes sort. Always applies to whatever date is selected
+// in #history-picker, not necessarily today.
+export function addMissedBreak() {
+    let dt = document.getElementById("history-picker").value;
+    if (!dt) { alert("Pick a date first."); return; }
+
+    let reasonEl = document.getElementById("missed-break-reason");
+    let startEl = document.getElementById("missed-break-start");
+    let endEl = document.getElementById("missed-break-end");
+    let reason = reasonEl.value.trim();
+    let start = startEl.value; // "HH:MM", 24hr, from <input type="time">
+    let end = endEl.value;
+
+    if (!reason) { alert("Enter what the break was for."); return; }
+    if (!start || !end) { alert("Enter both a start and end time."); return; }
+
+    let [sh, sm] = start.split(":").map(Number);
+    let [eh, em] = end.split(":").map(Number);
+    let durationSec = ((eh * 60 + em) - (sh * 60 + sm)) * 60;
+    if (durationSec <= 0) { alert("End time must be after start time."); return; }
+
+    let db = getDB();
+    if (!db[dt]) db[dt] = blankDay();
+    let day = ensureDayShape(db[dt]);
+
+    let stamp = new Date(2000, 0, 1, eh, em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    day.breaks.push({ id: generateId(), time: stamp, reason, duration: durationSec });
+    day.totalBreak += durationSec;
+    saveDB(db);
+
+    reasonEl.value = ""; startEl.value = ""; endEl.value = "";
+    loadHistoryData();
+    if (dt === getTodayKey()) updateLiveSummary();
 }
 
 export function deleteBreakLog() {

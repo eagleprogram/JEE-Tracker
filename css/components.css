@@ -198,6 +198,14 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 .settings-sub input[type="number"] { width: 52px; margin-top: 0; padding: 5px 6px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
 .settings-sub input[type="time"] { width: auto; margin-top: 0; padding: 5px 8px; font-size: 13px; }
 .small-note { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+/* "Add Missed Break" mini-form next to the Logged Breaks list (History card) */
+.missed-break-form { margin: 8px 0 12px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.missed-break-form input[type="text"] { margin-top: 0; margin-bottom: 8px; font-size: 13px; padding: 8px; }
+.missed-break-times { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.missed-break-times input[type="time"] { width: auto; flex: 1 1 90px; min-width: 90px; margin-top: 0; }
+.missed-break-times span { color: var(--muted); }
+.missed-break-times .btn { flex-shrink: 0; }
 /* Garden card's goal/streak-rules line — brighter than .small-note (which
    is meant to fade into the background) since this explains how the
    streak itself works and is worth actually reading. "Goal:" gets the

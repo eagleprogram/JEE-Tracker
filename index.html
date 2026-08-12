@@ -513,6 +513,15 @@
         </div>
         <div>
             <h4>Logged Breaks</h4>
+            <div class="missed-break-form">
+                <input type="text" id="missed-break-reason" placeholder="What was it? (e.g. Bath)">
+                <div class="missed-break-times">
+                    <input type="time" id="missed-break-start" title="Start time">
+                    <span>&ndash;</span>
+                    <input type="time" id="missed-break-end" title="End time">
+                    <button type="button" class="btn btn-pause btn-compact" onclick="addMissedBreak()">+ Add Missed Break</button>
+                </div>
+            </div>
             <div class="log-box" id="history-break-list" style="padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--border) var(--card);">No break logs recorded.</div>
         </div>
     </div>

@@ -30,7 +30,7 @@ import {
 
 import {
     loadHistoryData, deleteSubjectEntry, deleteStudySessionEntry,
-    deleteBreakEntry, deleteStudyLog, deleteBreakLog
+    deleteBreakEntry, deleteStudyLog, deleteBreakLog, addMissedBreak
 } from './history.js';
 
 import {
@@ -103,7 +103,7 @@ Object.assign(window, {
     renderGarden, renderHeatmap, renderTrendChart,
     // history.js
     loadHistoryData, deleteSubjectEntry, deleteStudySessionEntry,
-    deleteBreakEntry, deleteStudyLog, deleteBreakLog,
+    deleteBreakEntry, deleteStudyLog, deleteBreakLog, addMissedBreak,
     // sleep.js
     saveSleepLog, toggleSleepHistory, deleteSleepLogEntry, cancelPendingSleepLog,
     // syllabus.js
