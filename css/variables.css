@@ -13,4 +13,17 @@
        navy --bg, distinct from --primary (used everywhere on buttons/
        links) so the title doesn't visually blend into ordinary UI chrome. */
     --title: #7c9eff;
+
+    /* Single standardized tint palette — every button on the site (Start/
+       Pause/Break/Stop/Export, the report row, mock-test/mistakes actions,
+       notifications, account & sync, etc.) draws its color from ONE of
+       these six RGB triples via the .btn-* rules in components.css. Change
+       a value here and every button using that tint updates everywhere —
+       no more one-off hardcoded button colors scattered per file. */
+    --tint-sky: 56, 189, 248;      /* info / export / download */
+    --tint-emerald: 52, 211, 153;  /* positive / start / save */
+    --tint-amber: 245, 158, 11;    /* caution / pause / secondary action */
+    --tint-violet: 167, 139, 250;  /* break / focus */
+    --tint-rose: 244, 63, 94;      /* destructive / stop / delete */
+    --tint-indigo: 129, 140, 248;  /* share */
 }

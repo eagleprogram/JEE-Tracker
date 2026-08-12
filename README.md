@@ -36,11 +36,11 @@ Tracker/
 ├── index.html                    — page shell, all markup
 ├── manifest.json                 — PWA manifest
 ├── sw.js                         — service worker (offline app-shell caching)
-├── icon-192.png / icon-512.png   — PWA icons (repo root)
-├── target-icon                   — Target icons (repo root & used for Title icon)
-├── icon-user                     — user icon (repo root & used for account icon)
+├── assets/
+│   ├── icon-192.png / icon-512.png  — PWA icons
+│   └── target-icon.png              — used for the header title icon
 ├── css/
-│   ├── variables.css   — color/spacing tokens only
+│   ├── variables.css   — color/spacing tokens + shared --tint-* button palette
 │   ├── base.css        — layout, sidebar, scrollbars
 │   ├── components.css  — cards, buttons, modals, inputs, badges
 │   └── charts.css      — garden, heatmap, pie, trend chart styling
@@ -54,6 +54,7 @@ Tracker/
     ├── sleep.js         — sleep/wake log
     ├── syllabus.js      — chapter-by-chapter syllabus tracker
     ├── mocktest.js      — mock test scores + mistake tags
+    ├── mistakes.js      — chapter-wise mistakes tracker
     ├── youtube.js       — study-music player + history
     ├── charts.js        — garden, heatmap, streak, trend
     ├── reports.js       — share/download/email reports
@@ -62,6 +63,8 @@ Tracker/
     ├── ui.js            — sidebar, toasts, countdown
     └── main.js          — entry point, wires it all
 ```
+
+The account/guest "person" icon is no longer a separate PNG (`icon-user.png` was removed) — it's now an inline SVG data URI used directly as a CSS mask in `components.css`, so it can be recolored with a plain CSS variable and doesn't need its own file.
 
 ## Known Bugs Fixed in This Rebuild
 

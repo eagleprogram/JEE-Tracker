@@ -1,11 +1,47 @@
 import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml, formatDateDDMMYYYY, generateId } from './utils.js';
-import { getDB, saveDB, ensureDayShape, blankDay } from './storage.js';
+import { getDB, saveDB, ensureDayShape, blankDay, getSleepLog } from './storage.js';
 import { updateLiveSummary, resetOpenEntryRefs } from './timer.js';
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
+
+// Missed-break start/end times should only be loggable within the day's
+// actual awake window: no earlier than that date's logged wake time (a
+// break can't happen before you woke up), and — only when the selected
+// date IS today, since "now" has no meaning for a past date — no later
+// than the current time (a break can't be logged before it's happened).
+// Applied as native <input type="time"> min/max so the browser's own time
+// picker enforces it, not just a post-submit alert.
+export function applyMissedBreakTimeConstraints(dt) {
+    let startEl = document.getElementById("missed-break-start");
+    let endEl = document.getElementById("missed-break-end");
+    if (!startEl || !endEl) return;
+
+    let wakeTime = getSleepLog()[dt]?.wakeTime || null;
+    [startEl, endEl].forEach(el => {
+        if (wakeTime) el.setAttribute("min", wakeTime); else el.removeAttribute("min");
+    });
+
+    if (dt === getTodayKey()) {
+        let now = new Date();
+        let nowHHMM = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+        [startEl, endEl].forEach(el => el.setAttribute("max", nowHHMM));
+    } else {
+        [startEl, endEl].forEach(el => el.removeAttribute("max"));
+    }
+}
+
+// Re-reads whatever date is currently selected in the history picker and
+// re-applies the constraint above — called after saving a sleep log (see
+// sleep.js) so a just-logged wake time takes effect immediately even if
+// the user never touches the history date picker itself.
+export function refreshMissedBreakConstraints() {
+    let dt = document.getElementById("history-picker")?.value;
+    if (dt) applyMissedBreakTimeConstraints(dt);
+}
 
 export function loadHistoryData() {
     let dt = document.getElementById("history-picker").value;
     if (!dt) return;
+    applyMissedBreakTimeConstraints(dt);
     let db = getDB();
     let day = db[dt];
     if (!day) {
@@ -104,6 +140,24 @@ export function addMissedBreak() {
 
     if (!reason) { alert("Enter what the break was for."); return; }
     if (!start || !end) { alert("Enter both a start and end time."); return; }
+
+    // Same awake-window rule as applyMissedBreakTimeConstraints() above,
+    // enforced again here as a real guard — the min/max attributes stop the
+    // native time picker from landing outside the window, but don't stop a
+    // typed/pasted value, so both start and end are re-checked on save.
+    let wakeTime = getSleepLog()[dt]?.wakeTime;
+    if (wakeTime && (timeToMinutes(start) < timeToMinutes(wakeTime) || timeToMinutes(end) < timeToMinutes(wakeTime))) {
+        alert(`Breaks can only be logged after you woke up (${formatTime12Hour(wakeTime)}).`);
+        return;
+    }
+    if (dt === getTodayKey()) {
+        let now = new Date();
+        let nowMin = now.getHours() * 60 + now.getMinutes();
+        if (timeToMinutes(start) > nowMin || timeToMinutes(end) > nowMin) {
+            alert("Break times can't be later than right now.");
+            return;
+        }
+    }
 
     let [sh, sm] = start.split(":").map(Number);
     let [eh, em] = end.split(":").map(Number);

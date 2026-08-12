@@ -3,6 +3,10 @@ import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending } from './
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast } from './ui.js';
+// Refreshes the missed-break time inputs' min/max the instant a wake time is
+// saved, so History's "Add Missed Break" reflects it immediately without
+// requiring the user to touch the history date picker first.
+import { refreshMissedBreakConstraints } from './history.js';
 
 // A "pending" entry is always type 'sleep' now (bedtime logged, wake still
 // to come). Older saved data may still have a leftover type:'wake' pending
@@ -100,6 +104,7 @@ export function saveSleepLog() {
             };
             writeSleepLog(log);
             setSleepPending(null);
+            refreshMissedBreakConstraints();
             showToast("Sleep log completed!");
         } else {
             // 2b: Nothing pending — the realistic first-time-opening-the-app
@@ -110,6 +115,7 @@ export function saveSleepLog() {
             // morning's counterpart, and always starts fresh (CASE 1).
             log[today] = { sleepDate: null, sleepTime: null, wakeDate: today, wakeTime: wakeVal, durationMin: null };
             writeSleepLog(log);
+            refreshMissedBreakConstraints();
             showToast("Wake time logged (no bedtime on record for last night).");
         }
         document.getElementById("wake-time-input").value = "";
@@ -148,6 +154,7 @@ export function saveSleepLog() {
 
         log[wakeDate] = { sleepDate, sleepTime: sleepVal, wakeDate, wakeTime: wakeVal, durationMin };
         writeSleepLog(log);
+        refreshMissedBreakConstraints();
         if (pending) setSleepPending(null);
         document.getElementById("wake-time-input").value = "";
         document.getElementById("sleep-time-input").value = "";

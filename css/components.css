@@ -83,15 +83,36 @@ body.zen-mode .timer-box { min-height: 320px; }
     body.zen-mode .timer-screen { font-size: clamp(38px, 15vw, 68px); }
 }
 
-/* ===== Buttons ===== */
-button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; }
-.btn-start { background: var(--success); color: white; }
-.btn-pause { background: var(--warning); color: white; }
-.btn-break { background: #8b5cf6; color: white; }
-.btn-export { background: var(--primary); color: #04121f; font-weight: 700; }
-.btn-stop { background: var(--danger); color: white; }
-.btn-yellow { background: #eab308; color: #1a1400; }
-.btn:hover { opacity: 0.9; transform: translateY(-1px); }
+/* ===== Buttons =====
+   Every button class below is a soft tinted-glass style — translucent
+   background + matching 1px border + colored text, no solid fill — built
+   from the six shared --tint-* triples in variables.css. This is the same
+   look the weekly/monthly report buttons always used; the rest of the
+   site's buttons (Start/Pause/Break/Stop/Export, notifications, account &
+   sync, mock-test, mistakes, etc.) now match it instead of using loud
+   solid fills. Because every button just references one of these classes,
+   changing a --tint-* value in variables.css re-colors the whole site. */
+button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: background 0.2s, transform 0.2s; }
+.btn:hover { transform: translateY(-1px); }
+
+.btn-start, .btn-report-email { background: rgba(var(--tint-emerald), 0.12); border: 1px solid rgba(var(--tint-emerald), 0.4); color: rgb(var(--tint-emerald)); }
+.btn-start:hover, .btn-report-email:hover { background: rgba(var(--tint-emerald), 0.2); }
+
+.btn-pause, .btn-yellow { background: rgba(var(--tint-amber), 0.12); border: 1px solid rgba(var(--tint-amber), 0.4); color: rgb(var(--tint-amber)); }
+.btn-pause:hover, .btn-yellow:hover { background: rgba(var(--tint-amber), 0.2); }
+
+.btn-break { background: rgba(var(--tint-violet), 0.12); border: 1px solid rgba(var(--tint-violet), 0.4); color: rgb(var(--tint-violet)); }
+.btn-break:hover { background: rgba(var(--tint-violet), 0.2); }
+
+.btn-stop { background: rgba(var(--tint-rose), 0.12); border: 1px solid rgba(var(--tint-rose), 0.4); color: rgb(var(--tint-rose)); }
+.btn-stop:hover { background: rgba(var(--tint-rose), 0.2); }
+
+.btn-export, .btn-report-download { background: rgba(var(--tint-sky), 0.12); border: 1px solid rgba(var(--tint-sky), 0.4); color: rgb(var(--tint-sky)); }
+.btn-export:hover, .btn-report-download:hover { background: rgba(var(--tint-sky), 0.2); }
+
+.btn-report-share { background: rgba(var(--tint-indigo), 0.12); border: 1px solid rgba(var(--tint-indigo), 0.4); color: rgb(var(--tint-indigo)); }
+.btn-report-share:hover { background: rgba(var(--tint-indigo), 0.2); }
+
 .btn-small { padding: 8px 12px; font-size: 12px; }
 .btn-compact { padding: 7px 10px; font-size: 11px; }
 
@@ -209,33 +230,39 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 
 /* Number-of-tasks-left badge next to "Today's To-Do" — outlined circle,
    text/border colored to match the sidebar's accent so it sits quietly in
-   the left rail instead of competing with it. */
+   the left rail instead of competing with it. Fixed equal width/height +
+   border-radius:50% (instead of a min-width + horizontal padding pill)
+   so it stays a true circle for both single- and double-digit counts,
+   rather than stretching into an oval. */
 .todo-count-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
     margin-left: 4px;
     border: 1.5px solid var(--primary);
-    border-radius: 999px;
+    border-radius: 50%;
     color: var(--primary);
     font-size: 11px;
     font-weight: 700;
     vertical-align: middle;
     box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 /* Guest sign-in reminder + Account & Sync header icons — both use the same
-   transparent, solid-black source PNG (icon-user.png) as a CSS mask, so the
-   glyph itself can be recolored with plain background-color to match the
-   theme instead of being stuck with whatever color the source PNG shipped
-   with (or relying on an emoji, which renders differently per platform). */
+   inline SVG (plain circle-head + shoulders, stroke only, no fill) as a CSS
+   mask, so the glyph itself can be recolored with plain background-color to
+   match the theme. This replaced the old solid-silhouette icon-user.png:
+   that source PNG was a filled avatar shape, which is why the glyph used to
+   render as a solid blob instead of a clean outline. Being an inline data
+   URI also means there's no separate icon-user.png file to ship anymore. */
 .guest-modal-icon, .account-header-icon {
     display: inline-block;
-    -webkit-mask: url('../icon-user.png') no-repeat center / contain;
-    mask: url('../icon-user.png') no-repeat center / contain;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E") no-repeat center / contain;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E") no-repeat center / contain;
     background-color: var(--title);
 }
 .guest-modal-icon { width: 44px; height: 44px; margin-bottom: 10px; }
@@ -245,17 +272,6 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    inside the widened guest-reminder-modal instead of wrapping mid-word. */
 .btn-guest-small { flex: 1; padding: 8px 6px; font-size: 11px; white-space: nowrap; }
 
-/* Weekly/Monthly/Daily report action buttons — deliberately muted/cool
-   instead of the loud solid purple/green/orange the rest of the app uses
-   for primary actions (Start/Pause/Break), since a whole row of those reads
-   as visual noise. Same tri-color grouping (download / email / share) but
-   as soft tinted-glass buttons that sit quietly on the dark background. */
-.btn-report-download { background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.4); color: #7dd3fc; }
-.btn-report-download:hover { background: rgba(56, 189, 248, 0.2); }
-.btn-report-email { background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.4); color: #6ee7b7; }
-.btn-report-email:hover { background: rgba(52, 211, 153, 0.2); }
-.btn-report-share { background: rgba(129, 140, 248, 0.12); border: 1px solid rgba(129, 140, 248, 0.4); color: #a5b4fc; }
-.btn-report-share:hover { background: rgba(129, 140, 248, 0.2); }
 /* Garden card's goal/streak-rules line — brighter than .small-note (which
    is meant to fade into the background) since this explains how the
    streak itself works and is worth actually reading. "Goal:" gets the
@@ -345,8 +361,17 @@ input[type="time"] { width: 100%; padding: 6px 8px; background: var(--bg); borde
 
 /* ===== Mock Test & mistake tags ===== */
 .mock-entry { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; word-break: break-word; overflow-wrap: break-word; }
-.mock-entry .mock-top { display: flex; justify-content: space-between; align-items: center; }
-.mock-entry .mock-score { color: var(--success); font-weight: 800; }
+.mock-entry .mock-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+/* Title wraps freely in general (long subject names shouldn't overflow the
+   card), but a long title used to push the score onto its own second line
+   since the two sides were just two flex children with no width limits. The
+   title side now gets the remaining space and truncates to ONE line with an
+   ellipsis, while the score side is fixed-width/no-wrap, so "score / out of"
+   always stays on a single line next to the title regardless of its length. */
+.mock-entry .mock-title-wrap { min-width: 0; flex: 1 1 auto; }
+.mock-entry .mock-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mock-entry .mock-score-wrap { display: flex; align-items: center; gap: 8px; flex-shrink: 0; white-space: nowrap; }
+.mock-entry .mock-score { color: var(--success); font-weight: 800; white-space: nowrap; }
 .mock-entry .mock-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .mock-entry .mock-files img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
 .mock-entry .mock-files a.pdf-chip { font-size: 11px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--primary); text-decoration: none; }
