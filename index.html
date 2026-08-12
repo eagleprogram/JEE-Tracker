@@ -228,8 +228,8 @@
 
                 <!-- BOTTOM: Guest Delete Button -->
                 <div class="small-note" style="color:var(--danger); margin-bottom:4px;">⚠️ Guest mode: Deletes ALL local data from this device.<br>   (Study logs, Planner, Sleep, Settings) </div>
-                <button class="btn btn-stop btn-small" style="width:100%;" onclick="resetAllData()">🔴 Delete All Local Data</button>
-                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="clearCacheAndReload()" title="Clears cached app files and reloads — doesn't touch your study data">🧹 Delete Cache & Reload Website</button>
+                <button class="btn btn-stop btn-small" style="width:100%;" onclick="resetAllData()">Delete All Local Data</button>
+                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
             </div>
             <div id="signed-in-block" style="display:none;">
                 <div id="sync-last" class="small-note"></div>
@@ -242,7 +242,7 @@
                     <button class="btn btn-stop btn-compact" style="flex:1; white-space:nowrap;" onclick="resetAllData()">Reset All Data</button>
                     <button class="btn btn-stop btn-compact" style="flex:1; white-space:nowrap;" onclick="signOutOfGoogle()">Sign Out</button>
                 </div>
-                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="clearCacheAndReload()" title="Clears cached app files and reloads — doesn't touch your study data">🧹 Delete Cache & Reload Website</button>
+                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
             </div>
         </div>
     </div>

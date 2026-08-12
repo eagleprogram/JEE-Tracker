@@ -89,7 +89,10 @@ export async function signInWithGoogle() {
     } catch (e) { alert("Sign-in failed: " + e.message); }
 }
 
-export function signOutOfGoogle() { if (fbAuth) fbAuth.signOut(); }
+// Returns a promise so callers that need sign-out to actually finish before
+// doing something else (e.g. ui.js's deleteCookiesAndReload, which wipes
+// local data right after) can await it instead of racing it.
+export function signOutOfGoogle() { return fbAuth ? fbAuth.signOut() : Promise.resolve(); }
 
 export async function pushToCloud(silent = false) {
     if (!initFirebaseAuthIfNeeded()) return;

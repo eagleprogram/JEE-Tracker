@@ -238,10 +238,23 @@ export function setRawFlag(key, value) { localStorage.setItem(key, value); }
 export function clearRawFlag(key) { localStorage.removeItem(key); }
 
 // ----------------- FULL RESET -----------------
+// Core wipe logic shared by resetAllData() (below) and ui.js's
+// deleteCookiesAndReload() — clears every bit of this app's on-device
+// storage (localStorage: study logs/planner/sleep/syllabus/settings/flags,
+// and the mock-test/mistakes IndexedDB database). Returns a promise so
+// callers can sequence a reload after it actually finishes, rather than
+// racing the IndexedDB deletion like the old inline version did.
+export function wipeLocalData() {
+    localStorage.clear();
+    return new Promise((resolve) => {
+        let req = indexedDB.deleteDatabase(MOCK_DB_NAME);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve(); // best-effort — still resolve so the caller's reload isn't blocked
+        req.onblocked = () => resolve(); // e.g. another tab has the DB open; don't hang forever
+    });
+}
+
 export function resetAllData() {
     if (!confirm("This will permanently DELETE all study logs, planner tasks, sleep logs, and mock tests from this device. This action cannot be undone! Are you sure?")) return;
-    localStorage.clear();
-    let req = indexedDB.deleteDatabase(MOCK_DB_NAME);
-    req.onsuccess = () => { location.reload(); };
-    req.onerror = () => { location.reload(); };
+    wipeLocalData().then(() => location.reload());
 }

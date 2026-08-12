@@ -11,19 +11,51 @@ import { runNotificationChecks } from './notifications.js';
 import { renderMockTestList } from './mocktest.js';
 import { renderSyllabusTracker } from './syllabus.js';
 import { renderMistakesTracker } from './mistakes.js';
+import { wipeLocalData } from './storage.js';
+// Forward reference — firebase-sync.js also imports several things from
+// this file (showToast, maybeShowGuestSignInReminder, hideGuestSignInReminder).
+// That circular import is already the established pattern in this codebase
+// (see the "Forward reference" comments in firebase-sync.js/mistakes.js) and
+// is safe here: signOutOfGoogle/getCurrentUser are only ever called from
+// inside deleteCookiesAndReload()'s function body, well after both modules
+// have finished evaluating — never at module-eval time.
+import { signOutOfGoogle, getCurrentUser } from './firebase-sync.js';
 
-// ----------------- CACHE -----------------
-// Some browsers (Edge in particular) make clearing site data + hard-reload
-// a multi-step chore just to pick up a new deployed version, since sw.js
-// serves cache-first. This does both in one click: drops every Cache
-// Storage bucket this origin owns (the service worker's onactivate handler
-// already deletes stale-named caches on its own, but this also covers the
-// case where the SW itself hasn't updated yet) and unregisters the current
-// service worker so the next load re-registers sw.js fresh, then reloads.
-// Available both signed-out and signed-in — it never touches
-// localStorage/IndexedDB study data, only the PWA cache layer.
-export async function clearCacheAndReload() {
-    if (!confirm("This clears the app's cached files and does a full reload to fetch the latest version. It doesn't touch your study data, but as a precaution — especially if you haven't synced in a while — consider exporting a backup or saving to cloud first. Continue?")) return;
+// ----------------- FULL DEVICE RESET (Delete Cookies & Reload) -----------------
+// This used to only clear the PWA's Cache Storage layer (so a stale cached
+// build wouldn't keep being served) and leave everything else — study data,
+// sign-in — untouched. That's a different, much smaller thing than what
+// "delete cookies and site data" means when a user does it manually via the
+// browser's own UI (site-info icon → Cookies and site data → Delete), which
+// wipes EVERYTHING for the origin: cookies, localStorage, IndexedDB, Cache
+// Storage, and the service worker registration, and drops any signed-in
+// session with it. This function now does the same full wipe from inside
+// the app in one click, instead of requiring that manual multi-step process.
+//
+// Order matters: sign out FIRST (before local data is wiped) so
+// onAuthStateChanged's signed-out branch doesn't race the wipe below, then
+// clear the PWA cache layer, then local study data, then cookies, then do a
+// cache-busted reload. Because sign-out + local wipe are destructive and
+// unrecoverable from this device alone, the confirm dialog below leads with
+// telling the user to save to the cloud first — the cloud copy is what lets
+// them get their data back afterwards (autoLoadCloudDataIfNeeded in
+// firebase-sync.js already offers to restore it the next time they sign in
+// on this browser).
+export async function deleteCookiesAndReload() {
+    if (!confirm(
+        "This fully resets the app on THIS browser — the same as manually deleting cookies and site data. It will:\n\n" +
+        "• Sign you out of your account\n" +
+        "• Erase all study logs, planner tasks, sleep logs, syllabus progress, and mock tests on this device\n" +
+        "• Clear cached app files and reload the latest version from GitHub\n\n" +
+        "This cannot be undone on this device. If you haven't saved to the cloud recently, go to Account & Sync → Save to Cloud first — you'll be offered your cloud data back the next time you sign in here.\n\n" +
+        "Continue?"
+    )) return;
+    try {
+        if (getCurrentUser()) await signOutOfGoogle();
+    } catch (e) {
+        // Even if sign-out fails, still proceed with the wipe below — a
+        // stuck sign-out shouldn't block the user from resetting the app.
+    }
     try {
         if ("caches" in window) {
             let keys = await caches.keys();
@@ -34,8 +66,26 @@ export async function clearCacheAndReload() {
             await Promise.all(regs.map(r => r.unregister()));
         }
     } catch (e) {
-        // Even if clearing fails partway, still force the reload below —
-        // a plain reload is strictly better than doing nothing.
+        // Even if clearing fails partway, still proceed — a partial clear is
+        // strictly better than doing nothing.
+    }
+    try {
+        await wipeLocalData();
+    } catch (e) {
+        // Same reasoning — keep going even if IndexedDB deletion errors out.
+    }
+    try {
+        // This app doesn't set its own cookies, but Firebase Auth/Google
+        // Sign-In can leave a couple behind on this origin — clear whatever
+        // is readable from document.cookie the same way a manual "clear
+        // cookies" would. (HttpOnly cookies, which JS can never see or
+        // delete, aren't set by this app.)
+        document.cookie.split(";").forEach((c) => {
+            let name = c.split("=")[0].trim();
+            if (name) document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+        });
+    } catch (e) {
+        // Non-fatal — proceed to reload regardless.
     }
     // A plain location.reload() clears the SW/Cache-Storage layer above, but
     // the *browser's own HTTP disk cache* is a separate thing it does not
