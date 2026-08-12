@@ -101,9 +101,27 @@ export function openSidebarPanel(name) {
     mocktestBtn.classList.toggle("active", name === "mocktest");
     syllabusBtn.classList.toggle("active", name === "syllabus");
     mistakesBtn.classList.toggle("active", name === "mistakes");
-    if (name === "mocktest") renderMockTestList();
-    if (name === "syllabus") renderSyllabusTracker();
-    if (name === "mistakes") renderMistakesTracker();
+    // BUG FIX (the "huge lag when opening the sidebar" report): these three
+    // renders can build hundreds of DOM nodes synchronously (syllabus alone
+    // is 945 tasks). Calling them right here, in the same tick as the
+    // classList/style changes above, blocks the main thread for that whole
+    // render BEFORE the browser gets a chance to paint the very first frame
+    // of the sidebar-width / timer-font-size transitions — so the animation
+    // has to "catch up" once the thread frees up, which reads as stutter/lag
+    // that "struggles" then snaps. Deferring the heavy render by two
+    // animation frames lets the browser paint the transition's starting
+    // frame(s) first (frame 1: styles committed; frame 2: first paint done),
+    // so the CSS transition runs smoothly on the compositor while the panel
+    // content fills in a beat later instead of blocking the opening
+    // animation itself. closeSidebar() does no such rendering, which is why
+    // closing was already smooth.
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            if (name === "mocktest") renderMockTestList();
+            if (name === "syllabus") renderSyllabusTracker();
+            if (name === "mistakes") renderMistakesTracker();
+        });
+    });
 }
 
 // ----------------- DAY ROLLOVER -----------------

@@ -193,10 +193,12 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
 }
 
 .app-title-wrap { display: flex; align-items: center; gap: 14px; }
-/* Single title icon — replaces the old paired SVG rings-logo + trailing
-   🎯 emoji (two icons doing the same job). flex-shrink:0 keeps it from
-   getting squeezed when the header wraps on narrow widths. */
-.app-title-icon { font-size: 40px; line-height: 1; flex-shrink: 0; }
+/* Custom target/arrow mark — built from the SAME gradient stops as
+   .app-title-main's text (see #titleIconGrad in index.html), so the icon
+   and the "JEE 2027" text read as one cohesive, on-brand mark instead of
+   an emoji dropped in next to a gradient headline. Replaces the old
+   two-icon pairing (plain-stroke rings + a separate 🎯 emoji). */
+.app-title-icon { width: 44px; height: 44px; flex-shrink: 0; }
 .app-title-text { display: flex; flex-direction: column; line-height: 1.05; }
 .app-title-main {
     font-family: 'Sora', sans-serif;
@@ -220,7 +222,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
     margin-top: 4px;
     text-transform: uppercase;
 }
-@media (max-width: 850px) { .app-title-main { font-size: 26px; } .app-title-icon { font-size: 30px; } .header { gap: 20px; } }
+@media (max-width: 850px) { .app-title-main { font-size: 26px; } .app-title-icon { width: 34px; height: 34px; } .header { gap: 20px; } }
 
 .countdown-chip {
     background: var(--bg);

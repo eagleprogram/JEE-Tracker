@@ -136,7 +136,7 @@ export function renderSyllabusTracker() {
         });
     });
     let overallPct = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
-    document.getElementById("syllabus-overall").innerHTML = `<div>Overall: <span class="highlight-text">${doneTasks}</span>/${totalTasks} tasks (<span class="highlight-text">${overallPct}%</span>)</div><div class="so-bar-track"><div class="so-bar-fill" style="width:${overallPct}%;"></div></div>`;
+    document.getElementById("syllabus-overall").innerHTML = `<div>Overall: <span class="highlight-text">${doneTasks}</span>/<span class="highlight-text">${totalTasks}</span> tasks (<span class="highlight-pct">${overallPct}%</span>)</div><div class="so-bar-track"><div class="so-bar-fill" style="width:${overallPct}%;"></div></div>`;
 
     let html = "";
     [11, 12].forEach(cls => {

@@ -2,7 +2,7 @@
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; min-width: 0; }
 
 .timer-box { text-align: center; margin: 15px 0; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 280px; }
-.timer-screen { font-size: 72px; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: -1px; max-width: 100%; overflow-wrap: anywhere; }
+.timer-screen { font-size: 72px; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: -1px; max-width: 100%; overflow-wrap: anywhere; transition: font-size 0.25s ease; }
 .controls-row { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
 
 /* ===== Buttons ===== */
@@ -89,6 +89,13 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 .settings-sub input[type="number"] { width: 52px; margin-top: 0; padding: 5px 6px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
 .settings-sub input[type="time"] { width: auto; margin-top: 0; padding: 5px 8px; font-size: 13px; }
 .small-note { font-size: 11px; color: var(--muted); margin-top: 6px; }
+/* Garden card's goal/streak-rules line — brighter than .small-note (which
+   is meant to fade into the background) since this explains how the
+   streak itself works and is worth actually reading. "Goal:" gets the
+   strongest emphasis of the line; the rest is a step down from that but
+   still a step up from the old --muted-only note styling. */
+.goal-note { font-size: 12px; color: #94a3b8; margin-top: 6px; margin-bottom: 10px; line-height: 1.5; }
+.goal-note-emphasis { color: var(--text); font-weight: 800; }
 .session-log-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); padding: 6px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; }
 
 .countdown-card { padding: 12px; }
@@ -199,6 +206,7 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .syllabus-overall .so-bar-track { background: var(--bg); border-radius: 5px; height: 8px; margin-top: 4px; overflow: hidden; }
 .syllabus-overall .so-bar-fill { background: var(--success); height: 100%; border-radius: 5px; }
 .syllabus-overall .highlight-text { color: var(--primary); font-weight: 800; font-size: 14px; }
+.syllabus-overall .highlight-pct { color: var(--success); font-weight: 800; font-size: 14px; }
 .syllabus-class-header { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 6px; }
 .syllabus-chapter-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
 .syllabus-chapter-card .sc-top { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }

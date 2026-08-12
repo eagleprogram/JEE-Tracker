@@ -157,7 +157,7 @@
                     <span style="font-size:12px; color:var(--muted);">min on break</span>
                 </div>
                 <div class="settings-row">
-                    <label>Planner task reminder (2hr window, every 30min)</label>
+                    <label>Planner task reminder (2hr window, remind every 30min)</label>
                     <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -173,7 +173,7 @@
                     <input type="time" id="notif-revisionReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Sleep reminder (30-min window, every 5min)</label>
+                    <label>Sleep reminder (30-min window, remind every 5min)</label>
                     <input type="checkbox" id="notif-sleepReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -351,7 +351,20 @@
 <div class="main-wrapper">
     <div class="header">
         <div class="app-title-wrap">
-            <span class="app-title-icon" aria-hidden="true">🎓</span>
+            <svg class="app-title-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                    <linearGradient id="titleIconGrad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#38bdf8"/>
+                        <stop offset="55%" stop-color="#818cf8"/>
+                        <stop offset="100%" stop-color="#34d399"/>
+                    </linearGradient>
+                </defs>
+                <circle cx="24" cy="24" r="19" stroke="url(#titleIconGrad)" stroke-width="3"/>
+                <circle cx="24" cy="24" r="12" stroke="url(#titleIconGrad)" stroke-width="3"/>
+                <circle cx="24" cy="24" r="5" fill="url(#titleIconGrad)"/>
+                <path d="M40 8 L25.5 22.5" stroke="url(#titleIconGrad)" stroke-width="3" stroke-linecap="round"/>
+                <path d="M40 8 L33 8.5 L39.5 15 Z" fill="url(#titleIconGrad)"/>
+            </svg>
             <div class="app-title-text">
                 <span class="app-title-main" id="app-title-main">JEE 2027</span>
                 <span class="app-title-sub">Study Tracker</span>
@@ -428,7 +441,7 @@
             <h3 style="margin:0;">🌱 This Week's Garden</h3>
             <span class="streak-pill" id="streak-pill">🔥 0 day streak</span>
         </div>
-        <div class="small-note" style="margin-bottom:10px;">Goal: 10 hrs/day counts toward your streak. A missed day gets one ❄️ freeze per calendar week (Monday–Sunday) to protect your streak; a second missed day in the same week breaks it.</div>
+        <div class="goal-note"><strong class="goal-note-emphasis">Goal:</strong> 10 hrs/day counts toward your streak. A missed day gets one ❄️ freeze per week (Monday–Sunday) to protect your streak; a second missed day in the same week breaks the streak and resets to 0.</div>
         <div class="garden-row" id="garden-row"></div>
     </div>
 
