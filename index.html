@@ -157,7 +157,7 @@
                     <span style="font-size:12px; color:var(--muted);">min on break</span>
                 </div>
                 <div class="settings-row">
-                    <label>Planner task reminder (every 30min from start)</label>
+                    <label>Planner task reminder (2hr window, every 30min)</label>
                     <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -351,13 +351,9 @@
 <div class="main-wrapper">
     <div class="header">
         <div class="app-title-wrap">
-            <svg class="app-logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="24" cy="24" r="20" stroke="#38bdf8" stroke-width="3.5"/>
-                <circle cx="24" cy="24" r="12.5" stroke="#818cf8" stroke-width="3.5"/>
-                <circle cx="24" cy="24" r="5" fill="#34d399"/>
-            </svg>
+            <span class="app-title-icon" aria-hidden="true">🎓</span>
             <div class="app-title-text">
-                <span class="app-title-main" id="app-title-main">JEE 2027 <span class="app-title-emoji">🎯</span></span>
+                <span class="app-title-main" id="app-title-main">JEE 2027</span>
                 <span class="app-title-sub">Study Tracker</span>
                 <select id="exam-year-select" onchange="setExamYear(this.value)" title="Exam year — shifts the countdowns and title. Dates are approximated by shifting the 2027 dates by whole years; check official JEE dates once announced for your year." style="margin-top:4px; background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:11px; padding:2px 4px;">
                 </select>

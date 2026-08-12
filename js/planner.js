@@ -1,5 +1,11 @@
 import { getTodayKey, dateKey, escapeHtml } from './utils.js';
 import { getPlannerDB, savePlannerDB } from './storage.js';
+// Forward reference — ui.js imports FROM this module (carryOverIncompleteTodos,
+// renderSidebarTools, renderPlannerCalendar), so this is a circular import.
+// Same pattern already used by notifications.js: only called inside function
+// bodies at runtime, never at module top-level, so it's safe once main.js
+// has wired the full module graph.
+import { showToast } from './ui.js';
 
 let calViewYear, calViewMonth;
 let plannerActiveDateKey = null;
@@ -37,10 +43,16 @@ export function initPlannerCalendar() {
 // ----------------- SIDEBAR TODO (today only) -----------------
 export function addTodo() {
     let inp = document.getElementById("todo-input"); if (!inp.value.trim()) return;
+    let text = inp.value.trim();
     let prioritySel = document.getElementById("todo-priority-select");
     let priority = prioritySel ? prioritySel.value : "medium";
     let todayKey = getTodayKey(); let db = getPlannerDB();
-    if (!db[todayKey]) db[todayKey] = []; db[todayKey].push({ text: inp.value.trim(), done: false, priority }); savePlannerDB(db); inp.value = ""; renderSidebarTools(); renderPlannerCalendar();
+    if (!db[todayKey]) db[todayKey] = [];
+    // Exact-character duplicate guard — case-sensitive match against every
+    // task already on today's list (done or not), same rule applied in
+    // addPlannerTask() below for the calendar modal's add box.
+    if (db[todayKey].some(t => t.text === text)) { showToast("That task is already on today's list."); return; }
+    db[todayKey].push({ text, done: false, priority }); savePlannerDB(db); inp.value = ""; renderSidebarTools(); renderPlannerCalendar();
 }
 
 export function renderSidebarTools() {
@@ -66,19 +78,29 @@ export function deleteTodo(idx) {
 
 // Called once from checkDayRollover() (ui.js) at the exact moment local
 // midnight flips over. Any todo still unchecked on the day that just ended
-// moves onto the new day's list instead of being left behind on a date the
-// user will likely never revisit — the 8pm planner reminder (notifications.js)
-// nudges them beforehand, but whatever's still pending at midnight follows
-// them forward. Completed tasks stay put on the day they were finished. If
-// a carried-over task is STILL incomplete by the next midnight, this same
-// function runs again and carries it forward again — so it keeps rolling
-// day to day until it's either checked off or deleted.
+// is offered forward onto the new day's list instead of silently vanishing
+// onto a date the user will likely never revisit — the 8pm planner reminder
+// (notifications.js) nudges them beforehand, but this is the last chance.
+// Completed tasks stay put on the day they were finished either way.
+//
+// The move now requires explicit confirmation (numbered list, one line per
+// task, each prefixed with its priority color so the user can see at a
+// glance what they'd be carrying forward) instead of moving automatically.
+// Declining leaves the incomplete tasks on the old day untouched — they'll
+// be offered again (re-numbered, priority-colored) on the NEXT rollover
+// too, so nothing is lost by saying no once.
 export function carryOverIncompleteTodos(oldDayKey, newDayKey) {
     let db = getPlannerDB();
     let oldTasks = db[oldDayKey];
     if (!oldTasks || oldTasks.length === 0) return;
     let incomplete = oldTasks.filter(t => !t.done);
     if (incomplete.length === 0) return;
+
+    let isSingle = incomplete.length === 1;
+    let listText = incomplete.map((t, i) => `${i + 1}. ${getPriorityEmoji(t.priority)} ${t.text}`).join("\n");
+    let message = `You have ${incomplete.length} incomplete ${isSingle ? "task" : "tasks"} from yesterday:\n\n${listText}\n\nWould you like to transfer ${isSingle ? "it" : "them"} to today?`;
+    if (!confirm(message)) return;
+
     db[oldDayKey] = oldTasks.filter(t => t.done);
     db[newDayKey] = (db[newDayKey] || []).concat(incomplete);
     savePlannerDB(db);
@@ -119,10 +141,12 @@ export function closePlannerModal() {
 export function addPlannerTask() {
     if (plannerActiveDateKey < getTodayKey()) return;
     let inp = document.getElementById("planner-task-input"); if (!inp.value.trim()) return;
+    let text = inp.value.trim();
     let prioritySel = document.getElementById("planner-priority-select");
     let priority = prioritySel ? prioritySel.value : "medium";
     let db = getPlannerDB(); if (!db[plannerActiveDateKey]) db[plannerActiveDateKey] = [];
-    db[plannerActiveDateKey].push({ text: inp.value.trim(), done: false, priority }); savePlannerDB(db); inp.value = ""; renderPlannerTasks();
+    if (db[plannerActiveDateKey].some(t => t.text === text)) { showToast("That task is already on this day's list."); return; }
+    db[plannerActiveDateKey].push({ text, done: false, priority }); savePlannerDB(db); inp.value = ""; renderPlannerTasks();
 }
 
 export function togglePlannerTask(idx) {

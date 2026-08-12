@@ -28,6 +28,19 @@ body.panel-open { padding-left: 440px; }
     .timer-screen { font-size: clamp(32px, 11vw, 48px); }
 }
 
+/* Timer shrinks specifically while the sidebar panel is open, on widths
+   between the phone breakpoint above (700px, already handled) and desktop
+   (1024px+, plenty of room even with the panel open). In that gap the
+   sidebar's 420px push (body.panel-open's default padding-left:440px,
+   see the top of this file) leaves too little room next to it for the
+   72px desktop timer digits, so "00:00:00" wraps onto two lines and
+   spills past the card edge. Scoped to body.panel-open only, so closing
+   the panel instantly restores the full 72px size — nothing here touches
+   the timer when the sidebar is closed. */
+@media (min-width: 701px) and (max-width: 1024px) {
+    body.panel-open .timer-screen { font-size: clamp(28px, 6vw, 44px); }
+}
+
 /* ===== Scrollbars (themed dark, matches the UI everywhere) ===== */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
@@ -180,7 +193,10 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
 }
 
 .app-title-wrap { display: flex; align-items: center; gap: 14px; }
-.app-logo { width: 48px; height: 48px; flex-shrink: 0; }
+/* Single title icon — replaces the old paired SVG rings-logo + trailing
+   🎯 emoji (two icons doing the same job). flex-shrink:0 keeps it from
+   getting squeezed when the header wraps on narrow widths. */
+.app-title-icon { font-size: 40px; line-height: 1; flex-shrink: 0; }
 .app-title-text { display: flex; flex-direction: column; line-height: 1.05; }
 .app-title-main {
     font-family: 'Sora', sans-serif;
@@ -195,7 +211,6 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
     align-items: center;
     gap: 6px;
 }
-.app-title-emoji { font-size: 32px; background: none; -webkit-background-clip: unset; background-clip: unset; color: #f59e0b; }
 .app-title-sub {
     font-family: 'Space Grotesk', monospace;
     font-weight: 700;
@@ -205,7 +220,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
     margin-top: 4px;
     text-transform: uppercase;
 }
-@media (max-width: 850px) { .app-title-main { font-size: 26px; } .app-logo { width: 36px; height: 36px; } .header { gap: 20px; } }
+@media (max-width: 850px) { .app-title-main { font-size: 26px; } .app-title-icon { font-size: 30px; } .header { gap: 20px; } }
 
 .countdown-chip {
     background: var(--bg);

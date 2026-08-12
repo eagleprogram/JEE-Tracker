@@ -101,7 +101,24 @@ export function onAddSubjectChange() {
 export function onAddChapterChange() {
     let sel = document.getElementById("mistake-add-chapter");
     addFormChapter = sel ? sel.value : null;
-    renderMistakesTracker();
+    updateAddChapterBadge();
+}
+
+// Updates just the chapter-name label + "already logged" badge after a
+// chapter selection change — does NOT touch the <select> element or
+// re-render its container. Previously this called renderMistakesTracker(),
+// which rebuilt #mistake-add-chapter's whole innerHTML on every change
+// (including the ones the typeahead below fires programmatically),
+// destroying and recreating the select node and losing focus off it.
+// Keeping the select node itself untouched here means typed keystrokes
+// keep landing on the same still-focused element with no refocus needed.
+function updateAddChapterBadge() {
+    let key = addFormChapter ? keyFor(addFormSubject, addFormChapter) : null;
+    let existingTotal = key && mistakeCache[key] ? totalCount(mistakeCache[key]) : 0;
+    let nameEl = document.getElementById("mistake-add-chapter-name");
+    let badgeEl = document.getElementById("mistake-add-chapter-badge");
+    if (nameEl) nameEl.textContent = addFormChapter || "—";
+    if (badgeEl) badgeEl.textContent = String(existingTotal);
 }
 
 export async function saveAddMistake() {
@@ -370,11 +387,25 @@ function sortChapterRows(rows, mode) {
 }
 
 // Wires "type a letter to jump to a matching chapter" onto the chapter
-// <select>. Real <select> elements already do this natively on desktop, but
-// it's flaky-to-absent on several mobile browsers once a soft keyboard is
-// involved, which is what was actually being asked for here. Buffers
-// consecutive keystrokes (e.g. "k" "i" "n" -> "Kinematics") and resets the
-// buffer after a short pause, same as native typeahead behaves.
+// <select>. DECISION: tested dropping this in favor of relying purely on
+// the browser's built-in <select> typeahead, as requested — but native
+// typeahead only ever matches from the START of an option's visible text,
+// and every single option here is rendered as "Class 11 · <Chapter>" /
+// "Class 12 · <Chapter>". That means native typeahead can only ever cycle
+// between the two literal strings "Class 11" and "Class 12" — pressing "r"
+// for "Rotational Motion" would do nothing, since no option starts with
+// "r". That's not a small tweak away from working; it's a hard limitation
+// of how <select> typeahead matches. So per "if a small change can make it
+// work, do that, else remove it" — native can't be made to work here
+// without changing the option label format itself, so the custom handler
+// stays. What DID change: it used to force a full form re-render on every
+// jump (see updateAddChapterBadge() above) to refresh the badge, which
+// destroyed and recreated this exact <select> node mid-keystroke; that's
+// fixed now, so the refocus workaround below is dead code in practice
+// (kept as a no-op safety net) since the node is never actually replaced
+// anymore. Buffers consecutive keystrokes (e.g. "k" "i" "n" ->
+// "Kinematics") and resets the buffer after a short pause, same as native
+// typeahead behaves.
 let typeaheadBuffer = "";
 let typeaheadLastKey = "";
 let typeaheadTimer = null;
@@ -474,8 +505,8 @@ function renderAddForm() {
             ${chapterOptions.map(o => `<option value="${escapeHtml(o.ch)}" ${o.ch === addFormChapter ? 'selected' : ''}>Class ${o.cls} · ${escapeHtml(o.ch)}</option>`).join('')}
         </select>
         <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
-            <span class="mc-name" style="flex:1;">${escapeHtml(addFormChapter || "—")}</span>
-            <span class="mc-badge" style="color:var(--danger); border-color:var(--danger);" title="Already logged for this chapter">${existingTotal}</span>
+            <span class="mc-name" id="mistake-add-chapter-name" style="flex:1;">${escapeHtml(addFormChapter || "—")}</span>
+            <span class="mc-badge" id="mistake-add-chapter-badge" style="color:var(--danger); border-color:var(--danger);" title="Already logged for this chapter">${existingTotal}</span>
         </div>
         <label style="font-size:12px; color:var(--muted); margin-top:8px; display:block;">Notes (required)</label>
         <textarea id="mistake-add-notes" class="mc-notes" placeholder="What went wrong, how to fix it..."></textarea>

@@ -352,7 +352,10 @@ rebuildExamDates();
 export function renderExamYearUI() {
     let year = getExamYear();
     document.title = `JEE ${year} Study Tracker & Planner`;
-    document.getElementById("app-title-main").innerHTML = `JEE ${year} <span class="app-title-emoji">🎯</span>`;
+    // Single fixed icon now lives in index.html's .app-title-icon (outside
+    // this dynamically-rebuilt span) — this only ever needs to update the
+    // "JEE <year>" text itself when the exam year changes.
+    document.getElementById("app-title-main").textContent = `JEE ${year}`;
     document.getElementById("chip-mains1").title = `JEE Main ${year} (Session 1) — ${fmtExamDate(JEE_MAINS_DATE)}`;
     document.getElementById("chip-mains2").title = `JEE Main ${year} (Session 2) — ${fmtExamDate(JEE_MAINS2_DATE)}`;
     document.getElementById("chip-adv").title = `JEE Advanced ${year} — ${fmtExamDate(JEE_ADV_DATE)}`;

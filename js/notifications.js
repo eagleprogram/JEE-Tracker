@@ -211,11 +211,14 @@ export function runNotificationChecks() {
     let m = now.getMinutes();
     let minOfDay = h * 60 + m;
 
-    // Planner reminder: user-configurable start time (default 8:00 PM), every 30 min after that
+    // Planner reminder: user-configurable start time (default 8:00 PM), 2hr window, every 30 min
+    // (same window+cadence shape as the sleep reminder below, just 2hr/30min instead of 30min/5min —
+    // previously this pinged every 30 min indefinitely from the start time with no end).
     if (s.plannerReminder) {
         let [ph, pm2] = (s.plannerReminderStartTime || "20:00").split(":").map(n => parseInt(n, 10));
         let startMin = ph * 60 + pm2;
-        if (minOfDay >= startMin && (minOfDay - startMin) % 30 === 0) {
+        let endMin = startMin + 120;
+        if (minOfDay >= startMin && minOfDay <= endMin && (minOfDay - startMin) % 30 === 0) {
             let lastKey = "jee_planner_reminder_last_" + getTodayKey();
             let last = parseInt(getRawFlag(lastKey) || "0", 10);
             if (Date.now() - last > 30 * 60 * 1000) {
