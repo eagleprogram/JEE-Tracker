@@ -83,8 +83,12 @@ export async function enableBackgroundPush() {
         let reg = await navigator.serviceWorker.ready;
         let msg = initMessagingIfNeeded();
         if (!msg) { showToast("Push setup failed — try reloading the page."); return; }
-        msg.useServiceWorker(reg);
-        let token = await msg.getToken({ vapidKey: VAPID_PUBLIC_KEY });
+        // BUG FIX: msg.useServiceWorker(reg) was removed from the Firebase JS
+        // SDK starting in v9 (index.html loads v10.12.2) — calling it threw
+        // "msg.useServiceWorker is not a function" immediately, before a
+        // token was ever requested. The v9+ replacement is to pass the
+        // registration straight into getToken()'s options instead.
+        let token = await msg.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: reg });
         if (!token) { showToast("Could not get a push token — try again in a moment."); return; }
         await saveTokenToCloud(token);
         setRawFlag(PUSH_ENABLED_FLAG, "1");
@@ -107,8 +111,8 @@ export async function disableBackgroundPush() {
         let msg = initMessagingIfNeeded();
         if (dbInst && user && msg && "serviceWorker" in navigator) {
             let reg = await navigator.serviceWorker.ready;
-            msg.useServiceWorker(reg);
-            let token = await msg.getToken({ vapidKey: VAPID_PUBLIC_KEY }).catch(() => null);
+            // Same v9+ fix as enableBackgroundPush() above — no useServiceWorker().
+            let token = await msg.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: reg }).catch(() => null);
             if (token) {
                 await dbInst.collection("users").doc(user.uid).set(
                     { fcmTokens: firebase.firestore.FieldValue.arrayRemove(token) },
@@ -145,8 +149,8 @@ export async function reregisterPushIfEnabled() {
         let reg = await navigator.serviceWorker.ready;
         let msg = initMessagingIfNeeded();
         if (!msg) return;
-        msg.useServiceWorker(reg);
-        let token = await msg.getToken({ vapidKey: VAPID_PUBLIC_KEY });
+        // Same v9+ fix as enableBackgroundPush() above — no useServiceWorker().
+        let token = await msg.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: reg });
         if (token) await saveTokenToCloud(token);
     } catch (e) { console.log("Silent push re-registration skipped:", e.message); }
 }
