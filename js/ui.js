@@ -185,6 +185,20 @@ export function toggleZenMode() {
     showToast(active ? "Zen mode enabled." : "Zen mode disabled.");
 }
 
+// Auto-entry helper — called from timer.js whenever a study session actually
+// starts (fresh Start, Resume from paused, Resume from break), regardless of
+// whether the user opened it via the dedicated Zen Mode toggle or the plain
+// Start button on the main page. Idempotent and silent (no toast, no title
+// flip) if zen mode is already active, so pressing "Break" -> "Resume Study"
+// while already zen'd in doesn't spam a redundant toast.
+export function enterZenMode() {
+    if (document.body.classList.contains("zen-mode")) return;
+    document.body.classList.add("zen-mode");
+    document.body.style.overflow = "hidden";
+    let btn = document.getElementById("zen-toggle-btn");
+    if (btn) btn.title = "Exit Zen Mode";
+}
+
 // Wired to #zen-backdrop's own click handler — clicking the dim area around
 // the timer card exits zen mode (a click ON the card itself never reaches
 // the backdrop, since the card sits visually and structurally above it).

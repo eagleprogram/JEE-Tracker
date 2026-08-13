@@ -618,8 +618,9 @@
 <div class="modal" id="alarm-modal" style="z-index: 999;">
     <div class="modal-content" style="text-align: center; padding: 40px 30px; border: 2px solid var(--danger);">
         <div style="font-size: 64px; margin-bottom: 10px;">🔔</div>
-        <h3 style="color: var(--text); margin: 0 0 8px 0; font-size: 24px;">ALARM RINGING!</h3>
-        <p style="color: var(--muted); margin: 0 0 24px 0; font-size: 14px;">A critical notification requires your attention. Tap below to silence it.</p>
+        <h3 id="alarm-modal-title" style="color: var(--text); margin: 0 0 8px 0; font-size: 24px;">ALARM RINGING!</h3>
+        <p id="alarm-modal-reason" style="color: var(--text); margin: 0 0 6px 0; font-size: 15px; font-weight: 600;">A critical notification requires your attention.</p>
+        <p style="color: var(--muted); margin: 0 0 24px 0; font-size: 13px;">Tap below to silence it.</p>
         <button class="btn btn-stop" onclick="stopAlarmLoop()" style="font-size: 18px; padding: 14px 20px; width: 100%; border-radius: 10px;">STOP ALARM</button>
     </div>
 </div>

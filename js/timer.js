@@ -5,6 +5,14 @@ import { getDB, saveDB, blankDay, ensureDayShape, initToday, saveActiveSessionRa
 // (wired together in main.js, Step 7) has loaded.
 import { loadHistoryData } from './history.js';
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
+// Forward reference — ui.js imports several things from THIS module
+// (getCurrentDayKey, flushAndRestartSegment, updateLiveSummary, etc.), so
+// this is a circular import, same as the history.js/charts.js ones above.
+// Safe for the same reason: enterZenMode is only ever invoked from inside a
+// function body (confirmStartStudy/resumeStudy), never at module-evaluation
+// time, so it doesn't matter that ui.js hasn't finished initializing yet
+// when this file is first parsed.
+import { enterZenMode } from './ui.js';
 
 // ----------------- TIMER ENGINE -----------------
 let timerState = "IDLE";
@@ -236,11 +244,20 @@ export function confirmStartStudy() {
     document.getElementById("subject-modal").style.display = "none";
     timerState = "STUDYING"; currentSegmentId++; startSegment();
     updateUIState(); tick();
+    // Fresh study start (main-page Start button, or Resume Study after a
+    // break — both route through here) always drops straight into Zen Mode,
+    // whether or not the user touched the dedicated zen toggle themselves.
+    enterZenMode();
 }
 
 export function pauseStudy() { commitActiveSegment(); cancelAnimationFrame(animFrame); timerState = "PAUSED"; clearActiveSession(); updateUIState(); }
 
-export function resumeStudy() { timerState = "STUDYING"; currentSegmentId++; startSegment(); updateUIState(); tick(); }
+export function resumeStudy() {
+    timerState = "STUDYING"; currentSegmentId++; startSegment(); updateUIState(); tick();
+    // "Resume" from PAUSED also counts as (re)starting a study session — same
+    // auto-zen behavior as confirmStartStudy() above.
+    enterZenMode();
+}
 
 export function takeBreak() {
     commitActiveSegment(); cancelAnimationFrame(animFrame);

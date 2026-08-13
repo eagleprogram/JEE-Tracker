@@ -5,6 +5,19 @@ import { getTimerState, getSegmentElapsedMs } from './timer.js';
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast } from './ui.js';
 
+// ----------------- ALARM PRIORITY RANKING -----------------
+// Lower number = more urgent = rings first if two reminders are due at the
+// same time (see the alarm-queue in ringPersistentAlarm()/stopAlarmLoop()
+// below). Referenced from each notify() call site further down this file:
+//   1 = Parent log reminder   (someone else — your parent — is waiting)
+//   2 = Exam milestone        (fixed date, can't be rescheduled)
+//   3 = Revision reminder
+//   4 = Planner tasks pending
+//   5 = Sleep / wind-down reminder (also notify()'s own default)
+//   6 = Break overrun check-in
+//   7 = Idle nudge
+//   8 = Backup reminder       (pure housekeeping, least urgent)
+
 // ----------------- SETTINGS UI -----------------
 export function renderNotifSettingsUI() {
     let s = getNotifSettings();
@@ -131,13 +144,53 @@ document.addEventListener("touchstart", unlockAudioOnce);
 let alarmInterval = null;
 let isAlarmActive = false;
 
-export function ringPersistentAlarm() {
-    if (isAlarmActive) return; // Prevent overlapping alarms
+// BUG FIX: the alarm modal used to be one static, generic block ("ALARM
+// RINGING! A critical notification requires your attention.") no matter
+// which of the 6+ reminders (break overrun, idle nudge, exam milestone,
+// backup, planner tasks, sleep, revision, parent log) actually fired it —
+// so the one piece of information the alarm exists to convey (WHY it's
+// ringing right now) was never shown. ringPersistentAlarm() now takes the
+// same title/body every caller already builds for notify()/showToast()/the
+// OS Notification and writes it straight into the modal's heading + reason
+// line, so "Break check-in — You've been on break 47+ min" (etc.) is
+// visible the instant the modal appears, not just buried in the toast that
+// may have already faded by the time you look up.
+function setAlarmModalText(title, body) {
+    let titleEl = document.getElementById("alarm-modal-title");
+    let reasonEl = document.getElementById("alarm-modal-reason");
+    if (titleEl) titleEl.innerText = title ? `🔔 ${title}` : "🔔 ALARM RINGING!";
+    if (reasonEl) reasonEl.innerText = body || "A critical notification requires your attention.";
+}
+
+// ----------------- ALARM QUEUE (one at a time, most-important first) -----
+// BUG FIX: previously, if a second reason fired while an alarm was already
+// ringing, it just overwrote the modal's text in place — so e.g. a 9:00 PM
+// Revision reminder and a 9:00 PM Parent-log reminder firing together meant
+// whichever one's notify() call happened to run second silently replaced
+// the first's text before you'd even had a chance to read/dismiss it, and
+// the first reason was lost entirely. Reminders now carry a priority (lower
+// = more urgent — see the notify() call sites below for the actual
+// ranking), and a second reason that arrives while one is already ringing
+// is queued instead of overwriting anything. The moment the current one is
+// dismissed (stopAlarmLoop), the highest-priority queued reason immediately
+// starts ringing on its own — sequential, never simultaneous/overwritten.
+let alarmQueue = []; // { title, body, priority }
+function enqueueAlarm(title, body, priority) {
+    alarmQueue.push({ title, body, priority });
+    // Array.prototype.sort is stable in every modern JS engine, so
+    // same-priority reasons keep the order they actually fired in.
+    alarmQueue.sort((a, b) => a.priority - b.priority);
+}
+
+export function ringPersistentAlarm(title, body, priority = 5) {
+    if (isAlarmActive) { enqueueAlarm(title, body, priority); return; }
     isAlarmActive = true;
+    setAlarmModalText(title, body);
     document.getElementById("alarm-modal").style.display = "flex";
     document.body.style.overflow = 'hidden'; // block background scroll
     playAlarmSound();
     alarmInterval = setInterval(() => { playAlarmSound(); }, 1000);
+    startTitleFlash(title);
 }
 
 export function stopAlarmLoop() {
@@ -145,16 +198,132 @@ export function stopAlarmLoop() {
     isAlarmActive = false;
     document.getElementById("alarm-modal").style.display = "none";
     document.body.style.overflow = '';
+    stopTitleFlash();
     showToast("Alarm stopped.");
+    if (alarmQueue.length > 0) {
+        // Ring the next most-important queued reason right away — this is
+        // the "two reminders due at the same time" case: the more important
+        // one rings, gets dismissed, then (and only then) the next one rings
+        // in its own modal, exactly like a second WhatsApp message queues
+        // up after you dismiss the first notification.
+        let next = alarmQueue.shift();
+        ringPersistentAlarm(next.title, next.body, next.priority);
+    }
 }
 
-export function notify(title, body, persistent = true) {
-    if (persistent) { ringPersistentAlarm(); } else { playAlarmSound(); }
-    showToast(body ? `${title} — ${body}` : title);
+// ----------------- TAB-TITLE FLASH -----------------
+// Extra attention-grabber for the case where the tab is open and Chrome's JS
+// timers are still actually running (so the alarm sound + modal genuinely
+// did fire) but the tab itself isn't the focused one on screen — a second
+// browser window, another tab in front, etc. Flashing the title is visible
+// in the taskbar/tab-strip even then.
+const BASE_TITLE = document.title;
+let titleFlashInterval = null;
+function startTitleFlash(reasonTitle) {
+    if (titleFlashInterval) clearInterval(titleFlashInterval);
+    let on = false;
+    let flashText = reasonTitle ? `🔔 ${reasonTitle}!` : "🔔 Alarm!";
+    titleFlashInterval = setInterval(() => {
+        document.title = on ? BASE_TITLE : `${flashText} — ${BASE_TITLE}`;
+        on = !on;
+    }, 1000);
+}
+function stopTitleFlash() {
+    if (titleFlashInterval) { clearInterval(titleFlashInterval); titleFlashInterval = null; }
+    document.title = BASE_TITLE;
+}
+
+// ----------------- REAL OS NOTIFICATIONS (via the Service Worker) -------
+// BUG FIX / ENHANCEMENT: previously the only "outside the tab" alert was
+// `new Notification(...)` — a plain in-page Notification, which most
+// browsers auto-dismiss after a few seconds, never vibrates, never shows an
+// action button, and (critically) is NOT guaranteed to survive the tab
+// itself being minimized/backgrounded on every platform. Notifications
+// raised through the already-registered Service Worker
+// (`registration.showNotification()`, sw.js) behave much more like a real
+// app notification — WhatsApp-style: they land in the OS notification
+// tray/lock screen, can be set to stay ("requireInteraction") until the
+// user acts, can vibrate the device, and — this is the important part for
+// "even if Chrome is minimized or another app is fullscreened over it" —
+// they're delivered by the OS/browser notification system, not by this
+// page's foreground rendering, so they still show even when this tab isn't
+// the one on screen. Each distinct alarm reason gets its own OS
+// notification (tag'd by title) so, like a chat app, several different
+// reasons due around the same time each show up as their own banner in the
+// tray — separate from the in-page queue above, which only governs the
+// sound+modal experience for whichever tab is actually open.
+//
+// HONEST LIMIT (documented once here, not repeated at every call site):
+// this only works while the browser process itself is alive somewhere —
+// tab minimized, other app fullscreened over Chrome, phone screen off for a
+// short while, etc. all still count as "alive" and this WILL ring/vibrate.
+// If the OS has fully killed/discarded the browser process (force-closed
+// from recents, device restarted, browser not running at all), no
+// client-side code — this app or any other website — can wake it back up
+// without a server-sent Push message, which this static, backend-less site
+// doesn't have. That's a platform limitation, not something fixable here.
+function fireOsNotification(title, body, persistent) {
     let s = getNotifSettings();
-    if (s.enabled && "Notification" in window && Notification.permission === "granted") {
-        try { new Notification(title, { body }); } catch (e) {}
+    if (!s.enabled || !("Notification" in window) || Notification.permission !== "granted") {
+        if (persistent) maybeNudgeForOsNotifications();
+        return;
     }
+    let opts = {
+        body,
+        icon: "./assets/icon-192.png",
+        badge: "./assets/icon-192.png",
+        tag: "jee-alarm-" + String(title || "alert").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        renotify: true,
+        requireInteraction: !!persistent,
+        vibrate: persistent ? [300, 100, 300, 100, 300] : [150]
+    };
+    if (persistent) opts.actions = [{ action: "stop-alarm", title: "Stop Alarm" }];
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then((reg) => {
+            if (reg && reg.showNotification) reg.showNotification(title || "Alert", opts).catch(() => fallbackPlainNotification(title, body));
+            else fallbackPlainNotification(title, body);
+        }).catch(() => fallbackPlainNotification(title, body));
+    } else {
+        fallbackPlainNotification(title, body);
+    }
+}
+function fallbackPlainNotification(title, body) {
+    try { new Notification(title || "Alert", { body }); } catch (e) {}
+}
+
+// Relays the "Stop Alarm" action tap (or a plain tap on the notification)
+// from sw.js's notificationclick handler back into this running tab. If the
+// app wasn't open at all, sw.js opens a fresh tab instead — there's no live
+// page yet to receive a message in that case, so nothing to relay; the
+// fresh load just boots normally (the OS notification itself already showed
+// the reason, which was the actual point).
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data && event.data.type === "STOP_ALARM") stopAlarmLoop();
+    });
+}
+
+// ----------------- ONE-TIME OS-NOTIFICATION-PERMISSION NUDGE -----------
+// The one thing that can reach the user when this tab isn't the one in
+// front is a granted OS notification permission (see fireOsNotification's
+// comment above). So the first time a persistent alarm fires without that
+// permission granted, nudge toward turning it on — once only, tracked via a
+// persisted flag so it doesn't repeat every alarm.
+const NOTIF_HINT_SHOWN_KEY = "jee_notif_permission_hint_shown";
+function maybeNudgeForOsNotifications() {
+    if (!("Notification" in window) || Notification.permission === "denied") return;
+    if (getRawFlag(NOTIF_HINT_SHOWN_KEY)) return;
+    setRawFlag(NOTIF_HINT_SHOWN_KEY, "1");
+    showToast("Tip: tap 'Enable Notifications' in Settings so alarms can still reach you when this tab isn't in front.");
+}
+
+// priority: lower number = more urgent = rings first when two reminders are
+// queued up at once (see the alarm-queue comment above). Each call site
+// below passes its own ranking; unset defaults to 5 (mid-priority).
+export function notify(title, body, persistent = true, priority = 5) {
+    showToast(body ? `${title} — ${body}` : title);
+    fireOsNotification(title, body, persistent);
+    if (persistent) { ringPersistentAlarm(title, body, priority); } else { playAlarmSound(); }
 }
 
 // ----------------- BREAK OVERRUN -----------------
@@ -165,7 +334,7 @@ export function checkBreakOverrun(s) {
     let elapsed = getSegmentElapsedMs();
     let thresholdMs = (s.breakThresholdMin || 45) * 60 * 1000;
     if (elapsed >= thresholdMs && (!lastBreakNotifyAt || Date.now() - lastBreakNotifyAt >= 10 * 60 * 1000)) {
-        notify("Break check-in", `You've been on break ${Math.floor(elapsed/60000)}+ min — come back?`);
+        notify("Break check-in", `You've been on break ${Math.floor(elapsed/60000)}+ min — come back?`, true, 6);
         lastBreakNotifyAt = Date.now();
     }
 }
@@ -185,7 +354,7 @@ function checkIdleNudge(s) {
     let thresholdMs = (s.idleThresholdMin || 30) * 60 * 1000;
     let elapsed = Date.now() - idleSinceMs;
     if (elapsed >= thresholdMs && (!lastIdleNotifyAt || Date.now() - lastIdleNotifyAt >= 30 * 60 * 1000)) {
-        notify("Still there?", `You've been idle for ${Math.floor(elapsed/60000)}+ min — start a session?`);
+        notify("Still there?", `You've been idle for ${Math.floor(elapsed/60000)}+ min — start a session?`, true, 7);
         lastIdleNotifyAt = Date.now();
     }
 }
@@ -212,7 +381,7 @@ function checkExamMilestones(s) {
         if (EXAM_MILESTONE_DAYS.includes(daysUntil)) {
             let flagKey = `jee_exam_milestone_${key}_${daysUntil}_${getTodayKey()}`;
             if (!getRawFlag(flagKey)) {
-                notify("Exam milestone", `${label} is ${daysUntil} day${daysUntil === 1 ? '' : 's'} away.`);
+                notify("Exam milestone", `${label} is ${daysUntil} day${daysUntil === 1 ? '' : 's'} away.`, true, 2);
                 setRawFlag(flagKey, "1");
             }
         }
@@ -245,7 +414,7 @@ function checkBackupReminder(s) {
     if (Date.now() - last < BACKUP_REMINDER_INTERVAL_MS) return; // backed up recently enough
     let lastReminded = parseInt(getRawFlag(BACKUP_REMINDER_LAST_KEY) || "0", 10);
     if (Date.now() - lastReminded < BACKUP_REMINDER_INTERVAL_MS) return; // already pinged within the last 48h
-    notify("Backup reminder", "It's been 2+ days since your last backup — export one now from Settings.");
+    notify("Backup reminder", "It's been 2+ days since your last backup — export one now from Settings.", true, 8);
     setRawFlag(BACKUP_REMINDER_LAST_KEY, String(Date.now()));
 }
 
@@ -273,7 +442,7 @@ export function runNotificationChecks() {
                 let tasks = plannerDB[getTodayKey()] || [];
                 let pending = tasks.filter(t => !t.done).length;
                 if (pending > 0) {
-                    notify("Today's tasks", `${pending} task(s) pending!`);
+                    notify("Today's tasks", `${pending} task(s) pending!`, true, 4);
                     setRawFlag(lastKey, String(Date.now()));
                 }
             }
@@ -289,7 +458,7 @@ export function runNotificationChecks() {
             let lastKey = "jee_sleep_reminder_last_" + getTodayKey();
             let last = parseInt(getRawFlag(lastKey) || "0", 10);
             if (Date.now() - last > 5 * 60 * 1000) {
-                notify("Wind down", `Past ${s.sleepReminderStartTime} - start winding down!`);
+                notify("Wind down", `Past ${s.sleepReminderStartTime} - start winding down!`, true, 5);
                 setRawFlag(lastKey, String(Date.now()));
             }
         }
@@ -316,7 +485,7 @@ export function runNotificationChecks() {
         if (minOfDay >= targetMin) {
             let flagKey = "jee_revision_reminder_" + getTodayKey();
             if (!getRawFlag(flagKey)) {
-                notify("Revision reminder", `${s.revisionReminderTime} - Quick revision pass!`);
+                notify("Revision reminder", `${s.revisionReminderTime} - Quick revision pass!`, true, 3);
                 setRawFlag(flagKey, "1");
             }
         }
@@ -330,7 +499,7 @@ export function runNotificationChecks() {
         if (minOfDay >= targetMin) {
             let flagKey = "jee_parentlog_reminder_" + getTodayKey();
             if (!getRawFlag(flagKey)) {
-                notify("Daily log", "Send today's study log to your parent.");
+                notify("Daily log", "Send today's study log to your parent.", true, 1);
                 setRawFlag(flagKey, "1");
             }
         }
