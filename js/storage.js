@@ -237,6 +237,38 @@ export function getRawFlag(key) { return localStorage.getItem(key); }
 export function setRawFlag(key, value) { localStorage.setItem(key, value); }
 export function clearRawFlag(key) { localStorage.removeItem(key); }
 
+// ----------------- PER-TAB IDENTITY (cross-tab session lock) -----------------
+// BUG FIX: timer.js needs to tell "this same tab, just reloaded" apart from
+// "a genuinely different tab/window" so it can warn when a second tab tries
+// to run a study/break session while another tab already has one live (the
+// reported symptom: Total Breaks in the live summary climbing much faster
+// than the on-screen break timer, because two tabs were each independently
+// committing their own elapsed time for the same real-world break into the
+// same day record). A plain random ID generated in memory would be reborn
+// on every page load/refresh, so the SAME tab would look like a brand-new
+// one immediately after a reload — sessionStorage is the one browser
+// storage that is both per-tab (unlike localStorage, which is shared by
+// every tab on the same origin) AND survives a reload of that same tab
+// (unlike an in-memory variable), which is exactly the distinction needed
+// here.
+let cachedTabId = null;
+export function getTabId() {
+    if (cachedTabId) return cachedTabId;
+    try {
+        let existing = sessionStorage.getItem("jee_tab_id");
+        if (existing) { cachedTabId = existing; return cachedTabId; }
+        cachedTabId = `tab_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+        sessionStorage.setItem("jee_tab_id", cachedTabId);
+    } catch (e) {
+        // Private-browsing modes that block sessionStorage: fall back to a
+        // per-load ID. Worst case is this specific tab not being recognized
+        // across its own reload — never a crash, and the lock itself still
+        // degrades safely (see LOCK_STALE_MS in timer.js).
+        cachedTabId = `tab_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+    }
+    return cachedTabId;
+}
+
 // ----------------- FULL RESET -----------------
 // Core wipe logic shared by resetAllData() (below) and ui.js's
 // deleteCookiesAndReload() — clears every bit of this app's on-device

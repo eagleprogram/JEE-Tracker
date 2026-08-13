@@ -1,5 +1,5 @@
 import { formatHMS, formatReadable, dateKeyFromWall, getTodayKey, generateId } from './utils.js';
-import { getDB, saveDB, blankDay, ensureDayShape, initToday, saveActiveSessionRaw, readActiveSessionRaw, clearActiveSessionRaw, getRawFlag, setRawFlag } from './storage.js';
+import { getDB, saveDB, blankDay, ensureDayShape, initToday, saveActiveSessionRaw, readActiveSessionRaw, clearActiveSessionRaw, getRawFlag, setRawFlag, clearRawFlag, getTabId } from './storage.js';
 // Forward references to modules landing in later steps — safe because these
 // are only invoked inside function bodies, after the full module graph
 // (wired together in main.js, Step 7) has loaded.
@@ -100,6 +100,76 @@ export function getSegmentElapsedMs() { return segmentElapsedMs; }
 // array (matches original: `openEntryRefs = {};` inline). Exposed as a
 // setter since openEntryRefs is private to this module.
 export function resetOpenEntryRefs() { openEntryRefs = {}; }
+
+// ----------------- CROSS-TAB SESSION LOCK -----------------
+// BUG FIX: opening the site in a second tab/window (or accepting the "you
+// had an unfinished session — resume it?" prompt in a fresh tab while the
+// original tab was still open and running) let two tabs independently run
+// and autosave-commit the SAME logical study/break segment. Each tab only
+// ever displays ITS OWN local elapsed time (session-timer), but both were
+// writing their own elapsed chunks into the same shared day.totalBreak /
+// day.totalStudy in localStorage — so the Today's Live Summary total
+// climbed roughly twice as fast as any single tab's own on-screen timer,
+// exactly the "Break Duration says +1s but Total Breaks jumped +6s"
+// mismatch reported. This lock makes one tab the sole owner of an active
+// session: the owning tab refreshes a heartbeat in localStorage every few
+// seconds, and every other tab's Start/Break controls disable themselves
+// (with an explanation) for as long as that heartbeat stays fresh.
+const SESSION_LOCK_KEY = "jee_session_lock";
+const LOCK_HEARTBEAT_MS = 3000;
+// Comfortably more than 2x the heartbeat interval so one missed/delayed
+// tick (a throttled background tab, a slow frame) never makes a still-live
+// owning tab look stale to everyone else — while still clearing out within
+// a few seconds of a tab actually closing/crashing without a clean unload.
+const LOCK_STALE_MS = 9000;
+
+function readSessionLock() {
+    let raw = getRawFlag(SESSION_LOCK_KEY);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+// Returns the lock info if a DIFFERENT, still-live tab currently owns an
+// active session, or null if the lock is free (never claimed, stale/dead,
+// or owned by this very tab).
+function otherTabActiveLock() {
+    let lock = readSessionLock();
+    if (!lock || !lock.tabId || lock.tabId === getTabId()) return null;
+    if (Date.now() - lock.ts > LOCK_STALE_MS) return null;
+    return lock;
+}
+
+function writeSessionLockHeartbeat() {
+    if (timerState === "STUDYING" || timerState === "PAUSED" || timerState === "BREAK") {
+        let label = timerState === "BREAK" ? `on break (${activeBreakReason})` : `studying ${activeSubject}`;
+        setRawFlag(SESSION_LOCK_KEY, JSON.stringify({ tabId: getTabId(), ts: Date.now(), label }));
+    } else {
+        // IDLE: release the lock, but only if WE are the ones holding it —
+        // never clear another live tab's active lock just because this tab
+        // happens to be idle.
+        let lock = readSessionLock();
+        if (lock && lock.tabId === getTabId()) clearRawFlag(SESSION_LOCK_KEY);
+    }
+}
+setInterval(writeSessionLockHeartbeat, LOCK_HEARTBEAT_MS);
+
+// 'storage' fires in every OTHER tab (never the tab that made the change)
+// the instant the lock key changes — lets a second, otherwise-idle tab
+// react immediately (grey out/re-enable Start & Break) instead of waiting
+// on its own next heartbeat tick.
+window.addEventListener("storage", (e) => { if (e.key === SESSION_LOCK_KEY) updateUIState(); });
+
+// Shared guard for every click-time entry point that can start a BRAND NEW
+// session on this tab (fresh Start, or Break taken directly from IDLE).
+// Resuming an already-owned session (PAUSED -> resume, BREAK -> back to
+// study) never calls this — this tab already holds the lock in those cases.
+function blockedByOtherTab() {
+    let lock = otherTabActiveLock();
+    if (!lock) return false;
+    alert(`Another tab already has an active session running on this device (${lock.label}).\n\nFinish or close that tab first — running two at once double-counts your time.`);
+    updateUIState();
+    return true;
+}
 
 export function startSegment() {
     segmentStartWallMs = Date.now();
@@ -223,6 +293,14 @@ export function tryRestoreActiveSession() {
     let raw = readActiveSessionRaw(); if (!raw) return;
     let snap; try { snap = JSON.parse(raw); } catch(e) { clearActiveSessionRaw(); return; }
     if (snap.dayKey && snap.dayKey !== getTodayKey()) { clearActiveSessionRaw(); return; }
+    // BUG FIX: this snapshot lives in a plain (non tab-scoped) localStorage
+    // key, so a second tab opened while the first is still genuinely
+    // running would find it too and offer to "resume" a session that's
+    // already live elsewhere — accepting that is exactly how two tabs ended
+    // up double-committing the same segment (see the cross-tab lock above).
+    // If another tab currently owns an active lock, that session is already
+    // running live there — don't even offer to restore it here.
+    if (otherTabActiveLock()) return;
     let label = snap.state === "STUDYING" ? `studying ${snap.activeSubject}` : `on a break (${snap.activeBreakReason})`;
     if (confirm(`You had an unfinished session (${label}) running when this tab last closed.\n\nResume it now?`)) {
         timerState = snap.state; activeSubject = snap.activeSubject; activeBreakReason = snap.activeBreakReason; sessionStudySec = snap.sessionStudySec || 0; currentSegmentId++; startSegment(); updateUIState(); tick();
@@ -241,6 +319,10 @@ export function tryRestoreActiveSession() {
 export function openSubjectModal() {
     if (timerState === "PAUSED") { resumeStudy(); return; }
     if (timerState === "BREAK") { commitActiveSegment(); cancelAnimationFrame(animFrame); clearActiveSession(); }
+    // Only a genuinely fresh start (from IDLE) needs the cross-tab check —
+    // PAUSED/BREAK above already returned/branch into this tab's own
+    // already-owned session.
+    if (timerState === "IDLE" && blockedByOtherTab()) return;
     document.getElementById("modal-subject-select").value = activeSubject;
     document.getElementById("subject-modal").style.display = "flex";
     lockBodyScroll();
@@ -287,6 +369,11 @@ export function resumeStudy() {
 }
 
 export function takeBreak() {
+    // takeBreak() is reachable directly from IDLE (the Break button stays
+    // visible there — see index.html), so a fresh break needs the same
+    // cross-tab check as a fresh Start. Coming from STUDYING/PAUSED, this
+    // tab already owns the session, so no check needed there.
+    if (timerState === "IDLE" && blockedByOtherTab()) return;
     commitActiveSegment(); cancelAnimationFrame(animFrame);
     let reason = prompt("Break Reason (e.g. Lunch, Walk, Phone):");
     if (!reason || !reason.trim()) reason = "Short Break";
@@ -349,6 +436,16 @@ export function updateUIState() {
     let btnStop = document.getElementById("btn-stop");
     let changeSub = document.getElementById("change-subject-box");
     let sessionLabel = document.getElementById("session-label");
+    let lockNote = document.getElementById("session-lock-note");
+    let otherLock = (timerState === "IDLE") ? otherTabActiveLock() : null;
+    if (lockNote) {
+        lockNote.style.display = otherLock ? "block" : "none";
+        if (otherLock) lockNote.innerText = `⚠ Active session running in another tab (${otherLock.label}). Finish it there first — starting one here too would double-count time.`;
+    }
+    // Reset here so a state that no longer needs the cross-tab check (e.g.
+    // this tab going STUDYING/BREAK itself) never keeps a stale disabled
+    // control from an earlier IDLE render.
+    btnStart.disabled = false; btnBreak.disabled = false;
 
     if (timerState === "STUDYING") {
         badge.className = "badge badge-studying"; badge.innerText = `STUDYING: ${activeSubject}`;
@@ -366,6 +463,11 @@ export function updateUIState() {
         badge.className = "badge badge-idle"; badge.innerText = `STATUS: IDLE`;
         sessionLabel.innerText = "CURRENT SESSION";
         btnStart.innerText = "Start"; btnStart.style.display = "inline-block"; btnPause.style.display = "none"; btnBreak.style.display = "inline-block"; btnStop.style.display = "none"; changeSub.style.display = "none";
+        // Grey out (rather than hide) Start/Break while another tab owns an
+        // active session — the buttons stay visible so the note above them
+        // makes sense, but clicking is disabled at the control level too,
+        // not just guarded in the click handler.
+        btnStart.disabled = !!otherLock; btnBreak.disabled = !!otherLock;
     }
 }
 

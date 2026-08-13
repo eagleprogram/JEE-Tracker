@@ -114,33 +114,20 @@ export function renderHeatmap() {
         weeks.push(week);
     }
     let cell = 13; let gap = 4; let width = weeks.length * (cell + gap) + 16; let height = 7 * (cell + gap) + 10; let svg = `<svg width="${width}" height="${height}">`;
-    // CHANGE: swapped indices 1 and 2. Previously ["#2b3852","#b2ebf2","#0c3448","#008080","#00e5ff"] —
-    // the 2nd bucket (#b2ebf2) was a pale, whitish tint sitting between two dark colors, so the
-    // "Less -> More" progression visually got brighter then darker then brighter again instead of
-    // ramping smoothly. Moving the dark navy to position 1 and the whitish tint to the middle fixes that.
-    //
-    // FOLLOW-UP FIX: that still left #b2ebf2 (a near-white pale cyan, the
-    // single brightest color in the whole set) sitting on 3-6h — a low-mid
-    // bucket — so it visually outshone even the 10h+ goal color, breaking
-    // the "more hours = more intense" hierarchy a heatmap depends on. Swapped
-    // 3-6h and 6-10h: 3-6h now gets the old 6-10h teal (#008080), and 6-10h
-    // gets a TINTED (muted/dimmed, not the raw pale #b2ebf2) sibling of the
-    // 10h+ cyan — #00b3c0 sits exactly halfway between #008080 and #00e5ff —
-    // so brightness now climbs smoothly: 3-6h (dim teal) -> 6-10h (muted
-    // cyan) -> 10h+ (full-bright cyan), with 10h+ still the clear peak.
-    // FOLLOW-UP FIX: widening the gaps within the same teal/cyan hue (the
-    // previous fix here) still wasn't enough — a single-hue ramp is
-    // inherently hard to split into 5 confident buckets at a 13px square,
-    // no matter how far apart the lightness values are; the eye reads hue
-    // far more reliably than fine brightness gradations at that size.
-    // Switched to a genuine multi-hue scale instead, reusing the app's own
-    // existing --tint-sky/emerald/amber/rose colors (variables.css — same
-    // ones already used for buttons elsewhere) so 0-3h/3-6h/6-10h/10h+ are
-    // each a completely different color (blue -> green -> amber -> rose),
-    // not just a different brightness of one color. 0h stays the same
-    // neutral dark slate it always was ("no activity" reads as "off", not
-    // as another color on the scale).
-    const hmColors = ["#2b3852", "#38bdf8", "#34d399", "#f59e0b", "#f43f5e"];
+    // BUG FIX: the previous version used a genuine multi-hue scale (blue ->
+    // green -> amber -> rose per bucket) specifically because a single-hue
+    // ramp was hard to split into confident buckets. Feedback was the exact
+    // opposite: a different COLOR per bucket makes the grid read as
+    // categories, not a single "more = more" scale, which is harder to
+    // scan at a glance than one hue getting steadily more intense. Back to
+    // one hue (blue, matching --primary/--tint-sky used everywhere else in
+    // the app) with 5 brightness/saturation steps: 0h is a near-background
+    // neutral (reads as "off", not as a color on the scale), then each
+    // bucket gets steadily brighter/more saturated blue up to 10h+ as the
+    // clear, unmistakable peak — same "Less -> More" hierarchy as the
+    // legend, expressed as one consistent color instead of four different
+    // ones.
+    const hmColors = ["#1c2537", "#14456b", "#0d6faf", "#1996e0", "#7dd3fc"];
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
             if (day.date > today) return;

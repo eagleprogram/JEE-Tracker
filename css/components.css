@@ -94,6 +94,10 @@ body.zen-mode .timer-box { min-height: 320px; }
    changing a --tint-* value in variables.css re-colors the whole site. */
 button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: background 0.2s, transform 0.2s; }
 .btn:hover { transform: translateY(-1px); }
+/* BUG FIX: no rule existed for a disabled .btn, so a disabled button (e.g.
+   Start/Break while another tab owns the active session — see timer.js's
+   cross-tab session lock) looked fully clickable even though it wasn't. */
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; pointer-events: none; }
 
 .btn-start, .btn-report-email { background: rgba(var(--tint-emerald), 0.12); border: 1px solid rgba(var(--tint-emerald), 0.4); color: rgb(var(--tint-emerald)); }
 .btn-start:hover, .btn-report-email:hover { background: rgba(var(--tint-emerald), 0.2); }
@@ -234,7 +238,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    like an oversized white box against the dark theme. */
 .settings-sub input[type="number"] { width: 52px; margin-top: 0; padding: 5px 6px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
 .settings-sub input[type="time"] { width: auto; margin-top: 0; padding: 5px 8px; font-size: 13px; }
-.small-note { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.small-note { font-size: 11px; line-height: 1.35; color: var(--muted); margin-top: 6px; }
 
 /* "Add Missed Break" mini-form next to the Logged Breaks list (History card) */
 .missed-break-form { margin: 8px 0 12px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }

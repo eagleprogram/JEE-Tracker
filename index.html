@@ -205,7 +205,7 @@
                     <input type="number" id="notif-idleThreshold" min="10" max="240" onchange="saveNotifSettingsFromUI()">
                     <span style="font-size:12px; color:var(--muted);">min idle</span>
                 </div>
-                <div class="small-note">Info-only — never pauses/stops the timer. Break-overrun and idle-nudge specifically need the timer running in a live tab, so they only work while it's open — everything else below can also reach you with the app fully closed.</div>
+                <div class="small-note">Info-only, never pauses the timer. Break-overrun &amp; idle-nudge need a live tab open — everything below still reaches you when it's closed.</div>
             </div>
 
             <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
@@ -215,7 +215,7 @@
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="enableBackgroundPush()">Enable</button>
                     <button class="btn btn-stop btn-small" style="flex:1;" onclick="disableBackgroundPush()">Disable</button>
                 </div>
-                <div class="small-note" style="margin-top:6px;">Requires sign-in. Delivered by a free scheduled job that checks every ~5 minutes.</div>
+                <div class="small-note" style="margin-top:6px;">Requires sign-in. Checked by a free job every ~5 min.</div>
             </div>
         </div>
 
@@ -227,17 +227,17 @@
                     <span style="font-size:13px; font-weight:700;" id="account-name"></span>
                 </span>
             </h4>
-            <div id="sync-setup-note" class="small-note" style="color:var(--warning); margin-bottom:8px;">Cloud sync is not configured. To enable, add your Firebase keys in the code (search `FIREBASE_CONFIG`).</div>
+            <div id="sync-setup-note" class="small-note" style="color:var(--warning); margin-bottom:8px;">Cloud sync not configured — add Firebase keys in code (search `FIREBASE_CONFIG`).</div>
                         <div id="signed-out-block">
                 <!-- TOP: Sign in (Remains untouched at the top) -->
-                <div class="small-note" style="margin-bottom:8px;">Sign in to save your data to the cloud and keep every device you use automatically in sync.</div>
+                <div class="small-note" style="margin-bottom:8px;">Sign in to back up your data and auto-sync every device.</div>
                 <button class="btn btn-break btn-small" style="width:100%;" onclick="signInWithGoogle()">Sign in with Google</button>
 
                 <!-- Divider line for spacing -->
                 <div style="border-top:1px solid var(--border); margin:14px 0 10px 0;"></div>
 
                 <!-- BOTTOM: Guest Delete Button -->
-                <div class="small-note" style="color:var(--danger); margin-bottom:4px;">⚠️ Guest mode: Deletes ALL local data from this device.<br>   (Study logs, Planner, Sleep, Settings) </div>
+                <div class="small-note" style="color:var(--danger); margin-bottom:4px;">⚠️ Guest mode: deletes ALL local data (logs, planner, sleep, settings).</div>
                 <button class="btn btn-stop btn-small" style="width:100%;" onclick="resetAllData()">Delete All Local Data</button>
                 <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: auto-saves to cloud (if signed in), signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
             </div>
@@ -322,7 +322,7 @@
 
     <div class="sidebar-content" id="panel-mistakes">
         <h3 style="margin:0; color:var(--primary);">❗ Chapter Mistakes Tracker</h3>
-        <div class="small-note">Log how many mistakes you've made in each syllabus chapter, with optional notes and attachments.</div>
+        <div class="small-note">Log mistakes per chapter, with optional notes &amp; attachments.</div>
         <button class="btn btn-pause btn-small" style="width:100%;" onclick="exportAllMistakes()">⬇ Download All Mistake Entries (.zip)</button>
 
         <div class="mistake-view-toggle">
@@ -417,6 +417,7 @@
                     <button class="btn btn-break" id="btn-break" onclick="takeBreak()" style="display:none;">Break</button>
                     <button class="btn btn-stop" id="btn-stop" onclick="endDay()" style="display:none;">End Day</button>
                 </div>
+                <div id="session-lock-note" class="small-note" style="display:none; color:var(--warning); text-align:center;"></div>
                 <div id="change-subject-box" style="display:none; margin-top:15px;">
                     <label style="font-size:12px; color:var(--muted);">Switch Subject Mid-Session:</label>
                     <select id="switch-subject-select" onchange="changeSubjectMidSession()">
@@ -463,11 +464,11 @@
         <div class="heatmap-legend">
             <span>Less</span>
             <span class="heatmap-swatch-group">
-                <span class="heatmap-swatch-item"><span class="sq" style="background:#2b3852;" title="0h studied"></span><span class="sq-label">0h</span></span>
-                <span class="heatmap-swatch-item"><span class="sq" style="background:#38bdf8;" title="Up to 3h studied"></span><span class="sq-label">0&ndash;3h</span></span>
-                <span class="heatmap-swatch-item"><span class="sq" style="background:#34d399;" title="3-6h studied"></span><span class="sq-label">3&ndash;6h</span></span>
-                <span class="heatmap-swatch-item"><span class="sq" style="background:#f59e0b;" title="6-10h studied"></span><span class="sq-label">6&ndash;10h</span></span>
-                <span class="heatmap-swatch-item"><span class="sq" style="background:#f43f5e;" title="10h+ studied"></span><span class="sq-label">10h+</span></span>
+                <span class="heatmap-swatch-item"><span class="sq" style="background:#1c2537;" title="0h studied"></span><span class="sq-label">0h</span></span>
+                <span class="heatmap-swatch-item"><span class="sq" style="background:#14456b;" title="Up to 3h studied"></span><span class="sq-label">0&ndash;3h</span></span>
+                <span class="heatmap-swatch-item"><span class="sq" style="background:#0d6faf;" title="3-6h studied"></span><span class="sq-label">3&ndash;6h</span></span>
+                <span class="heatmap-swatch-item"><span class="sq" style="background:#1996e0;" title="6-10h studied"></span><span class="sq-label">6&ndash;10h</span></span>
+                <span class="heatmap-swatch-item"><span class="sq" style="background:#7dd3fc;" title="10h+ studied"></span><span class="sq-label">10h+</span></span>
             </span>
             <span>More</span>
         </div>
@@ -482,7 +483,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <div>
                 <h3 style="margin:0 0 4px 0;">💾 Backup & Export</h3>
-                <div class="small-note" style="margin:0;">Exports your entire history — every day, subject, break, and planner task — independent of cloud sync.</div>
+                <div class="small-note" style="margin:0;">Exports your full history — independent of cloud sync.</div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="btn btn-export" onclick="exportDataJSON()">Export Backup</button>
@@ -500,7 +501,7 @@
                 <button class="btn btn-report-share btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
                 <button class="btn btn-report-share btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
             </div>
-            <div class="small-note" style="margin-top:4px; color:var(--warning);">NOTE: Emails are automatically sent on Sundays and at month-ends if signed in. Use the buttons above to send manually.</div>
+            <div class="small-note" style="margin-top:4px; color:var(--warning);">Auto-sent Sundays &amp; month-end if signed in — or send manually above.</div>
         </div>
     </div>
 
@@ -514,8 +515,8 @@
         <div class="btn-row-nowrap" style="margin-top:10px;">
             <button class="btn btn-stop btn-compact" onclick="deleteStudyLog()">🗑 Delete Study Log</button>
             <button class="btn btn-stop btn-compact" onclick="deleteBreakLog()">🗑 Delete Break Log</button>
-            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('daily', false)">Send Daily Report (Email)</button>
             <button class="btn btn-report-download btn-compact" onclick="downloadDayLog()">💾 Download Log</button>
+            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('daily', false)">Send Daily Report (Email)</button>
             <button class="btn btn-report-share btn-compact" onclick="shareDayLog()">📤 Share Log</button>
         </div>
             <div class="grid-2" style="margin-top:15px;">

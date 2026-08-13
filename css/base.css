@@ -46,7 +46,19 @@ body.panel-open { padding-left: 440px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
-html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
+/* BUG FIX: color-scheme: dark was already set on <body> (below) and
+   redundantly on input[type="date"]/input[type="time"] themselves
+   (components.css), which is enough to dark-theme the INPUT BOX itself but
+   NOT enough for Chrome's native date/time picker POPUP (the little
+   calendar/hour-minute-AMPM dropdown that appears on click) — that popup is
+   a separate UA-rendered surface that keys off the color-scheme of the root
+   <html> element specifically, not the input or any of its ancestors below
+   it. Every native time picker in the app (Sleep/Wake log, missed-break
+   times, the four notification-reminder time fields) was popping up in the
+   browser's default light-grey styling regardless of the other two rules
+   because of this. Setting it here, on the actual root element, is what
+   the popup itself respects. */
+html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-scheme: dark; }
 .sidebar { scrollbar-width: thin; scrollbar-color: var(--border) var(--card); }
 /* The global ::-webkit-scrollbar rule above should already cover this, but
    giving the sidebar's own scroll track a directly-targeted, higher-

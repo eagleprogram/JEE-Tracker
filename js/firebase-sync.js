@@ -13,6 +13,14 @@ import { showToast, maybeShowGuestSignInReminder, hideGuestSignInReminder } from
 // Forward reference — reports.js (Step 6) needs sendReportViaEmail for the
 // auto-report scheduler below.
 import { sendReportViaEmail } from './reports.js';
+// Forward reference — push-notifications.js (Step 8-ish) imports FROM this
+// file (getFirebaseApp/getFirebaseDb/getCurrentUser), so this is the same
+// kind of circular import already used elsewhere in the app (timer.js/
+// ui.js, timer.js/charts.js, etc.) — safe because both functions imported
+// here are only ever invoked from inside the onAuthStateChanged callback
+// body below, well after the full module graph has finished loading, never
+// at this file's own top-level evaluation time.
+import { updatePushPermissionStatusUI, reregisterPushIfEnabled } from './push-notifications.js';
 
 // ----------------- FIREBASE CONFIG -----------------
 const FIREBASE_CONFIG = {
@@ -73,6 +81,23 @@ export function initFirebaseAuthIfNeeded() {
         fbAuth.onAuthStateChanged((user) => {
             currentUser = user;
             renderSyncUI();
+            // BUG FIX: main.js's boot sequence only ever painted the
+            // Background Alerts status ONCE, right after the very first
+            // resolveInitialAuthAndSync() — using whatever currentUser was
+            // at that single moment. If the real sign-in state settled
+            // slightly later than that (a slow/flaky connection past the
+            // 8s boot timeout, a silent token refresh, a genuine sign-in/
+            // out later in the session), this listener already re-ran
+            // renderSyncUI() to repaint the Account panel — but nothing
+            // ever repainted the push status panel to match, so it could
+            // permanently show a stale "Sign in first…" (looking like the
+            // Enable click was forgotten) even once the user genuinely was
+            // signed in with alerts already enabled on this device. Now
+            // every real auth change — not just the very first boot
+            // resolution — repaints it and quietly re-registers this
+            // device's push token if it was already enabled.
+            updatePushPermissionStatusUI();
+            reregisterPushIfEnabled();
             if (user) {
                 showToast(`Signed in as ${user.displayName || user.email}`);
                 hideGuestSignInReminder();
