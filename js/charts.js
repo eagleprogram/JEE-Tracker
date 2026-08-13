@@ -118,7 +118,17 @@ export function renderHeatmap() {
     // the 2nd bucket (#b2ebf2) was a pale, whitish tint sitting between two dark colors, so the
     // "Less -> More" progression visually got brighter then darker then brighter again instead of
     // ramping smoothly. Moving the dark navy to position 1 and the whitish tint to the middle fixes that.
-    const hmColors = ["#2b3852", "#0c3448", "#b2ebf2", "#008080", "#00e5ff"];
+    //
+    // FOLLOW-UP FIX: that still left #b2ebf2 (a near-white pale cyan, the
+    // single brightest color in the whole set) sitting on 3-6h — a low-mid
+    // bucket — so it visually outshone even the 10h+ goal color, breaking
+    // the "more hours = more intense" hierarchy a heatmap depends on. Swapped
+    // 3-6h and 6-10h: 3-6h now gets the old 6-10h teal (#008080), and 6-10h
+    // gets a TINTED (muted/dimmed, not the raw pale #b2ebf2) sibling of the
+    // 10h+ cyan — #00b3c0 sits exactly halfway between #008080 and #00e5ff —
+    // so brightness now climbs smoothly: 3-6h (dim teal) -> 6-10h (muted
+    // cyan) -> 10h+ (full-bright cyan), with 10h+ still the clear peak.
+    const hmColors = ["#2b3852", "#0c3448", "#008080", "#00b3c0", "#00e5ff"];
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
             if (day.date > today) return;

@@ -392,6 +392,15 @@ button.del:hover { color: #fca5a5; }
 
 /* ===== Sleep / Wake log ===== */
 input[type="time"] { width: 100%; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-family: inherit; box-sizing: border-box; }
+/* BUG FIX: this container was missing the thin-scrollbar treatment every
+   other scrollable list (todo-list, yt-history-panel, history-session-list)
+   already had — it fell back to the browser's default (thick) scrollbar.
+   Matches the same scrollbar-width/color + webkit fallback pattern used
+   for .yt-history-panel above. */
+.sleep-history-container { scrollbar-width: thin; scrollbar-color: var(--border) var(--card); }
+.sleep-history-container::-webkit-scrollbar { width: 6px; }
+.sleep-history-container::-webkit-scrollbar-track { background: var(--card); }
+.sleep-history-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 .sleep-log-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
 .sleep-log-row:last-child { border-bottom: none; }
 .sleep-log-row .sl-date { color: var(--muted); }

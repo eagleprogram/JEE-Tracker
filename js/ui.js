@@ -44,9 +44,17 @@ import { signOutOfGoogle, signInWithGoogle, getCurrentUser, pushToCloud } from '
 // signing back in on this browser afterwards — autoLoadCloudDataIfNeeded in
 // firebase-sync.js already offers to restore it the moment they do.
 export async function deleteCookiesAndReload() {
+    // BUG FIX: the extra blank line between the intro sentence and "It
+    // will:" pushed this confirm() past the native dialog's max content
+    // height on some browsers, forcing an internal scrollbar that hid the
+    // final "you won't lose data" line and the OK/Cancel buttons below the
+    // fold until the user scrolled. Native confirm()/alert() dialogs can't
+    // be styled or resized from here (they're rendered by the browser
+    // chrome, not this page's DOM/CSS), so the only lever available is
+    // trimming a line — merging the intro straight into "It will:" saves
+    // exactly the one line needed to fit everything without scrolling.
     if (!confirm(
-        "This fully resets the app on THIS browser — deleting cookies & site data.\n\n" +
-        "It will:\n" +
+        "This fully resets the app on THIS browser — deleting cookies & site data. It will:\n" +
         "• Auto-save your data to the cloud (if signed in)\n" +
         "• Sign you out\n" +
         "• Erase all data on this device\n" +
@@ -109,6 +117,33 @@ export async function deleteCookiesAndReload() {
     location.replace(url.toString());
 }
 
+// ----------------- SHARED BODY-SCROLL LOCK -----------------
+// BUG FIX: five different places (this file's boot-gate/guest-reminder/zen
+// mode, plus notifications.js's alarm modal) each set
+// `document.body.style.overflow` directly. That's fine in isolation, but
+// with two of these overlays able to be "up" at the same time — e.g. Zen
+// Mode active (locked scroll) and then an alarm rings on top of it and gets
+// dismissed — stopAlarmLoop()/hideGuestSignInReminder() unconditionally
+// wrote overflow = "" and silently un-locked scroll out from under Zen Mode
+// that was still on screen. Reported as: in Zen Mode, page scroll stops
+// working (or, on the flip side, scroll stays stuck OFF on the plain
+// dashboard after a modal closes even though nothing is visibly open —
+// same root cause either way, just whichever overlay's close handler ran
+// last). A simple reference count fixes both directions: overflow only
+// ever gets set to "hidden" once (on the 0→1 transition) and only ever
+// gets cleared once every locker has released it (the 1→0 transition) —
+// so a leftover Zen Mode lock survives an alarm's dismissal, and a
+// dashboard with no overlay open is never left stuck non-scrollable.
+let scrollLockCount = 0;
+export function lockBodyScroll() {
+    scrollLockCount++;
+    document.body.style.overflow = "hidden";
+}
+export function unlockBodyScroll() {
+    scrollLockCount = Math.max(0, scrollLockCount - 1);
+    if (scrollLockCount === 0) document.body.style.overflow = "";
+}
+
 // ----------------- TOASTS -----------------
 export function showToast(msg) {
     let stack = document.getElementById("toast-stack");
@@ -162,7 +197,7 @@ export function runBootSignInGate() {
         bootGateResolveFn = resolve;
         let modal = document.getElementById("guest-reminder-modal");
         if (modal) modal.style.display = "flex";
-        document.body.style.overflow = "hidden";
+        lockBodyScroll();
     });
 }
 
@@ -209,13 +244,13 @@ export function maybeShowGuestSignInReminder() {
     }
     let modal = document.getElementById("guest-reminder-modal");
     if (modal) modal.style.display = "flex";
-    document.body.style.overflow = "hidden"; // block background scroll while it's up
+    lockBodyScroll(); // block background scroll while it's up
 }
 
 export function hideGuestSignInReminder() {
     let modal = document.getElementById("guest-reminder-modal");
     if (modal) modal.style.display = "none";
-    document.body.style.overflow = "";
+    unlockBodyScroll();
     releaseBootGateIfWaiting();
 }
 
@@ -245,7 +280,7 @@ export function toggleZenMode() {
     let active = document.body.classList.toggle("zen-mode");
     let btn = document.getElementById("zen-toggle-btn");
     if (btn) btn.title = active ? "Exit Zen Mode" : "Zen Mode — hide distractions and focus on the timer";
-    document.body.style.overflow = active ? "hidden" : ""; // block background scroll while zen is up
+    if (active) lockBodyScroll(); else unlockBodyScroll(); // block background scroll while zen is up
     showToast(active ? "Zen mode enabled." : "Zen mode disabled.");
 }
 
@@ -258,7 +293,7 @@ export function toggleZenMode() {
 export function enterZenMode() {
     if (document.body.classList.contains("zen-mode")) return;
     document.body.classList.add("zen-mode");
-    document.body.style.overflow = "hidden";
+    lockBodyScroll();
     let btn = document.getElementById("zen-toggle-btn");
     if (btn) btn.title = "Exit Zen Mode";
 }
@@ -269,7 +304,7 @@ export function enterZenMode() {
 export function exitZenMode() {
     if (!document.body.classList.contains("zen-mode")) return; // avoid a stray toast if already off
     document.body.classList.remove("zen-mode");
-    document.body.style.overflow = "";
+    unlockBodyScroll();
     let btn = document.getElementById("zen-toggle-btn");
     if (btn) btn.title = "Zen Mode — hide distractions and focus on the timer";
     showToast("Zen mode disabled.");

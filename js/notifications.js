@@ -3,7 +3,7 @@ import { getNotifSettings, saveNotifSettings, getPlannerDB, getRawFlag, setRawFl
 import { getTimerState, getSegmentElapsedMs } from './timer.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
-import { showToast } from './ui.js';
+import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
 
 // ----------------- ALARM PRIORITY RANKING -----------------
 // Lower number = more urgent = rings first if two reminders are due at the
@@ -187,7 +187,7 @@ export function ringPersistentAlarm(title, body, priority = 5) {
     isAlarmActive = true;
     setAlarmModalText(title, body);
     document.getElementById("alarm-modal").style.display = "flex";
-    document.body.style.overflow = 'hidden'; // block background scroll
+    lockBodyScroll(); // block background scroll — shared counter, see ui.js
     playAlarmSound();
     alarmInterval = setInterval(() => { playAlarmSound(); }, 1000);
     startTitleFlash(title);
@@ -212,7 +212,7 @@ export function stopAlarmLoop() {
     if (alarmInterval) { clearInterval(alarmInterval); alarmInterval = null; }
     isAlarmActive = false;
     document.getElementById("alarm-modal").style.display = "none";
-    document.body.style.overflow = '';
+    unlockBodyScroll();
     stopTitleFlash();
     showToast("Alarm stopped.");
     if (alarmQueue.length > 0) {

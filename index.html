@@ -94,7 +94,7 @@
                 <button class="btn btn-break btn-small" style="flex:1;" onclick="toggleSleepHistory()">🕘 History</button>
             </div>
             <div id="sleep-pending-banner" style="display:none; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; padding:8px 10px; border:1px solid var(--warning); border-radius:6px; background:rgba(245,158,11,0.1); font-size:12px; color:var(--warning);"></div>
-            <div id="sleep-history-container" style="display:none; margin-top:8px; max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:6px; background:var(--bg);"></div>
+            <div id="sleep-history-container" class="sleep-history-container" style="display:none; margin-top:8px; max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:6px; background:var(--bg);"></div>
         </div>
 
         <div class="card" style="padding: 12px;">
@@ -465,8 +465,8 @@
             <span class="heatmap-swatch-group">
                 <span class="heatmap-swatch-item"><span class="sq" style="background:#2b3852;" title="0h studied"></span><span class="sq-label">0h</span></span>
                 <span class="heatmap-swatch-item"><span class="sq" style="background:#0c3448;" title="Up to 3h studied"></span><span class="sq-label">0&ndash;3h</span></span>
-                <span class="heatmap-swatch-item"><span class="sq" style="background:#b2ebf2;" title="3-6h studied"></span><span class="sq-label">3&ndash;6h</span></span>
-                <span class="heatmap-swatch-item"><span class="sq" style="background:#008080;" title="6-10h studied"></span><span class="sq-label">6&ndash;10h</span></span>
+                <span class="heatmap-swatch-item"><span class="sq" style="background:#008080;" title="3-6h studied"></span><span class="sq-label">3&ndash;6h</span></span>
+                <span class="heatmap-swatch-item"><span class="sq" style="background:#00b3c0;" title="6-10h studied"></span><span class="sq-label">6&ndash;10h</span></span>
                 <span class="heatmap-swatch-item"><span class="sq" style="background:#00e5ff;" title="10h+ studied"></span><span class="sq-label">10h+</span></span>
             </span>
             <span>More</span>
