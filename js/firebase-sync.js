@@ -28,6 +28,12 @@ let fbApp = null, fbDb = null, fbReady = false;
 let fbAuth = null, currentUser = null;
 let autoSyncInterval = null, autoSyncTimeout = null, autoReportInterval = null;
 let cloudUnsubscribe = null;
+// Set synchronously (before any `await`) inside the main onAuthStateChanged
+// handler below, the moment it decides to auto-load cloud data — so
+// resolveInitialAuthAndSync() can await the SAME in-flight call instead of
+// triggering a second, racing one. See that function's own comment further
+// down for why this matters.
+let initialAutoLoadPromise = null;
 
 export function getCurrentUser() { return currentUser; }
 
@@ -66,7 +72,7 @@ export function initFirebaseAuthIfNeeded() {
                 hideGuestSignInReminder();
                 startAutoServices();
                 startCloudListener();
-                autoLoadCloudDataIfNeeded();
+                initialAutoLoadPromise = autoLoadCloudDataIfNeeded();
             } else {
                 if (autoSyncTimeout) clearTimeout(autoSyncTimeout);
                 if (autoSyncInterval) clearInterval(autoSyncInterval);
@@ -79,6 +85,52 @@ export function initFirebaseAuthIfNeeded() {
         });
     }
     return true;
+}
+
+// ----------------- BOOT-TIME AUTH GATE -----------------
+// BUG FIX: main.js used to render/mutate local data (day-rollover,
+// todo-carryover confirm dialog, planner calendar, history, etc. — all via
+// tickCountdowns()/checkDayRollover()) BEFORE initFirebaseAuthIfNeeded() was
+// even called. Auth resolution, and any resulting cloud auto-load +
+// location.reload() from autoLoadCloudDataIfNeeded(), only happened
+// strictly AFTER. That's a race: on a device that's actually still signed
+// in (e.g. right after "Delete Cookies & Reload", which can leave
+// Firebase's own auth session intact even though this app's local data was
+// wiped), the day-rollover/todo-carryover dialog could fire and mutate
+// local planner data against an empty/stale local DB — get approved by the
+// user — and moments later autoLoadCloudDataIfNeeded() would detect the
+// sign-in, silently pull the (older) cloud snapshot on top of it, and
+// reload — wiping out exactly what was just approved. Reported as: "the
+// to-do transfer dialog came, I accepted it, then everything went away."
+//
+// resolveInitialAuthAndSync() lets main.js `await` ONE settled outcome
+// before touching any local data at all: either (a) the user is signed
+// out/guest — nothing to wait for, resolves immediately; or (b) the user IS
+// signed in and autoLoadCloudDataIfNeeded() has finished deciding whether
+// to pull. If it did pull, the page is already mid-reload by the time this
+// resolves — so nothing after the `await` in main.js ever runs anyway, the
+// reload replaces the whole JS context and boots fresh with the correct
+// (already-merged) local data. Capped with a timeout so a slow/offline
+// network never blocks first paint indefinitely.
+export function resolveInitialAuthAndSync() {
+    return new Promise((resolve) => {
+        if (!initFirebaseAuthIfNeeded()) { resolve(); return; } // sync not configured — nothing to wait for
+        let settled = false;
+        let finish = () => { if (!settled) { settled = true; resolve(); } };
+        let timeoutId = setTimeout(finish, 4000); // never hold first paint hostage to a slow/offline network
+        let unsub = fbAuth.onAuthStateChanged(async (user) => {
+            if (typeof unsub === "function") unsub();
+            if (user) {
+                // initialAutoLoadPromise was assigned synchronously by the
+                // MAIN onAuthStateChanged listener above — it's registered
+                // first, so it always runs before this one for the same
+                // auth event, guaranteeing the promise exists by now.
+                try { await initialAutoLoadPromise; } catch (e) { /* already logged inside autoLoadCloudDataIfNeeded */ }
+            }
+            clearTimeout(timeoutId);
+            finish();
+        });
+    });
 }
 
 export async function signInWithGoogle() {

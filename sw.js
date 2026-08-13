@@ -5,7 +5,7 @@
 // thing that makes the activate handler below delete the old cache and let
 // the new files be fetched fresh. Forgetting this step means fixes silently
 // never reach anyone who doesn't manually hard-refresh.
-const CACHE_NAME = "jee-tracker-v2.4.4";
+const CACHE_NAME = "jee-tracker-v2.4.5";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -92,6 +92,34 @@ self.addEventListener("fetch", (event) => {
         .catch(() => {
           if (req.mode === "navigate") return caches.match("./index.html");
         });
+    })
+  );
+});
+
+// ----------------- ALARM NOTIFICATIONS: CLICK / ACTION HANDLING ---------
+// Notifications raised via registration.showNotification() (see
+// fireOsNotification() in js/notifications.js) are delivered by the
+// browser's own OS-level notification system, which is what lets them
+// still appear when this app's tab is minimized or another app is
+// fullscreened over the browser — the OS, not this page, owns rendering
+// them. Tapping either the notification body or its "Stop Alarm" action
+// button needs to reach back into the actual running page to silence the
+// in-page alarm loop/modal, which is what this does: find an already-open
+// client (tab) for this app and postMessage it; if none is open, open one
+// (there's no live page yet to message in that case — the fresh load just
+// boots normally, which is the best a static, backend-less site can do).
+self.addEventListener("notificationclick", (event) => {
+  const isStop = event.action === "stop-alarm";
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          client.postMessage({ type: isStop ? "STOP_ALARM" : "FOCUS_ALARM" });
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow("./");
     })
   );
 });

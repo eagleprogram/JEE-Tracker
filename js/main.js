@@ -70,7 +70,7 @@ import { exportDataJSON, importDataJSON } from './backup.js';
 
 import {
     signInWithGoogle, signOutOfGoogle, pushToCloud, pullFromCloud,
-    deleteCloudData, initFirebaseAuthIfNeeded, renderSyncUI, showPendingToastIfAny
+    deleteCloudData, renderSyncUI, showPendingToastIfAny, resolveInitialAuthAndSync
 } from './firebase-sync.js';
 
 import {
@@ -164,6 +164,20 @@ async function initApp() {
     // that can't just call showToast() directly before reloading.
     showPendingToastIfAny();
 
+    // BUG FIX: resolve sign-in state — and let any pending cloud auto-load
+    // finish (or trigger its own reload) — BEFORE any local data is
+    // rendered or mutated below. See resolveInitialAuthAndSync()'s own
+    // comment in firebase-sync.js for the full story: skipping this used to
+    // let checkDayRollover()'s todo-carryover dialog run and mutate local
+    // data while a cloud pull was still in flight, and the cloud pull would
+    // then silently overwrite (and reload away) whatever was just approved.
+    // For the normal case (already synced, or guest/offline) this resolves
+    // near-instantly and boot proceeds exactly as before. If an auto-load
+    // DOES end up happening, it triggers its own location.reload() — this
+    // await simply never gets past that point, and the reload boots a fresh
+    // instance of the app with the correctly-merged local data instead.
+    await resolveInitialAuthAndSync();
+
     // One-time migration for the just-renamed/split syllabus chapters —
     // must run before the syllabus tab could possibly be rendered.
     migrateSyllabusChapterRenames();
@@ -221,9 +235,10 @@ async function initApp() {
     // Seed the backup-reminder timestamp on first run so it has a baseline.
     if (!getLastBackupAt()) markBackupDone();
 
-    // Cloud sync: wire up the auth listener so a returning signed-in user
-    // is recognized automatically; render the signed-out UI in the meantime.
-    initFirebaseAuthIfNeeded();
+    // Cloud sync: auth was already resolved by resolveInitialAuthAndSync()
+    // above (which also called initFirebaseAuthIfNeeded() internally, wiring
+    // up the listener for any LATER sign-in/out this session) — just paint
+    // the signed-in/out UI to match the final state now.
     renderSyncUI();
 
     // PWA offline support.
