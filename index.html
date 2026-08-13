@@ -205,7 +205,17 @@
                     <input type="number" id="notif-idleThreshold" min="10" max="240" onchange="saveNotifSettingsFromUI()">
                     <span style="font-size:12px; color:var(--muted);">min idle</span>
                 </div>
-                <div class="small-note">Info-only — never pauses/stop timer. Only works while tab is open.</div>
+                <div class="small-note">Info-only — never pauses/stops the timer. Break-overrun and idle-nudge specifically need the timer running in a live tab, so they only work while it's open — everything else below can also reach you with the app fully closed.</div>
+            </div>
+
+            <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+                <div style="font-size:13px; font-weight:700; margin-bottom:4px;">📴 Background Alerts (even when the app is fully closed)</div>
+                <div id="push-permission-status" class="small-note" style="margin-bottom:8px;"></div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn btn-start btn-small" style="flex:1;" onclick="enableBackgroundPush()">Enable</button>
+                    <button class="btn btn-stop btn-small" style="flex:1;" onclick="disableBackgroundPush()">Disable</button>
+                </div>
+                <div class="small-note" style="margin-top:6px;">Requires sign-in. Delivered by a free scheduled job that checks every ~5 minutes — see PUSH_SETUP.md for one-time setup, and its "Limits" section for what this can't guarantee.</div>
             </div>
         </div>
 
@@ -594,6 +604,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 
 <script type="module" src="js/main.js"></script>
     <!-- Guest Sign-In Reminder — nudges a not-signed-in user toward cloud
@@ -606,7 +617,7 @@
         <span class="guest-modal-icon" aria-hidden="true"></span>
         <h3 style="color: var(--text); margin: 0 0 8px 0; font-size: 19px;">You're browsing as a guest</h3>
         <p style="color: var(--muted); margin: 0 0 22px 0; font-size: 13px; line-height: 1.5;">Your study logs are only saved on this device right now. Signing in backs them up to the cloud and keeps them safe if you clear your browser data or switch devices.</p>
-        <button class="btn btn-start" onclick="hideGuestSignInReminder(); signInWithGoogle();" style="width: 100%; margin-bottom: 8px;">Sign In</button>
+        <button class="btn btn-start" onclick="guestReminderSignInClicked()" style="width: 100%; margin-bottom: 8px;">Sign In</button>
         <div style="display: flex; gap: 8px;">
             <button class="btn btn-stop btn-guest-small" onclick="guestReminderSnooze()">Remind Later (5 min)</button>
             <button class="btn btn-stop btn-guest-small" onclick="guestReminderIgnore()">Ignore for Today</button>

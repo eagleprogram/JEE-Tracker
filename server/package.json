@@ -1,0 +1,13 @@
+{
+  "name": "jee-tracker-push-scheduler",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Scheduled job for the JEE Tracker app: reads each signed-in user's notification settings from Firestore, decides which reminders are due right now, and sends them as FCM push messages — so alarms can reach a device even when no browser tab is open. Triggered every 5 minutes by ../.github/workflows/scheduled-alarms.yml (free GitHub Actions cron). See ../PUSH_SETUP.md for setup.",
+  "main": "send-scheduled-alarms.js",
+  "scripts": {
+    "start": "node send-scheduled-alarms.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

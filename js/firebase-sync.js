@@ -1,4 +1,4 @@
-import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry } from './storage.js';
+import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry, getLastBackupAt } from './storage.js';
 // mistakes.js switched each chapter's stored record from one flat
 // {count, notes, files} blob to an `entries` array (separately editable
 // mistake log entries). normalizeRecord() upgrades either shape (a record
@@ -36,6 +36,12 @@ let cloudUnsubscribe = null;
 let initialAutoLoadPromise = null;
 
 export function getCurrentUser() { return currentUser; }
+
+// Exposed for push-notifications.js — it needs the initialized Firebase App
+// (for firebase.messaging()) and the Firestore handle (to save/remove this
+// device's push token), without duplicating the init/config logic above.
+export function getFirebaseApp() { return initFirebaseIfNeeded() ? fbApp : null; }
+export function getFirebaseDb() { return fbDb; }
 
 // Redeems a toast message that was queued right before a location.reload()
 // (see autoLoadCloudDataIfNeeded and startCloudListener) — called once from
@@ -117,7 +123,19 @@ export function resolveInitialAuthAndSync() {
         if (!initFirebaseAuthIfNeeded()) { resolve(); return; } // sync not configured — nothing to wait for
         let settled = false;
         let finish = () => { if (!settled) { settled = true; resolve(); } };
-        let timeoutId = setTimeout(finish, 4000); // never hold first paint hostage to a slow/offline network
+        // BUG FIX: was 4000ms. On a slow/just-reconnected network (e.g. right
+        // after "Delete Cookies & Reload", or a flaky mobile connection) the
+        // real auth-state + cloud-auto-load round trip can take longer than
+        // that, so this timeout could fire and let main.js's boot sequence
+        // (including runBootSignInGate()) proceed while the actual sign-in
+        // was still resolving — the exact race behind "to-do transfer came,
+        // I accepted, then sign-in came and everything went away." 8s gives
+        // a slow reconnect a real chance to finish first. If the real
+        // sign-in DOES land after this timeout anyway, onAuthStateChanged's
+        // signed-in branch still calls hideGuestSignInReminder() itself
+        // (see above), which quietly dismisses any sign-in prompt that's
+        // still on screen at that point — never a silent overwrite.
+        let timeoutId = setTimeout(finish, 8000); // never hold first paint hostage to a dead network forever
         let unsub = fbAuth.onAuthStateChanged(async (user) => {
             if (typeof unsub === "function") unsub();
             if (user) {
@@ -180,6 +198,10 @@ export async function pushToCloud(silent = false) {
             ytHistory: getYtHistory(),
             examYear: getExamYear(),
             ytLastLink: getRawFlag("jee_yt_last_link") || "",
+            // Lets the scheduled server-side push job (server/send-scheduled-alarms.js)
+            // compute the "2+ days since backup" reminder too — it has no
+            // other way to know when this device last exported a backup.
+            lastBackupAt: getLastBackupAt(),
             mockTests,
             mistakeChapters,
             updatedAt: now

@@ -5,7 +5,62 @@
 // thing that makes the activate handler below delete the old cache and let
 // the new files be fetched fresh. Forgetting this step means fixes silently
 // never reach anyone who doesn't manually hard-refresh.
-const CACHE_NAME = "jee-tracker-v2.4.5";
+const CACHE_NAME = "jee-tracker-v2.5.0";
+
+// ----------------- BACKGROUND PUSH (Firebase Cloud Messaging) -----------------
+// Handles push messages that arrive while no tab of this app is open or
+// focused — the one channel that can still reach the user with the browser
+// fully closed (as far as the OS/platform allows at all — see the "HONEST
+// LIMIT" comment in js/push-notifications.js). Sent by the free scheduled
+// job in server/send-scheduled-alarms.js — see PUSH_SETUP.md for setup.
+//
+// A classic (non-module) service worker can't `import` js/firebase-sync.js,
+// so the Firebase compat SDK is loaded the same way that file loads it in
+// index.html, and the same PUBLIC (client-side-safe) config values are
+// duplicated here — there is no secret in a Firebase web config; it's
+// designed to be embedded in client code. Keep this object in sync with
+// FIREBASE_CONFIG in js/firebase-sync.js if that project is ever rotated.
+importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
+
+firebase.initializeApp({
+  apiKey: "AIzaSyCHvTipTo9yc19FOB-o31GfRu0El3SIqzc",
+  authDomain: "jee-study-tracker-99.firebaseapp.com",
+  projectId: "jee-study-tracker-99",
+  storageBucket: "jee-study-tracker-99.firebasestorage.app",
+  messagingSenderId: "221533539699",
+  appId: "1:221533539699:web:5a68a74a33898627cb4906"
+});
+
+const messaging = firebase.messaging();
+
+// The scheduled server script sends DATA-ONLY messages (no top-level
+// "notification" field) on purpose. A "notification" payload gets
+// auto-displayed by the browser with no way to control its tag, vibrate
+// pattern, or action buttons from here — that would make a server-sent
+// alarm look and behave differently from every in-tab one. Data-only
+// messages always land in onBackgroundMessage instead, so this builds the
+// exact same requireInteraction + vibrate + "Stop Alarm" action notification
+// that fireOsNotification() in js/notifications.js already builds — one
+// consistent alarm experience no matter which path sent it. The existing
+// notificationclick handler further down already handles taps on these
+// (same tag/action shape), so nothing extra is needed there.
+messaging.onBackgroundMessage((payload) => {
+  const d = payload.data || {};
+  const title = d.title || "JEE Tracker reminder";
+  const persistent = d.persistent !== "0";
+  self.registration.showNotification(title, {
+    body: d.body || "",
+    icon: "./assets/icon-192.png",
+    badge: "./assets/icon-192.png",
+    tag: "jee-alarm-" + String(title).toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    renotify: true,
+    requireInteraction: persistent,
+    vibrate: persistent ? [300, 100, 300, 100, 300] : [150],
+    actions: persistent ? [{ action: "stop-alarm", title: "Stop Alarm" }] : []
+  });
+});
+
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -18,6 +73,7 @@ const APP_SHELL = [
   "./js/storage.js",
   "./js/timer.js",
   "./js/notifications.js",
+  "./js/push-notifications.js",
   "./js/planner.js",
   "./js/history.js",
   "./js/sleep.js",

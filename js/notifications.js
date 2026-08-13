@@ -193,6 +193,21 @@ export function ringPersistentAlarm(title, body, priority = 5) {
     startTitleFlash(title);
 }
 
+// Exposed so other modules (ui.js's guest sign-in reminder) can avoid
+// popping their own full-screen modal on top of an alarm that's currently
+// ringing or about to ring its next queued reason — see the "isAlarmRinging"
+// check in maybeShowGuestSignInReminder() in ui.js.
+export function isAlarmRinging() {
+    return isAlarmActive || alarmQueue.length > 0 || nextAlarmTimer !== null;
+}
+
+let nextAlarmTimer = null;
+// Gap (in ms) between dismissing one queued alarm and the next one ringing.
+// Requested explicitly: give the user a moment to actually put the phone
+// down / look away from the screen before the next reason starts blaring,
+// rather than it slamming straight back on with zero breathing room.
+const ALARM_QUEUE_GAP_MS = 15000;
+
 export function stopAlarmLoop() {
     if (alarmInterval) { clearInterval(alarmInterval); alarmInterval = null; }
     isAlarmActive = false;
@@ -201,13 +216,20 @@ export function stopAlarmLoop() {
     stopTitleFlash();
     showToast("Alarm stopped.");
     if (alarmQueue.length > 0) {
-        // Ring the next most-important queued reason right away — this is
-        // the "two reminders due at the same time" case: the more important
-        // one rings, gets dismissed, then (and only then) the next one rings
-        // in its own modal, exactly like a second WhatsApp message queues
-        // up after you dismiss the first notification.
+        // Ring the next most-important queued reason after a short gap —
+        // this is the "two (or more) reminders due at the same time" case:
+        // the more important one rings, gets dismissed, then — after a
+        // 15-second breather, not instantly — the next one rings in its own
+        // modal, and so on down the queue. The OS notification for every
+        // queued reason already went out the instant it became due (see
+        // notify()/fireOsNotification below), so nothing about the alert
+        // itself is delayed — only the in-page modal+sound is sequenced.
         let next = alarmQueue.shift();
-        ringPersistentAlarm(next.title, next.body, next.priority);
+        showToast(`Next alarm ("${next.title}") in 15s…`);
+        nextAlarmTimer = setTimeout(() => {
+            nextAlarmTimer = null;
+            ringPersistentAlarm(next.title, next.body, next.priority);
+        }, ALARM_QUEUE_GAP_MS);
     }
 }
 

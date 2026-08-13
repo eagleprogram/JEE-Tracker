@@ -7,7 +7,7 @@ import { renderSidebarTools, renderPlannerCalendar, carryOverIncompleteTodos } f
 // have no dependency back on ui.js, so this is a normal (non-circular) import.
 import { loadHistoryData } from './history.js';
 import { renderGarden } from './charts.js';
-import { runNotificationChecks } from './notifications.js';
+import { runNotificationChecks, isAlarmRinging } from './notifications.js';
 import { renderMockTestList } from './mocktest.js';
 import { renderSyllabusTracker } from './syllabus.js';
 import { renderMistakesTracker } from './mistakes.js';
@@ -19,7 +19,7 @@ import { wipeLocalData } from './storage.js';
 // is safe here: signOutOfGoogle/getCurrentUser are only ever called from
 // inside deleteCookiesAndReload()'s function body, well after both modules
 // have finished evaluating — never at module-eval time.
-import { signOutOfGoogle, getCurrentUser, pushToCloud } from './firebase-sync.js';
+import { signOutOfGoogle, signInWithGoogle, getCurrentUser, pushToCloud } from './firebase-sync.js';
 
 // ----------------- FULL DEVICE RESET (Delete Cookies & Reload) -----------------
 // This used to only clear the PWA's Cache Storage layer (so a stale cached
@@ -134,6 +134,57 @@ const GUEST_REMINDER_IGNORED_DATE_KEY = "jee_guestReminderIgnoredDate";
 const GUEST_REMINDER_SNOOZE_KEY = "jee_guestReminderSnoozeUntil";
 const GUEST_REMINDER_SNOOZE_MS = 5 * 60 * 1000;
 
+// ----------------- BOOT-TIME SIGN-IN GATE -----------------
+// BUG FIX: previously this same modal only ever popped up ~1.5s AFTER
+// sign-out was detected, fully decoupled from main.js's boot sequence — so
+// tickCountdowns() (day-rollover, the todo-carryover confirm() dialog,
+// notification checks, alarms...) could already be running, or a cloud
+// auto-load could land and reload the page, WHILE the user hadn't even been
+// asked to sign in yet. Reported as: "to-do transfer came, I accepted it,
+// then sign-in came and everything went away" — two independent async flows
+// stepping on each other with no ordering between them.
+//
+// runBootSignInGate() is awaited from main.js's initApp() BEFORE any of
+// that runs. It resolves immediately if the user is already signed in
+// (nothing to gate). Otherwise it shows this exact modal right away — the
+// very first thing the user sees — and does not resolve until ONE of the
+// three things the user asked for happens: a real successful sign-in
+// (onAuthStateChanged's signed-in branch calls hideGuestSignInReminder()
+// itself, see firebase-sync.js), "Ignore for Today", or "Remind Later (5
+// min)". Only then does main.js proceed to render/mutate anything.
+let bootGateResolveFn = null;
+let bootGateActive = false;
+
+export function runBootSignInGate() {
+    return new Promise((resolve) => {
+        if (getCurrentUser()) { resolve(); return; } // already signed in — nothing to gate
+        bootGateActive = true;
+        bootGateResolveFn = resolve;
+        let modal = document.getElementById("guest-reminder-modal");
+        if (modal) modal.style.display = "flex";
+        document.body.style.overflow = "hidden";
+    });
+}
+
+function releaseBootGateIfWaiting() {
+    if (!bootGateActive) return;
+    bootGateActive = false;
+    let fn = bootGateResolveFn;
+    bootGateResolveFn = null;
+    if (fn) fn();
+}
+
+// Sign-In button inside the modal calls this instead of hiding the modal
+// immediately — the modal now stays up (and the boot gate, if any, keeps
+// waiting) until sign-in genuinely succeeds. If the Google popup is
+// cancelled or fails, signInWithGoogle() already alerts the reason and this
+// modal simply stays open so the user can retry or fall back to Remind
+// Later / Ignore for Today, instead of the app silently proceeding as if
+// they were still a guest.
+export function guestReminderSignInClicked() {
+    signInWithGoogle();
+}
+
 export function maybeShowGuestSignInReminder() {
     if (getRawFlag(GUEST_REMINDER_IGNORED_DATE_KEY) === getTodayKey()) return;
     let snoozeUntil = parseInt(getRawFlag(GUEST_REMINDER_SNOOZE_KEY) || "0", 10);
@@ -142,6 +193,18 @@ export function maybeShowGuestSignInReminder() {
         // Tab may stay open past the snooze window — re-check when it lapses
         // instead of only re-prompting on the next full page load.
         setTimeout(maybeShowGuestSignInReminder, remaining + 500);
+        return;
+    }
+    // BUG FIX: this periodic (post-boot) nag used to be able to pop up over
+    // an alarm that was actively ringing — two full-screen modals fighting
+    // for the same click, reported as "sign-in comes instead of the alarm".
+    // Both modals already have distinct z-index (alarm above guest-reminder)
+    // so the alarm was never literally un-clickable, but showing a second
+    // life-admin prompt mid-alarm is exactly the "everything gone away"
+    // confusion being reported. Simplest fix: just wait for the alarm (and
+    // anything already queued behind it) to fully clear first.
+    if (isAlarmRinging()) {
+        setTimeout(maybeShowGuestSignInReminder, 5000);
         return;
     }
     let modal = document.getElementById("guest-reminder-modal");
@@ -153,6 +216,7 @@ export function hideGuestSignInReminder() {
     let modal = document.getElementById("guest-reminder-modal");
     if (modal) modal.style.display = "none";
     document.body.style.overflow = "";
+    releaseBootGateIfWaiting();
 }
 
 export function guestReminderIgnore() {

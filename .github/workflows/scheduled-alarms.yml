@@ -1,0 +1,43 @@
+# Runs server/send-scheduled-alarms.js on a schedule so reminder pushes can
+# reach a device even when no browser tab of the app is open. Free on both
+# public and private repos (public repos get unlimited Actions minutes;
+# private repos get 2,000 free minutes/month — this job takes well under a
+# minute per run, ~5,000-6,000 runs/month at 5-min intervals, so it stays
+# comfortably inside the free tier either way). See ../PUSH_SETUP.md.
+#
+# LIMITS (see PUSH_SETUP.md's "Limits" section for the full explanation):
+# - GitHub does not guarantee exact cron timing — a few minutes' delay
+#   during platform-wide high load is normal and expected.
+# - GitHub auto-disables a repo's scheduled workflows after 60 days with no
+#   activity (no commits/pushes) to the repo at all. Any commit, or manually
+#   running this workflow once via the "Run workflow" button, resets that
+#   clock. If reminders quietly stop arriving after a long gap of not
+#   touching the repo, check Actions tab > this workflow > re-enable.
+name: JEE Tracker Scheduled Alarms
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab to test
+
+jobs:
+  send-alarms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm install --no-audit --no-fund
+
+      - name: Send due reminders
+        working-directory: server
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: node send-scheduled-alarms.js

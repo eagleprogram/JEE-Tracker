@@ -18,7 +18,8 @@ import {
     showToast, closeSidebar, openSidebarPanel, checkDayRollover,
     renderQuoteOfDay, renderExamYearUI, setExamYear, tickCountdowns,
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
-    hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze
+    hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
+    guestReminderSignInClicked, runBootSignInGate
 } from './ui.js';
 
 import {
@@ -78,6 +79,11 @@ import {
     updateNotifPermissionStatus, stopAlarmLoop
 } from './notifications.js';
 
+import {
+    enableBackgroundPush, disableBackgroundPush, updatePushPermissionStatusUI,
+    reregisterPushIfEnabled
+} from './push-notifications.js';
+
 // -----------------------------------------------------------------------
 // EXPOSE EVERY FUNCTION THE HTML's INLINE onclick/onchange HANDLERS CALL.
 // (ES module top-level functions are NOT global — this is required.)
@@ -94,6 +100,7 @@ Object.assign(window, {
     renderQuoteOfDay, renderExamYearUI, setExamYear, tickCountdowns,
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
     hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
+    guestReminderSignInClicked,
     // planner.js
     addTodo, toggleTodo, deleteTodo, calShiftMonth, renderSidebarTools,
     renderPlannerCalendar, openPlannerModal, closePlannerModal,
@@ -126,7 +133,9 @@ Object.assign(window, {
     signInWithGoogle, signOutOfGoogle, pushToCloud, pullFromCloud,
     deleteCloudData,
     // notifications.js
-    enableNotifications, saveNotifSettingsFromUI, stopAlarmLoop
+    enableNotifications, saveNotifSettingsFromUI, stopAlarmLoop,
+    // push-notifications.js
+    enableBackgroundPush, disableBackgroundPush
 });
 
 // -----------------------------------------------------------------------
@@ -177,6 +186,20 @@ async function initApp() {
     // await simply never gets past that point, and the reload boots a fresh
     // instance of the app with the correctly-merged local data instead.
     await resolveInitialAuthAndSync();
+
+    // BUG FIX: sign-in must be resolved (signed in, "Ignore for Today", or
+    // "Remind Later") BEFORE anything else below runs — day rollover's
+    // todo-carryover confirm() dialog, notification/alarm checks, planner
+    // rendering, all of it. Previously the sign-in reminder only appeared
+    // ~1.5s after sign-out was detected, fully independent of this boot
+    // sequence, so it could show up mid-way through (or after) all of the
+    // above — reported as "the to-do transfer dialog came, I accepted it,
+    // then sign-in came and everything went away." Awaiting this here makes
+    // the sign-in prompt the very first thing a guest/signed-out user sees,
+    // and guarantees nothing else touches local data until they've made a
+    // choice. Already-signed-in users resolve this instantly (see
+    // runBootSignInGate()'s own comment in ui.js).
+    await runBootSignInGate();
 
     // One-time migration for the just-renamed/split syllabus chapters —
     // must run before the syllabus tab could possibly be rendered.
@@ -240,6 +263,15 @@ async function initApp() {
     // up the listener for any LATER sign-in/out this session) — just paint
     // the signed-in/out UI to match the final state now.
     renderSyncUI();
+
+    // Background push (Firebase Cloud Messaging): paint current status, and
+    // silently re-register this device's token if it was already enabled
+    // before (see reregisterPushIfEnabled()'s own comment in
+    // push-notifications.js for why). Fire-and-forget — never blocks boot,
+    // and fails silently (logged, not surfaced) if push isn't configured on
+    // this deployment yet.
+    updatePushPermissionStatusUI();
+    reregisterPushIfEnabled();
 
     // PWA offline support.
     if ("serviceWorker" in navigator) {
