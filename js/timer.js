@@ -12,7 +12,7 @@ import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
 // function body (confirmStartStudy/resumeStudy), never at module-evaluation
 // time, so it doesn't matter that ui.js hasn't finished initializing yet
 // when this file is first parsed.
-import { enterZenMode, lockBodyScroll, unlockBodyScroll } from './ui.js';
+import { enterZenMode, exitZenMode, lockBodyScroll, unlockBodyScroll } from './ui.js';
 
 // ----------------- TIMER ENGINE -----------------
 let timerState = "IDLE";
@@ -40,6 +40,22 @@ let segmentElapsedMs = 0;
 // chunkSec values that land in the DB, guarantees both displays floor to
 // the identical number every single frame.
 let sessionStudySec = 0;
+// BUG FIX: BREAK DURATION (the big blue "session-timer" digits while on a
+// break) used to be driven purely by segmentElapsedMs — the elapsed time
+// since the CURRENT segment started. commitActiveSegment()+startSegment()
+// run every 20s (the autosave interval, see startAutosave()) and on every
+// tab-hide/pagehide (see flushAndRestartSegment()), and each of those
+// resets segmentStartWallMs. STUDYING already had its own running total
+// (sessionStudySec, above) that survives those restarts, but BREAK had no
+// equivalent — so the on-screen break timer visibly snapped back down
+// (e.g. from ~20s to ~0s) every time an autosave/tab-hide restart fired,
+// while "Total Breaks" in Today's Live Summary (built from the DB total +
+// live segment, not from the display timer) kept counting correctly. That
+// mismatch is exactly what was reported: the small "Total Breaks" figure
+// staying accurate while the big break timer lagged/jumped after switching
+// tabs or apps. sessionBreakSec mirrors sessionStudySec for BREAK so the
+// on-screen timer and the live summary always agree.
+let sessionBreakSec = 0;
 let animFrame = null;
 let autosaveInterval = null;
 let currentSegmentId = 0;
@@ -219,6 +235,7 @@ export function commitActiveSegment() {
     let db = getDB();
     let cursor = wallStart;
     let committedStudySecThisCall = 0;
+    let committedBreakSecThisCall = 0;
     while (cursor < wallEnd) {
         let cd = new Date(cursor);
         let nextMidnight = new Date(cd.getFullYear(), cd.getMonth(), cd.getDate() + 1, 0, 0, 0, 0).getTime();
@@ -235,7 +252,22 @@ export function commitActiveSegment() {
             if (!db[dayKey]) db[dayKey] = blankDay();
             let day = ensureDayShape(db[dayKey]);
             let refKey = `${currentSegmentId}:${dayKey}:${timerState}`;
-            let stamp = stampTime12Hour(new Date(chunkEnd));
+            // BUG FIX: this used to stamp every log entry with chunkEnd — the
+            // wall-clock time at the moment this particular commit fired
+            // (every 20s autosave, every tab-hide, every pause/break/subject
+            // switch). Since existing.time was then overwritten on every
+            // later commit that extended the same entry, the displayed time
+            // kept creeping forward for as long as the study/break ran (e.g.
+            // a break started at 4:00 PM and still going at 4:20 PM would
+            // show "4:20 PM", not the actual start time) — reported as
+            // logs taking the "output"/end time instead of the input/start
+            // time. Logs should show when the user actually started that
+            // study/break segment and never drift afterward. Stamping with
+            // cursor (this chunk's START, not its end) and never touching
+            // existing.time again on later commits fixes both: a same-day
+            // entry gets its true start time once, and only its duration
+            // grows after that.
+            let stamp = stampTime12Hour(new Date(cursor));
             if (timerState === "STUDYING") {
                 day.subjects[activeSubject] = (day.subjects[activeSubject] || 0) + chunkSec;
                 day.totalStudy += chunkSec;
@@ -244,7 +276,6 @@ export function commitActiveSegment() {
                 let existing = ref ? day.studySessions.find(s => s.id === ref.id) : null;
                 if (existing && existing.subject === activeSubject) {
                     existing.duration += chunkSec;
-                    existing.time = stamp;
                 } else {
                     let newEntry = { id: generateId(), time: stamp, subject: activeSubject, duration: chunkSec };
                     day.studySessions.push(newEntry);
@@ -252,11 +283,11 @@ export function commitActiveSegment() {
                 }
             } else if (timerState === "BREAK") {
                 day.totalBreak += chunkSec;
+                committedBreakSecThisCall += chunkSec;
                 let ref = openEntryRefs[refKey];
                 let existing = ref ? day.breaks.find(b => b.id === ref.id) : null;
                 if (existing) {
                     existing.duration += chunkSec;
-                    existing.time = stamp;
                 } else {
                     let newEntry = { id: generateId(), time: stamp, reason: activeBreakReason, duration: chunkSec };
                     day.breaks.push(newEntry);
@@ -267,6 +298,7 @@ export function commitActiveSegment() {
         cursor = chunkEnd;
     }
     if (timerState === "STUDYING") sessionStudySec += committedStudySecThisCall;
+    else if (timerState === "BREAK") sessionBreakSec += committedBreakSecThisCall;
     saveDB(db);
     refreshCachedTodayDay();
 }
@@ -283,7 +315,7 @@ export function startAutosave() {
 
 export function persistActiveSession() {
     if (timerState === "STUDYING" || timerState === "BREAK") {
-        saveActiveSessionRaw({ state: timerState, activeSubject, activeBreakReason, segmentStartWallMs, sessionStudySec, dayKey: currentDayKey });
+        saveActiveSessionRaw({ state: timerState, activeSubject, activeBreakReason, segmentStartWallMs, sessionStudySec, sessionBreakSec, dayKey: currentDayKey });
     } else { clearActiveSessionRaw(); }
 }
 
@@ -303,7 +335,7 @@ export function tryRestoreActiveSession() {
     if (otherTabActiveLock()) return;
     let label = snap.state === "STUDYING" ? `studying ${snap.activeSubject}` : `on a break (${snap.activeBreakReason})`;
     if (confirm(`You had an unfinished session (${label}) running when this tab last closed.\n\nResume it now?`)) {
-        timerState = snap.state; activeSubject = snap.activeSubject; activeBreakReason = snap.activeBreakReason; sessionStudySec = snap.sessionStudySec || 0; currentSegmentId++; startSegment(); updateUIState(); tick();
+        timerState = snap.state; activeSubject = snap.activeSubject; activeBreakReason = snap.activeBreakReason; sessionStudySec = snap.sessionStudySec || 0; sessionBreakSec = snap.sessionBreakSec || 0; currentSegmentId++; startSegment(); updateUIState(); tick();
     } else { clearActiveSessionRaw(); }
 }
 
@@ -378,6 +410,11 @@ export function takeBreak() {
     let reason = prompt("Break Reason (e.g. Lunch, Walk, Phone):");
     if (!reason || !reason.trim()) reason = "Short Break";
     activeBreakReason = reason;
+    // Fresh break (as opposed to the same break resuming after an autosave/
+    // tab-hide restart, which goes through flushAndRestartSegment() instead
+    // and never calls takeBreak() again) — reset the break session total so
+    // BREAK DURATION starts counting this break from zero.
+    sessionBreakSec = 0;
     timerState = "BREAK"; currentSegmentId++; startSegment();
     updateUIState(); tick();
 }
@@ -386,7 +423,13 @@ export function changeSubjectMidSession() { activeSubject = document.getElementB
 
 export function endDay() {
     commitActiveSegment(); cancelAnimationFrame(animFrame);
-    timerState = "IDLE"; segmentElapsedMs = 0; sessionStudySec = 0; carryMs = 0; clearActiveSession();
+    timerState = "IDLE"; segmentElapsedMs = 0; sessionStudySec = 0; sessionBreakSec = 0; carryMs = 0; clearActiveSession();
+    // BUG FIX: End Day used to leave Zen Mode's overlay/backdrop on screen if
+    // the user hit the red "End Day" button while zen'd in (reachable during
+    // both STUDYING and BREAK — see index.html). exitZenMode() itself is a
+    // safe no-op when zen mode isn't active, so this is safe to call
+    // unconditionally on every End Day, not just the zen'd-in case.
+    exitZenMode();
     updateUIState();
     document.getElementById("session-timer").innerText = "00:00:00";
     updateLiveSummary(); loadHistoryData(); renderGarden(); renderHeatmap(); renderTrendChart();
@@ -396,7 +439,7 @@ export function tick() {
     // Same wall-clock fix as commitActiveSegment() above — see its comment.
     segmentElapsedMs = Date.now() - segmentStartWallMs;
     if (timerState === "STUDYING") document.getElementById("session-timer").innerText = formatHMS(sessionStudySec * 1000 + segmentElapsedMs);
-    else if (timerState === "BREAK") document.getElementById("session-timer").innerText = formatHMS(segmentElapsedMs);
+    else if (timerState === "BREAK") document.getElementById("session-timer").innerText = formatHMS(sessionBreakSec * 1000 + segmentElapsedMs);
     updateLiveSummaryFast();
     animFrame = requestAnimationFrame(tick);
 }
