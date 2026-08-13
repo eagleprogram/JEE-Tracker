@@ -134,8 +134,8 @@ export function renderHeatmap() {
     // fill instead of one fixed contrasting grey — so it reads as a soft
     // tile edge on every cell, not as an outline that only shows up on the
     // (previously near-invisible) empty ones.
-    const hmColors = ["#33415c", "#2c5d8f", "#1f7ec2", "#1996e0", "#7dd3fc"];
-    const hmStrokes = ["#425374", "#3d75ab", "#3897d6", "#3fabe8", "#a8e2ff"];
+    const hmColors = ["#13192b", "#1d2863", "#39479a", "#5b6bc1", "#7e89d8"];
+    const hmStrokes = ["#232b47", "#2c3a82", "#4a5bb8", "#6f7ed4", "#98a2e6"];
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
             if (day.date > today) return;

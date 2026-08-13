@@ -204,24 +204,29 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     flex-wrap: wrap;
 }
 
-/* Restructured so the icon sits in its OWN row alongside just the
-   "JEE 2027" text (.app-title-row), with align-items:center on that row —
-   this centers the icon exactly against the cap-height of the "J", rather
-   than against the whole 3-line block (title + subtitle + year select).
-   The subtitle/select sit below, outside the row, in normal document flow. */
-.app-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+/* The icon sits in its OWN row alongside just the "JEE 2027" text
+   (.app-title-row), with align-items:center on that row — this centers the
+   icon exactly against the cap-height of the "J", rather than against the
+   whole title+subtitle block. The subtitle/select row (.app-title-text)
+   sits below that, in normal document flow. */
+.app-title-wrap { display: flex; flex-direction: column; gap: 4px; }
 .app-title-row { display: flex; align-items: center; gap: 10px; }
-.app-title-icon { width: 42px; height: 42px; flex-shrink: 0; object-fit: contain; }
-.app-title-text { display: flex; flex-direction: column; line-height: 1.05; }
-/* Single, solid title color (--title) instead of the old multicolor
-   gradient — one unified tone that still stands out against --bg without
-   competing with it. */
+.app-title-icon { width: 52px; height: 52px; flex-shrink: 0; object-fit: contain; }
+/* BUG FIX (header restyle): the subtitle ("STUDY TRACKER") and the exam-year
+   select used to be stacked in their own column below the title row. Now
+   laid out as a single inline row — label first, select right next to it —
+   to match the requested header layout. */
+.app-title-text { display: flex; flex-direction: row; align-items: center; gap: 8px; line-height: 1.05; }
+/* Single, solid title color instead of the old lighter blue-purple — set
+   directly here (not via the shared --title variable) so it doesn't also
+   darken the unrelated account/guest person-icon mask that also reads
+   --title, which needs to stay light/visible against the dark background. */
 .app-title-main {
     font-family: 'Sora', sans-serif;
     font-weight: 800;
-    font-size: 38px;
+    font-size: 48px;
     letter-spacing: -0.5px;
-    color: var(--title);
+    color: #2d2b63;
 }
 .app-title-sub {
     font-family: 'Space Grotesk', monospace;
@@ -229,10 +234,10 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     font-size: 12px;
     letter-spacing: 3.5px;
     color: var(--muted);
-    margin-top: 4px;
     text-transform: uppercase;
 }
-@media (max-width: 850px) { .app-title-main { font-size: 26px; } .app-title-icon { width: 32px; height: 32px; } .header { gap: 20px; } }
+#exam-year-select { font-size: 13px !important; padding: 4px 6px !important; }
+@media (max-width: 850px) { .app-title-main { font-size: 30px; } .app-title-icon { width: 36px; height: 36px; } .header { gap: 20px; } .app-title-text { flex-wrap: wrap; } }
 
 .countdown-chip {
     background: var(--bg);

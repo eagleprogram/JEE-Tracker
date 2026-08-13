@@ -281,6 +281,26 @@ export function guestReminderSignInClicked() {
 }
 
 export function maybeShowGuestSignInReminder() {
+    // BUG FIX: this periodic (post-boot) check runs on its own setTimeout
+    // from firebase-sync.js (onAuthStateChanged's signed-out branch, ~1.5s
+    // after boot) completely independently of runBootSignInGate() in this
+    // same file, which ALSO shows this exact modal (and calls
+    // lockBodyScroll()) immediately at boot. If that 1.5s timer fires while
+    // the boot-gate modal is still up — e.g. the user hasn't clicked
+    // anything yet, or clicks "Remind Later" right around the 1.5s mark —
+    // this function had no way of knowing the modal was already open, so it
+    // showed it "again" (a no-op visually) but still called lockBodyScroll()
+    // a SECOND time, incrementing the shared ref-count to 2. The single
+    // "Remind Later"/"Ignore" click that followed only ever unlocks once,
+    // so the count got stuck at 1 — overflow stayed "hidden" and the body
+    // stayed position:fixed forever, which is exactly the reported "scroll
+    // bar disappears and the page won't scroll until I refresh" bug. Bailing
+    // out here whenever the boot gate already owns the modal (or the modal
+    // is somehow already visible from a prior call) keeps every show/lock
+    // paired with exactly one hide/unlock.
+    if (bootGateActive) return;
+    let existingModal = document.getElementById("guest-reminder-modal");
+    if (existingModal && existingModal.style.display === "flex") return;
     if (getRawFlag(GUEST_REMINDER_IGNORED_DATE_KEY) === getTodayKey()) return;
     let snoozeUntil = parseInt(getRawFlag(GUEST_REMINDER_SNOOZE_KEY) || "0", 10);
     let remaining = snoozeUntil - Date.now();
