@@ -128,14 +128,19 @@ export function renderHeatmap() {
     // 10h+ cyan — #00b3c0 sits exactly halfway between #008080 and #00e5ff —
     // so brightness now climbs smoothly: 3-6h (dim teal) -> 6-10h (muted
     // cyan) -> 10h+ (full-bright cyan), with 10h+ still the clear peak.
-    // BUG FIX: 3-6h/6-10h/10h+ (#008080 -> #00b3c0 -> #00e5ff) all stayed in
-    // the same narrow teal-cyan brightness band, so those top three buckets
-    // were hard to tell apart at a glance even though 0h -> 0-3h -> 3-6h
-    // already read clearly. Kept the bottom two untouched and respaced the
-    // top three across a much wider lightness range (dim teal -> saturated
-    // cyan -> near-white cyan) so each step up is now clearly brighter than
-    // the last, all the way to the 10h+ peak.
-    const hmColors = ["#2b3852", "#0c3448", "#0f766e", "#06b6d4", "#a5f3fc"];
+    // FOLLOW-UP FIX: widening the gaps within the same teal/cyan hue (the
+    // previous fix here) still wasn't enough — a single-hue ramp is
+    // inherently hard to split into 5 confident buckets at a 13px square,
+    // no matter how far apart the lightness values are; the eye reads hue
+    // far more reliably than fine brightness gradations at that size.
+    // Switched to a genuine multi-hue scale instead, reusing the app's own
+    // existing --tint-sky/emerald/amber/rose colors (variables.css — same
+    // ones already used for buttons elsewhere) so 0-3h/3-6h/6-10h/10h+ are
+    // each a completely different color (blue -> green -> amber -> rose),
+    // not just a different brightness of one color. 0h stays the same
+    // neutral dark slate it always was ("no activity" reads as "off", not
+    // as another color on the scale).
+    const hmColors = ["#2b3852", "#38bdf8", "#34d399", "#f59e0b", "#f43f5e"];
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
             if (day.date > today) return;

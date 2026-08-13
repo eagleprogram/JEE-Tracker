@@ -168,6 +168,12 @@ select.typeahead-jump { border-color: var(--primary); box-shadow: 0 0 0 2px rgba
 .date-picker-btn:hover { opacity: 0.85; }
 input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
 input[type="date"] { color-scheme: dark; }
+/* BUG FIX: input[type="time"] never got this rule, so every native time
+   picker in the app (missed-break start/end, wake/sleep time, the four
+   notification-reminder time fields) popped up in the browser's default
+   light-grey styling instead of matching the dark theme every date-picker
+   already uses. */
+input[type="time"] { color-scheme: dark; }
 input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor: not-allowed; }
 .field-note { font-size: 11px; color: var(--warning); margin-top: 6px; }
 

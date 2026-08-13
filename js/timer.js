@@ -23,7 +23,6 @@ window.addEventListener("beforeunload", (e) => {
         return e.returnValue;
     }
 });
-let segmentStartPerf = 0;
 let segmentStartWallMs = 0;
 let segmentElapsedMs = 0;
 // BUG FIX: this used to be sessionStudyMs, a raw-millisecond accumulator
@@ -103,7 +102,6 @@ export function getSegmentElapsedMs() { return segmentElapsedMs; }
 export function resetOpenEntryRefs() { openEntryRefs = {}; }
 
 export function startSegment() {
-    segmentStartPerf = performance.now();
     segmentStartWallMs = Date.now();
     segmentElapsedMs = 0;
     refreshCachedTodayDay();
@@ -115,7 +113,7 @@ export function commitActiveSegment() {
     // "PAUSED" or "IDLE". takeBreak() is reachable directly from PAUSED (the
     // Break button stays visible while paused — see index.html), and it
     // calls commitActiveSegment() before switching state to BREAK. Because
-    // pauseStudy() never resets segmentStartPerf, that stale call computed
+    // pauseStudy() never resets segmentStartWallMs, that stale call computed
     // elapsed time going all the way back to the ORIGINAL study start (study
     // time + the entire paused gap), not just the pause duration. The state
     // check below correctly stopped that bogus total from being written to
@@ -126,8 +124,25 @@ export function commitActiveSegment() {
     // whenever we're not actually STUDYING or on a BREAK stops that leak at
     // the source, and also skips a wasted loop + saveDB() call.
     if (timerState !== "STUDYING" && timerState !== "BREAK") return;
-    let nowPerf = performance.now();
-    segmentElapsedMs = nowPerf - segmentStartPerf;
+    // BUG FIX: this used to be `performance.now() - segmentStartPerf`.
+    // performance.now() is a MONOTONIC clock, and on several real-device
+    // scenarios that matter a lot for a study timer — phone screen locks
+    // and the OS actually suspends the browser process, laptop lid closed,
+    // a backgrounded mobile tab getting frozen for an extended stretch —
+    // that monotonic clock does not reliably keep advancing through the
+    // suspend the way a plain wall clock does. The practical symptom
+    // reported: leave the tab running in the background (switch tabs,
+    // watch a lecture elsewhere, lock the phone) and come back to a
+    // session/break timer that under-counted the real elapsed time, or a
+    // display that looked "stuck"/laggy catching up. Date.now() is tied to
+    // the system wall clock, not a suspendable monotonic counter, so a
+    // diff against it always reflects the true real-world elapsed time
+    // regardless of what the JS engine itself was doing (or not doing) in
+    // between — exactly the same reasoning wallStart/wallEnd below already
+    // relied on Date.now() for; this just makes the duration itself use
+    // the same clock instead of mixing two different ones.
+    let nowWallMs = Date.now();
+    segmentElapsedMs = nowWallMs - segmentStartWallMs;
     if (segmentElapsedMs <= 0) return;
     let wallStart = segmentStartWallMs;
     let wallEnd = wallStart + segmentElapsedMs;
@@ -291,7 +306,8 @@ export function endDay() {
 }
 
 export function tick() {
-    segmentElapsedMs = performance.now() - segmentStartPerf;
+    // Same wall-clock fix as commitActiveSegment() above — see its comment.
+    segmentElapsedMs = Date.now() - segmentStartWallMs;
     if (timerState === "STUDYING") document.getElementById("session-timer").innerText = formatHMS(sessionStudySec * 1000 + segmentElapsedMs);
     else if (timerState === "BREAK") document.getElementById("session-timer").innerText = formatHMS(segmentElapsedMs);
     updateLiveSummaryFast();
@@ -349,7 +365,7 @@ export function updateUIState() {
     } else {
         badge.className = "badge badge-idle"; badge.innerText = `STATUS: IDLE`;
         sessionLabel.innerText = "CURRENT SESSION";
-        btnStart.innerText = "Start"; btnStart.style.display = "inline-block"; btnPause.style.display = "none"; btnBreak.style.display = "none"; btnStop.style.display = "none"; changeSub.style.display = "none";
+        btnStart.innerText = "Start"; btnStart.style.display = "inline-block"; btnPause.style.display = "none"; btnBreak.style.display = "inline-block"; btnStop.style.display = "none"; changeSub.style.display = "none";
     }
 }
 
@@ -372,7 +388,7 @@ export function updateLiveSummary() {
 
 document.addEventListener("visibilitychange", () => { if (document.hidden) flushAndRestartSegment(); });
 // BUG FIX: was `commitActiveSegment()` — commits the segment but never
-// restarts it (segmentStartPerf stays at its old value). pagehide fires on
+// restarts it (segmentStartWallMs stays at its old value). pagehide fires on
 // real navigation/close (harmless either way, nothing runs after), but also
 // fires in cases where the page context survives (e.g. bfcache) — if the
 // user comes back to that same still-running tab, the next commit would
@@ -382,6 +398,30 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) flush
 // whether or not the page actually unloads. It also already guards for
 // STUDYING/BREAK, so this is a strict improvement with no downside.
 window.addEventListener("pagehide", () => { flushAndRestartSegment(); });
+
+// BUG FIX: requestAnimationFrame callbacks stop being invoked at all while
+// a tab is hidden (not just throttled — genuinely paused), and on top of
+// that, Chrome/most browsers "freeze" an entire background tab (no timers
+// of any kind run) after it's stayed hidden for a few minutes. Previously
+// the on-screen timer just silently sat frozen until the next time the
+// browser itself got around to resuming the rAF loop, which could visibly
+// lag behind for a moment after switching back — reported as "timer
+// latency"/the number looking wrong right after reopening the tab. This
+// forces an immediate, one-off resync the INSTANT the tab becomes visible
+// again: cancel whatever (possibly very stale) frame was still pending,
+// then call tick() directly so the display jumps straight to the correct
+// wall-clock-computed value on this very frame instead of waiting for the
+// browser to get around to it. cancelAnimationFrame() first is required,
+// not optional — without it this and the browser's own eventually-resumed
+// frame would both be running tick()'s self-rescheduling loop at once,
+// doubling (then quadrupling, ad infinitum) the update rate every time the
+// tab was hidden and shown again.
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && (timerState === "STUDYING" || timerState === "BREAK")) {
+        cancelAnimationFrame(animFrame);
+        tick();
+    }
+});
 
 // ----------------- SCREEN WAKE LOCK -----------------
 // Keeps the display from auto-locking while a study/break session is

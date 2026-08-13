@@ -161,18 +161,47 @@ export function addMissedBreak() {
 
     let [sh, sm] = start.split(":").map(Number);
     let [eh, em] = end.split(":").map(Number);
-    let durationSec = ((eh * 60 + em) - (sh * 60 + sm)) * 60;
+    let newStartMin = sh * 60 + sm, newEndMin = eh * 60 + em;
+    let durationSec = (newEndMin - newStartMin) * 60;
     if (durationSec <= 0) { alert("End time must be after start time."); return; }
 
     let db = getDB();
     if (!db[dt]) db[dt] = blankDay();
     let day = ensureDayShape(db[dt]);
 
+    // BUG FIX: nothing here checked the new [start,end) range against breaks
+    // already logged for the same day, so e.g. a 10:00-12:00 break followed
+    // by an 11:00-12:00 break for the same day were both silently accepted,
+    // double-counting 60 minutes into totalBreak. Every existing break entry
+    // is now converted to its own [start,end) window and checked for overlap
+    // before the new one is allowed to save.
+    //
+    // Interval reconstruction has to handle two different stamp conventions
+    // that already coexist in this same day.breaks array: a live timer break
+    // (committed by timer.js's commitActiveSegment) stamps the time it
+    // ENDED, so its window is [time-duration, time); a manually-added missed
+    // break (this function) stamps the time it STARTED — see the comment
+    // below — so its window is [time, time+duration). The `manual` flag
+    // added below is how a future check tells the two apart; entries saved
+    // before this fix has no flag and are treated as the (older, still
+    // correct for them) end-stamped case.
+    let newDayEntries = day.breaks || [];
+    let overlap = newDayEntries.find((b) => {
+        let t = timeToMinutes(b.time);
+        let existingStart = b.manual ? t : t - Math.round(b.duration / 60);
+        let existingEnd = b.manual ? t + Math.round(b.duration / 60) : t;
+        return newStartMin < existingEnd && existingStart < newEndMin;
+    });
+    if (overlap) {
+        alert(`That overlaps an existing break — "${overlap.reason}" (${formatTime12Hour(overlap.time)}, ${formatReadable(overlap.duration)}). Adjust the time range or delete the existing entry first.`);
+        return;
+    }
+
     // Stamp with the START time (unlike the timer's own live break commits,
     // which stamp the end) — for a break you're logging after the fact,
     // "started at X" is what you actually remember and want listed.
     let stamp = new Date(2000, 0, 1, sh, sm).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    day.breaks.push({ id: generateId(), time: stamp, reason, duration: durationSec });
+    day.breaks.push({ id: generateId(), time: stamp, reason, duration: durationSec, manual: true });
     day.totalBreak += durationSec;
     saveDB(db);
 
