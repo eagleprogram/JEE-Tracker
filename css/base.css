@@ -265,3 +265,24 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 /* ===== Two-column page grid ===== */
 .grid-2 { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; }
 @media (max-width: 850px) { .grid-2 { grid-template-columns: 1fr; } .header { flex-direction: column; align-items: stretch; } }
+
+/* BUG FIX: body.zen-mode .timer-card (components.css) switches the timer
+   card to `position: fixed` the instant zen mode turns on. That takes it
+   out of grid flow immediately (no transition can smooth this — an element
+   is either in flow or it isn't), which frees up column 1 of .grid-2 for a
+   split second before the #zen-backdrop finishes fading to fully opaque.
+   CSS grid auto-placement reacts to that instantly by pulling the very next
+   item — #live-summary-card, with the subject-wise timers and total study
+   time — into the now-empty column 1. That's the flash the user is
+   reporting: the summary panel visibly snapping to the left, briefly
+   visible through the still-fading backdrop, every time Zen Mode/Start is
+   pressed. Pinning this card to column 2 explicitly means it can never
+   auto-flow into column 1 no matter what its sibling is doing, so there is
+   nothing left to reflow while zen mode's backdrop and card transition. */
+#live-summary-card { grid-column: 2; }
+@media (max-width: 850px) {
+    /* Below the breakpoint .grid-2 collapses to a single column — pinning
+       this to column 2 here would leave it invisible off to the side, so
+       let it fall back to normal (only) column placement. */
+    #live-summary-card { grid-column: 1; }
+}
