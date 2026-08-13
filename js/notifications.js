@@ -155,10 +155,15 @@ let isAlarmActive = false;
 // line, so "Break check-in — You've been on break 47+ min" (etc.) is
 // visible the instant the modal appears, not just buried in the toast that
 // may have already faded by the time you look up.
+// BUG FIX: the modal already shows one large 64px 🔔 above the title (see
+// the alarm-modal markup in index.html), but this function was ALSO
+// prefixing a small 🔔 onto the title text itself — so every reminder
+// ("Revision reminder", etc.) rendered with two bells stacked on top of
+// each other. The big icon is the only bell now; the title is plain text.
 function setAlarmModalText(title, body) {
     let titleEl = document.getElementById("alarm-modal-title");
     let reasonEl = document.getElementById("alarm-modal-reason");
-    if (titleEl) titleEl.innerText = title ? `🔔 ${title}` : "🔔 ALARM RINGING!";
+    if (titleEl) titleEl.innerText = title || "ALARM RINGING!";
     if (reasonEl) reasonEl.innerText = body || "A critical notification requires your attention.";
 }
 

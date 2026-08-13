@@ -123,19 +123,17 @@ export function renderHeatmap() {
     // one hue (blue, matching --primary/--tint-sky used everywhere else in
     // the app) with 5 brightness/saturation steps.
     //
-    // FOLLOW-UP FIX: 0h's original color (#1c2537) was so close to the
-    // page background that, combined with the cell stroke, every empty day
-    // rendered as a near-invisible hollow outline instead of a filled tile
-    // — reported as "outlines" vs. the desired solid filled-square look.
-    // Bucket 0 is now a clearly visible solid slate (still the dimmest
-    // step, so the "more hours = more intense" hierarchy is untouched —
-    // every bucket above it is still strictly brighter/more saturated),
-    // and the stroke is now a subtle LIGHTENED sibling of each cell's own
-    // fill instead of one fixed contrasting grey — so it reads as a soft
-    // tile edge on every cell, not as an outline that only shows up on the
-    // (previously near-invisible) empty ones.
-    const hmColors = ["#13192b", "#1d2863", "#39479a", "#5b6bc1", "#7e89d8"];
-    const hmStrokes = ["#232b47", "#2c3a82", "#4a5bb8", "#6f7ed4", "#98a2e6"];
+    // FOLLOW-UP FIX #2: the previous "fix" (#13192b) was STILL basically
+    // the same near-invisible navy as the page background (--bg), so with
+    // most days at 0h (a fresh tracker, or just days you haven't logged
+    // yet), the whole grid still read as empty hollow outlines rather than
+    // filled squares. Bucket 0 is now a clearly visible solid slate-blue
+    // (#33415c) that reads as an actual filled tile against the dark
+    // background — still the dimmest step (every bucket above it is
+    // strictly brighter/more saturated, so "more hours = more intense" is
+    // untouched), just no longer camouflaged into the page itself.
+    const hmColors = ["#33415c", "#3d4f82", "#4a5da0", "#5b70c0", "#7e89d8"];
+    const hmStrokes = ["#4b5b7f", "#5566a8", "#6272c0", "#7484d4", "#98a2e6"];
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
             if (day.date > today) return;

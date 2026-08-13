@@ -216,7 +216,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    select used to be stacked in their own column below the title row. Now
    laid out as a single inline row — label first, select right next to it —
    to match the requested header layout. */
-.app-title-text { display: flex; flex-direction: row; align-items: center; gap: 8px; line-height: 1.05; }
+.app-title-text { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px; line-height: 1.05; }
 /* Single, solid title color instead of the old lighter blue-purple — set
    directly here (not via the shared --title variable) so it doesn't also
    darken the unrelated account/guest person-icon mask that also reads
@@ -235,9 +235,25 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     letter-spacing: 3.5px;
     color: var(--muted);
     text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
-#exam-year-select { font-size: 13px !important; padding: 4px 6px !important; }
-@media (max-width: 850px) { .app-title-main { font-size: 30px; } .app-title-icon { width: 36px; height: 36px; } .header { gap: 20px; } .app-title-text { flex-wrap: wrap; } }
+/* BUG FIX (header layout): the generic `select { width: 100% }` rule
+   (components.css) was winning here, so the exam-year dropdown tried to
+   stretch to the full width of its flex container (.app-title-text) —
+   the same row "Study Tracker" sits in. With both flex items fighting for
+   space and .app-title-sub free to wrap, the browser wrapped "STUDY
+   TRACKER" onto two lines instead of shrinking the select, and the select
+   itself rendered oversized. The select now sizes to its own content
+   (auto width, flex 0 0 auto, compact padding) so it sits right next to
+   "STUDY TRACKER" on one line, matching the intended layout. */
+#exam-year-select {
+    font-size: 13px !important;
+    padding: 4px 22px 4px 8px !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+}
+@media (max-width: 850px) { .app-title-main { font-size: 30px; } .app-title-icon { width: 36px; height: 36px; } .header { gap: 20px; } }
 
 .countdown-chip {
     background: var(--bg);

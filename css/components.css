@@ -126,11 +126,25 @@ button.btn { padding: 12px 20px; font-size: 14px; font-weight: 700; border-radiu
 .btn-compact { flex: 0 0 auto; padding: 7px 7px; font-size: 11px; letter-spacing: -0.2px; white-space: nowrap; }
 
 /* ===== Single-line button rows (no wrapping to a 2nd row) ===== */
+/* BUG FIX (hover outline getting clipped/"underlapping"): per the CSS
+   overflow spec, setting overflow-x to a non-visible value (auto, here)
+   while overflow-y is left at its 'visible' default forces the browser to
+   silently compute overflow-y as 'auto' too — you cannot have scroll-x
+   without also getting clip-y. Every .btn in this row lifts 1px on hover
+   (.btn:hover { transform: translateY(-1px) }), and with zero padding-top
+   that 1px of upward movement had nowhere to go: it got clipped by the
+   row's own top edge, so the top of the border/rounded corner visually
+   vanished — looking like the button's outline had sunk "underneath"
+   whatever sits above the row. Adding matching top/bottom padding gives
+   the hover-lift room to live inside the padding box (the actual clip
+   boundary for 'auto'), so nothing gets cut off, while horizontal
+   scrolling still works exactly as before. */
 .btn-row-nowrap {
     display: flex;
     flex-wrap: nowrap;
     gap: 6px;
     overflow-x: auto;
+    padding-top: 4px;
     padding-bottom: 4px;
     scrollbar-width: thin;
     scrollbar-color: var(--border) var(--bg);
