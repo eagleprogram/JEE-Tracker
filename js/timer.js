@@ -1,4 +1,4 @@
-import { formatHMS, formatReadable, dateKeyFromWall, getTodayKey, generateId } from './utils.js';
+import { formatHMS, formatReadable, dateKeyFromWall, getTodayKey, generateId, stampTime12Hour } from './utils.js';
 import { getDB, saveDB, blankDay, ensureDayShape, initToday, saveActiveSessionRaw, readActiveSessionRaw, clearActiveSessionRaw, getRawFlag, setRawFlag, clearRawFlag, getTabId } from './storage.js';
 // Forward references to modules landing in later steps — safe because these
 // are only invoked inside function bodies, after the full module graph
@@ -235,24 +235,7 @@ export function commitActiveSegment() {
             if (!db[dayKey]) db[dayKey] = blankDay();
             let day = ensureDayShape(db[dayKey]);
             let refKey = `${currentSegmentId}:${dayKey}:${timerState}`;
-            // BUG FIX: this used to stamp with chunkEnd (the wall-clock time
-            // this *commit* happened to run at — autosave fires every 20s,
-            // plus on every pause/break/subject-switch) and, worse,
-            // re-wrote `existing.time = stamp` on every single continuation
-            // commit for the same open entry. So a session you actually
-            // started at 4:00 PM would keep sliding its displayed "started
-            // at" time forward — 4:00:20, 4:00:40, ... — landing on
-            // whatever moment you happened to end/switch it (e.g. 4:20 PM),
-            // not when you actually clicked Start/Break. Reported as: log
-            // list shows the break/session's END time instead of the time
-            // the user actually pressed the button.
-            // Fix: compute the START-of-chunk stamp (cursor, not chunkEnd)
-            // and only ever set `time` once, when the entry is first
-            // created — later commits extend `duration` but leave the
-            // original start stamp untouched, same convention
-            // addMissedBreak() in history.js already uses for manual
-            // entries.
-            let startStamp = new Date(cursor).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            let stamp = stampTime12Hour(new Date(chunkEnd));
             if (timerState === "STUDYING") {
                 day.subjects[activeSubject] = (day.subjects[activeSubject] || 0) + chunkSec;
                 day.totalStudy += chunkSec;
@@ -261,8 +244,9 @@ export function commitActiveSegment() {
                 let existing = ref ? day.studySessions.find(s => s.id === ref.id) : null;
                 if (existing && existing.subject === activeSubject) {
                     existing.duration += chunkSec;
+                    existing.time = stamp;
                 } else {
-                    let newEntry = { id: generateId(), time: startStamp, subject: activeSubject, duration: chunkSec };
+                    let newEntry = { id: generateId(), time: stamp, subject: activeSubject, duration: chunkSec };
                     day.studySessions.push(newEntry);
                     openEntryRefs[refKey] = { id: newEntry.id };
                 }
@@ -272,8 +256,9 @@ export function commitActiveSegment() {
                 let existing = ref ? day.breaks.find(b => b.id === ref.id) : null;
                 if (existing) {
                     existing.duration += chunkSec;
+                    existing.time = stamp;
                 } else {
-                    let newEntry = { id: generateId(), time: startStamp, reason: activeBreakReason, duration: chunkSec };
+                    let newEntry = { id: generateId(), time: stamp, reason: activeBreakReason, duration: chunkSec };
                     day.breaks.push(newEntry);
                     openEntryRefs[refKey] = { id: newEntry.id };
                 }

@@ -1,4 +1,4 @@
-import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml, formatDateDDMMYYYY, generateId } from './utils.js';
+import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml, formatDateDDMMYYYY, generateId, stampTime12Hour } from './utils.js';
 import { getDB, saveDB, ensureDayShape, blankDay, getSleepLog } from './storage.js';
 import { updateLiveSummary, resetOpenEntryRefs } from './timer.js';
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
@@ -200,7 +200,7 @@ export function addMissedBreak() {
     // Stamp with the START time (unlike the timer's own live break commits,
     // which stamp the end) — for a break you're logging after the fact,
     // "started at X" is what you actually remember and want listed.
-    let stamp = new Date(2000, 0, 1, sh, sm).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let stamp = stampTime12Hour(new Date(2000, 0, 1, sh, sm));
     day.breaks.push({ id: generateId(), time: stamp, reason, duration: durationSec, manual: true });
     day.totalBreak += durationSec;
     saveDB(db);

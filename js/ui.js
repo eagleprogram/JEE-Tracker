@@ -134,48 +134,56 @@ export async function deleteCookiesAndReload() {
 // gets cleared once every locker has released it (the 1→0 transition) —
 // so a leftover Zen Mode lock survives an alarm's dismissal, and a
 // dashboard with no overlay open is never left stuck non-scrollable.
-// BUG FIX: plain `body.style.overflow = "hidden"` has two problems that
-// together caused the visible "page jumps down, then snaps back to the
-// top" glitch reported on the Zen Mode toggle. (1) In standards-mode
-// documents the actual scrolling element is usually <html>, not <body> —
-// setting overflow:hidden on body alone doesn't reliably stop the
-// viewport from scrolling. (2) Zen Mode's own CSS pulls .timer-card out
-// of normal flow (`position: fixed`) the instant body.zen-mode is added,
-// which shrinks the in-flow document height right as the lock engages;
-// the browser then has to clamp/re-flow the current scroll position to
-// fit the new (shorter) layout, which is exactly the jump that was
-// visible before snapping back once the transition settled. Pinning
-// <body> to a fixed offset equal to the scroll position at lock-time
-// (the standard "freeze the viewport" pattern) makes the page visually
-// immovable for the entire duration of the lock regardless of how much
-// the underlying layout height changes underneath it, and restoring the
-// exact saved scrollY on unlock guarantees the page lands back exactly
-// where it was — no jump in either direction.
+// BUG FIX: `document.body.style.overflow = "hidden"` alone stops FURTHER
+// scrolling, but it does nothing to freeze the scroll position that's
+// already on screen. The moment Zen Mode's class flips on, `.timer-card`
+// switches to `position: fixed`, which yanks it out of normal document
+// flow instantly — the vertical space it used to occupy in the grid
+// collapses, the page's total content height shrinks, and the browser
+// immediately re-clamps the viewport to fit that new (shorter) height.
+// overflow:hidden does not run before that clamp; it can't, because the
+// clamp isn't a user scroll, it's the browser re-laying-out the same
+// frame. The visible symptom was exactly what got reported: click Zen
+// Mode / Start Study → the page visibly jumps down for a frame → then
+// snaps back up once the fixed/centered card and backdrop finish
+// painting. Same root cause on both, since confirmStartStudy() also
+// calls enterZenMode() (see timer.js).
+//
+// The fix pins the body itself in place instead of merely disabling
+// scroll: on the 0→1 transition, remember the exact current scrollY,
+// then take the body out of flow with `position: fixed; top: -scrollY`.
+// A fixed-position body can't be moved by ANY layout change happening
+// below or around it — there is nothing left for the browser to
+// re-clamp — so the underlying page is now physically incapable of
+// jumping while locked, in either direction. On the 1→0 transition
+// (every locker released), flow is restored and the saved scrollY is
+// re-applied in one step, landing exactly back where the user was with
+// no animation and no snap.
 let scrollLockCount = 0;
 let savedScrollY = 0;
 export function lockBodyScroll() {
-    if (scrollLockCount === 0) {
-        savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        document.documentElement.style.overflow = "hidden";
-        document.body.style.overflow = "hidden";
-        document.body.style.position = "fixed";
-        document.body.style.top = `-${savedScrollY}px`;
-        document.body.style.left = "0";
-        document.body.style.right = "0";
-        document.body.style.width = "100%";
-    }
     scrollLockCount++;
+    if (scrollLockCount === 1) {
+        savedScrollY = window.scrollY || window.pageYOffset || 0;
+        let body = document.body.style;
+        body.position = "fixed";
+        body.top = `-${savedScrollY}px`;
+        body.left = "0";
+        body.right = "0";
+        body.width = "100%";
+        body.overflow = "hidden";
+    }
 }
 export function unlockBodyScroll() {
     scrollLockCount = Math.max(0, scrollLockCount - 1);
     if (scrollLockCount === 0) {
-        document.documentElement.style.overflow = "";
-        document.body.style.overflow = "";
-        document.body.style.position = "";
-        document.body.style.top = "";
-        document.body.style.left = "";
-        document.body.style.right = "";
-        document.body.style.width = "";
+        let body = document.body.style;
+        body.position = "";
+        body.top = "";
+        body.left = "";
+        body.right = "";
+        body.width = "";
+        body.overflow = "";
         window.scrollTo(0, savedScrollY);
     }
 }

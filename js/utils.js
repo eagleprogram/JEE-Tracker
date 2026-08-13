@@ -15,6 +15,33 @@ export function formatReadable(sec) {
     return `${h}h ${m}m ${s}s`;
 }
 
+// BUG FIX: timer.js (live break/session commits) and history.js (manually
+// added "missed" breaks) used to stamp each entry's clock time with
+// `date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})`. That
+// output is entirely at the mercy of the browser/OS locale — it isn't
+// guaranteed to be "H:MM AM/PM" with a plain space. Depending on the
+// device's regional format it can come back as 24-hour ("16:20", no
+// AM/PM at all), or with "am"/"pm" lowercased, or — the one that actually
+// hit here — with a NARROW NO-BREAK SPACE (U+202F) before the AM/PM
+// instead of a normal space, which is what recent Chrome uses for en-IN
+// and several other locales. formatTime12Hour()/timeToMinutes() below
+// both split on a literal " " (U+0020), so that narrow space silently
+// broke the split: the AM/PM half was lost, sorting compared the wrong
+// numbers, and a couple of downstream string-built spots (report/export
+// text that concatenates hour+minute for a compact stamp) ended up
+// gluing the hour and minute digits together with nothing in between —
+// e.g. "4:20 PM" losing its separators and reading as "420".
+// stampTime12Hour() below builds the exact same "HH:MM AM/PM" shape by
+// hand from a Date's local hours/minutes, with a normal ASCII space,
+// zero locale dependency, and guaranteed round-trip through
+// formatTime12Hour()/timeToMinutes() every time.
+export function stampTime12Hour(date) {
+    let h = date.getHours(), m = date.getMinutes();
+    let ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 export function formatTime12Hour(timeStr) {
     if (!timeStr || timeStr === "--:--" || timeStr === "—" || timeStr === "---") return "--:--";
     let h, m;
