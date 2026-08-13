@@ -121,13 +121,21 @@ export function renderHeatmap() {
     // categories, not a single "more = more" scale, which is harder to
     // scan at a glance than one hue getting steadily more intense. Back to
     // one hue (blue, matching --primary/--tint-sky used everywhere else in
-    // the app) with 5 brightness/saturation steps: 0h is a near-background
-    // neutral (reads as "off", not as a color on the scale), then each
-    // bucket gets steadily brighter/more saturated blue up to 10h+ as the
-    // clear, unmistakable peak — same "Less -> More" hierarchy as the
-    // legend, expressed as one consistent color instead of four different
-    // ones.
-    const hmColors = ["#1c2537", "#14456b", "#0d6faf", "#1996e0", "#7dd3fc"];
+    // the app) with 5 brightness/saturation steps.
+    //
+    // FOLLOW-UP FIX: 0h's original color (#1c2537) was so close to the
+    // page background that, combined with the cell stroke, every empty day
+    // rendered as a near-invisible hollow outline instead of a filled tile
+    // — reported as "outlines" vs. the desired solid filled-square look.
+    // Bucket 0 is now a clearly visible solid slate (still the dimmest
+    // step, so the "more hours = more intense" hierarchy is untouched —
+    // every bucket above it is still strictly brighter/more saturated),
+    // and the stroke is now a subtle LIGHTENED sibling of each cell's own
+    // fill instead of one fixed contrasting grey — so it reads as a soft
+    // tile edge on every cell, not as an outline that only shows up on the
+    // (previously near-invisible) empty ones.
+    const hmColors = ["#33415c", "#2c5d8f", "#1f7ec2", "#1996e0", "#7dd3fc"];
+    const hmStrokes = ["#425374", "#3d75ab", "#3897d6", "#3fabe8", "#a8e2ff"];
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
             if (day.date > today) return;
@@ -136,7 +144,7 @@ export function renderHeatmap() {
             // color is only reached at the actual goal (10h+), not 9h —
             // matches the updated "10h+" legend label in index.html.
             let colorIdx = day.hrs >= 10 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
-            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${hmColors[colorIdx]}" stroke="#374357" stroke-width="1"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
+            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="${hmColors[colorIdx]}" stroke="${hmStrokes[colorIdx]}" stroke-width="1"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
         });
     });
     svg += `</svg>`;

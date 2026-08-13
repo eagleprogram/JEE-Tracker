@@ -4,7 +4,7 @@ import { openMockDB, getAllMockTests, MOCK_STORE } from './storage.js';
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast } from './ui.js';
 
-export const MISTAKE_TAGS = ["Silly mistake", "Concept gap", "Time pressure", "Calculation error", "Misread question", "Not revised", "Panic/anxiety", "Guessed wrong", "Other"];
+export const MISTAKE_TAGS = ["Silly mistake", "Concept gap", "Time pressure", "Calculation error", "Misread question", "Not revised", "Panic/anxiety", "Guessed wrong", "Formula error", "Skipped step", "Overconfidence", "Other"];
 let selectedMistakeTags = [];
 
 export function renderMistakeTagPicker() {
