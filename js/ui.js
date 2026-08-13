@@ -134,14 +134,50 @@ export async function deleteCookiesAndReload() {
 // gets cleared once every locker has released it (the 1→0 transition) —
 // so a leftover Zen Mode lock survives an alarm's dismissal, and a
 // dashboard with no overlay open is never left stuck non-scrollable.
+// BUG FIX: plain `body.style.overflow = "hidden"` has two problems that
+// together caused the visible "page jumps down, then snaps back to the
+// top" glitch reported on the Zen Mode toggle. (1) In standards-mode
+// documents the actual scrolling element is usually <html>, not <body> —
+// setting overflow:hidden on body alone doesn't reliably stop the
+// viewport from scrolling. (2) Zen Mode's own CSS pulls .timer-card out
+// of normal flow (`position: fixed`) the instant body.zen-mode is added,
+// which shrinks the in-flow document height right as the lock engages;
+// the browser then has to clamp/re-flow the current scroll position to
+// fit the new (shorter) layout, which is exactly the jump that was
+// visible before snapping back once the transition settled. Pinning
+// <body> to a fixed offset equal to the scroll position at lock-time
+// (the standard "freeze the viewport" pattern) makes the page visually
+// immovable for the entire duration of the lock regardless of how much
+// the underlying layout height changes underneath it, and restoring the
+// exact saved scrollY on unlock guarantees the page lands back exactly
+// where it was — no jump in either direction.
 let scrollLockCount = 0;
+let savedScrollY = 0;
 export function lockBodyScroll() {
+    if (scrollLockCount === 0) {
+        savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.overflow = "hidden";
+        document.body.style.position = "fixed";
+        document.body.style.top = `-${savedScrollY}px`;
+        document.body.style.left = "0";
+        document.body.style.right = "0";
+        document.body.style.width = "100%";
+    }
     scrollLockCount++;
-    document.body.style.overflow = "hidden";
 }
 export function unlockBodyScroll() {
     scrollLockCount = Math.max(0, scrollLockCount - 1);
-    if (scrollLockCount === 0) document.body.style.overflow = "";
+    if (scrollLockCount === 0) {
+        document.documentElement.style.overflow = "";
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.top = "";
+        document.body.style.left = "";
+        document.body.style.right = "";
+        document.body.style.width = "";
+        window.scrollTo(0, savedScrollY);
+    }
 }
 
 // ----------------- TOASTS -----------------
