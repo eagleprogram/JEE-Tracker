@@ -12,7 +12,7 @@ import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
 // function body (confirmStartStudy/resumeStudy), never at module-evaluation
 // time, so it doesn't matter that ui.js hasn't finished initializing yet
 // when this file is first parsed.
-import { enterZenMode } from './ui.js';
+import { enterZenMode, lockBodyScroll, unlockBodyScroll } from './ui.js';
 
 // ----------------- TIMER ENGINE -----------------
 let timerState = "IDLE";
@@ -214,11 +214,21 @@ export function tryRestoreActiveSession() {
     } else { clearActiveSessionRaw(); }
 }
 
+// BUG FIX: this modal used to just set display:flex with no scroll lock of
+// its own, so the dashboard behind it stayed fully scrollable the whole
+// time it was up — visible as a live scrollbar/scrollable background
+// directly behind the "Select Subject" dialog. It now takes the same
+// shared lockBodyScroll() counter as Zen Mode/the alarm modal/the guest
+// reminder (see ui.js), and confirmStartStudy()/cancelSubjectModal() below
+// each release exactly one lock on their way out — so the background is
+// non-scrollable for the modal's entire time on screen, including the brief
+// window between it closing and Zen Mode (or nothing, on Back) taking over.
 export function openSubjectModal() {
     if (timerState === "PAUSED") { resumeStudy(); return; }
     if (timerState === "BREAK") { commitActiveSegment(); cancelAnimationFrame(animFrame); clearActiveSession(); }
     document.getElementById("modal-subject-select").value = activeSubject;
     document.getElementById("subject-modal").style.display = "flex";
+    lockBodyScroll();
 }
 
 // BUG FIX: the old inline onclick just hid the modal. If openSubjectModal()
@@ -229,6 +239,7 @@ export function openSubjectModal() {
 // segment/tick (mirroring resumeStudy's pattern) before closing the modal.
 export function cancelSubjectModal() {
     document.getElementById("subject-modal").style.display = "none";
+    unlockBodyScroll(); // release the lock openSubjectModal() took — Back never enters Zen Mode
     if (timerState === "BREAK") {
         // NOT currentSegmentId++ — openSubjectModal()'s BREAK branch (above)
         // never incremented it either, so this is still the same real-world
@@ -242,6 +253,7 @@ export function cancelSubjectModal() {
 export function confirmStartStudy() {
     activeSubject = document.getElementById("modal-subject-select").value;
     document.getElementById("subject-modal").style.display = "none";
+    unlockBodyScroll(); // release the modal's own lock — enterZenMode() below takes its own
     timerState = "STUDYING"; currentSegmentId++; startSegment();
     updateUIState(); tick();
     // Fresh study start (main-page Start button, or Resume Study after a

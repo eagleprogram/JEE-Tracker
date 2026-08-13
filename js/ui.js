@@ -187,12 +187,28 @@ const GUEST_REMINDER_SNOOZE_MS = 5 * 60 * 1000;
 // (onAuthStateChanged's signed-in branch calls hideGuestSignInReminder()
 // itself, see firebase-sync.js), "Ignore for Today", or "Remind Later (5
 // min)". Only then does main.js proceed to render/mutate anything.
+//
+// BUG FIX: this used to skip straight past those Ignore/Remind-Later flags
+// entirely and show the modal on every single boot whenever getCurrentUser()
+// was null — including right after the user had just clicked "Ignore for
+// Today" or was still inside a 5-minute snooze window, since neither of
+// those actually signs anyone in. Reported as "every time I refresh, this
+// popup comes back even though I already dismissed it." The periodic
+// post-boot check (maybeShowGuestSignInReminder() below) already respected
+// both flags correctly — this now checks the exact same two before deciding
+// whether to gate the boot sequence at all, so a fresh reload during an
+// active Ignore/snooze window proceeds straight through untouched, same as
+// it would have mid-session. A user who has never dismissed it (or whose
+// snooze/ignore window has lapsed) still gets gated exactly as before.
 let bootGateResolveFn = null;
 let bootGateActive = false;
 
 export function runBootSignInGate() {
     return new Promise((resolve) => {
         if (getCurrentUser()) { resolve(); return; } // already signed in — nothing to gate
+        if (getRawFlag(GUEST_REMINDER_IGNORED_DATE_KEY) === getTodayKey()) { resolve(); return; } // ignored for today
+        let snoozeUntil = parseInt(getRawFlag(GUEST_REMINDER_SNOOZE_KEY) || "0", 10);
+        if (snoozeUntil - Date.now() > 0) { resolve(); return; } // still inside a Remind-Later window
         bootGateActive = true;
         bootGateResolveFn = resolve;
         let modal = document.getElementById("guest-reminder-modal");

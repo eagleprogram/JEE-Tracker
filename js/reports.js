@@ -437,10 +437,12 @@ ctx.textAlign = "left";
     // ---- Study Heatmap (centered in left half) ----
     ctx.fillStyle = "#f1f5f9"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("Study Heatmap", leftHalfCenter, sectionTitleY);
-    // Kept in sync with charts.js's renderHeatmap() — see that file's comment
-    // for why the pale tint sits at index 2 rather than the end: it stops the
-    // "Less -> More" ramp from going bright -> dark -> bright again.
-    const hmColors = ["#2b3852", "#0c3448", "#b2ebf2", "#008080", "#00e5ff"];
+    // Kept in sync with charts.js's renderHeatmap() — this had fallen out of
+    // sync with that file's color-distinguishability fix (still had the old
+    // pale, hard-to-tell-apart top-three colors), so a downloaded/shared
+    // report image looked different from the live in-app heatmap. Same
+    // 5-color array as charts.js now.
+    const hmColors = ["#2b3852", "#0c3448", "#0f766e", "#06b6d4", "#a5f3fc"];
     const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     ctx.fillStyle = "#64748b"; ctx.font = "12px sans-serif";
     for (let j = 0; j < 7; j++) { ctx.fillText(dow[j], heatmapX + 11 + j * (cellSize + cellGap), heatmapDowY); }

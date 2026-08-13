@@ -482,7 +482,14 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mc-entry-meta .mc-entry-num { color: var(--danger); font-weight: 700; }
 .mc-detail input, .mc-detail textarea { margin: 0 0 6px 0; }
 .mc-count-input { width: 100%; }
-.mc-notes { width: 100%; min-height: 80px; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; box-sizing: border-box; font-family: inherit; resize: vertical; overflow-wrap: break-word; word-break: break-word; }
+.mc-notes { width: 100%; min-height: 80px; padding: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; box-sizing: border-box; font-family: inherit; resize: vertical; overflow-wrap: break-word; word-break: break-word; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
+/* BUG FIX: .mc-notes had no scrollbar rules of its own, so once its content
+   grew tall enough to scroll it fell back to the browser's native (thick,
+   unstyled) scrollbar instead of the thin themed one every other scrollable
+   panel in the app uses (sidebar, syllabus list, todo list, etc. above). */
+.mc-notes::-webkit-scrollbar { width: 6px; }
+.mc-notes::-webkit-scrollbar-track { background: var(--bg); }
+.mc-notes::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 .mc-files-row { display: flex; gap: 8px; align-items: center; }
 .mc-files-row input[type="file"] { flex: 1; font-size: 11px; }
 .mc-file-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
