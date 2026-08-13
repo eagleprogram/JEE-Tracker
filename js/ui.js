@@ -337,11 +337,29 @@ export function guestReminderSnooze() {
 // alters the timer state machine, so Pause/Break/End/switch-subject all
 // keep working completely unmodified inside the enlarged card.
 export function toggleZenMode() {
-    let active = document.body.classList.toggle("zen-mode");
+    // BUG FIX: this used to toggle the "zen-mode" class first and call
+    // lockBodyScroll()/unlockBodyScroll() after. Adding the class is what
+    // collapses .timer-card out of normal flow (see body.zen-mode rules in
+    // components.css), which shrinks the page height and makes the browser
+    // instantly re-clamp scroll position — visible as the page jumping down
+    // then snapping back. lockBodyScroll() exists specifically to pin the
+    // page BEFORE that collapse happens, so it has to run before the class
+    // change, not after. Turning zen mode OFF is the mirror image: the class
+    // has to come off first (restoring full page height) so unlockBodyScroll()
+    // can scroll back to the saved position on a page that's already tall
+    // enough to reach it.
+    let turningOn = !document.body.classList.contains("zen-mode");
     let btn = document.getElementById("zen-toggle-btn");
-    if (btn) btn.title = active ? "Exit Zen Mode" : "Zen Mode — hide distractions and focus on the timer";
-    if (active) lockBodyScroll(); else unlockBodyScroll(); // block background scroll while zen is up
-    showToast(active ? "Zen mode enabled." : "Zen mode disabled.");
+    if (turningOn) {
+        lockBodyScroll();
+        document.body.classList.add("zen-mode");
+        if (btn) btn.title = "Exit Zen Mode";
+    } else {
+        document.body.classList.remove("zen-mode");
+        unlockBodyScroll();
+        if (btn) btn.title = "Zen Mode — hide distractions and focus on the timer";
+    }
+    showToast(turningOn ? "Zen mode enabled." : "Zen mode disabled.");
 }
 
 // Auto-entry helper — called from timer.js whenever a study session actually
@@ -352,8 +370,14 @@ export function toggleZenMode() {
 // while already zen'd in doesn't spam a redundant toast.
 export function enterZenMode() {
     if (document.body.classList.contains("zen-mode")) return;
-    document.body.classList.add("zen-mode");
+    // Same ordering fix as toggleZenMode() above: lock (pin) the page BEFORE
+    // adding the class that collapses .timer-card out of flow, or the page
+    // visibly jumps for a frame first. This is the path the Start/Resume
+    // Study buttons take (see confirmStartStudy()/resumeStudy() in
+    // timer.js), so this one fix covers both the dedicated Zen Mode toggle
+    // and the Start-button jump.
     lockBodyScroll();
+    document.body.classList.add("zen-mode");
     let btn = document.getElementById("zen-toggle-btn");
     if (btn) btn.title = "Exit Zen Mode";
 }
