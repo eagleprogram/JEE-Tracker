@@ -10,13 +10,14 @@ For multi-device users, Firebase Firestore provides effortless, cross-device syn
 
 - **Precision Timer Engine:** Powered by `performance.now()`, handles midnight rollovers, session recovery, and auto-saves every 20 seconds.
 - **Comprehensive Planner:** Includes a daily to-do list, interactive calendar, and task management.
+- **Question Practice Tracker:** Records the approximate number of questions solved each day, automatically prompts after a completed sleep log, and shows a color-coded weekly question ring. The data is included in backups, cloud sync, and reports.
 - **Syllabus Tracker:** 9 custom tags per chapter across Physics, Chemistry, and Mathematics with visual progress bars.
 - **Advanced Analytics:** Visualize your habits with a 12-month study heatmap, weekly subject trend charts, and an interactive tree garden that rewards 10-hour streaks.
 - **Automated A4 Reports:** Generates professional, stylized weekly and monthly PNG reports with automatic email delivery via Cloudflare Worker.
 - **Mock Test & Analysis:** IndexedDB-backed storage for scores, mistake tags (e.g., "Concept gap", "Calculation error"), and file attachments (images/PDFs).
 - **Chapter-Wise Mistakes:** Dedicated mistakes log tied to individual syllabus chapters.
-- **Offline-First PWA:** Service worker caching enables full functionality without an internet connection.
-- **Cross-Device Cloud Sync:** Securely syncs all data (study logs, planner, sleep, syllabus) across devices using Firebase Auth and Firestore.
+- **Offline-First PWA:** Service worker caching enables full functionality without an internet connection, including the question-practice tracker module.
+- **Cross-Device Cloud Sync:** Securely syncs all data (study logs, planner, sleep, syllabus, and question-practice counts) across devices using Firebase Auth and Firestore.
 - **Background Push Reminders:** Optional second delivery channel (Firebase Cloud Messaging + a free GitHub Actions cron job) that delivers reminders/alarms even when the browser is fully closed — see [`PUSH_SETUP.md`](./PUSH_SETUP.md) for the one-time setup.
 
 ---
@@ -63,6 +64,7 @@ JEE-Tracker/
     ├── planner.js            — to-do list + calendar
     ├── history.js            — logs, per-entry delete
     ├── sleep.js               — sleep/wake log
+    ├── questions.js           — daily question count prompt + weekly question-practice ring
     ├── syllabus.js             — chapter-by-chapter syllabus tracker
     ├── mocktest.js              — mock test scores + mistake tags
     ├── mistakes.js               — chapter-wise mistakes tracker

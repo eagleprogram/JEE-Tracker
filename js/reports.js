@@ -309,13 +309,14 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
         // date (same source as Share Log / Download Log); weekly/monthly
         // aggregate a date range exactly as before.
         let db = getDB();
-        let days, totalStudy, totalBreak, aggregateSubjects, canvas, dateRangeLabel;
+        let days, totalStudy, totalBreak, totalQuestions, aggregateSubjects, canvas, dateRangeLabel;
         if (type === 'daily') {
             let dt = document.getElementById("history-picker").value || getTodayKey();
             let day = db[dt] || blankDay();
             ensureDayShape(day);
             totalStudy = day.totalStudy || 0;
             totalBreak = day.totalBreak || 0;
+            totalQuestions = day.questionsSolved || 0;
             aggregateSubjects = { ...day.subjects };
             days = [dt];
             dateRangeLabel = dt;
@@ -324,9 +325,9 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
             let today = new Date(); let range = (type === 'weekly') ? 6 : 29;
             days = [];
             for (let i = range; i >= 0; i--) { let d = new Date(today); d.setDate(today.getDate() - i); days.push(dateKeyFromWall(d.getTime())); }
-            totalStudy = 0; totalBreak = 0;
+            totalStudy = 0; totalBreak = 0; totalQuestions = 0;
             aggregateSubjects = { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Preparation": 0, "Mock Test / Analysis": 0 };
-            days.forEach(key => { let day = db[key]; if (!day) return; ensureDayShape(day); totalStudy += day.totalStudy || 0; totalBreak += day.totalBreak || 0; for (let [cat, sec] of Object.entries(day.subjects)) { aggregateSubjects[cat] = (aggregateSubjects[cat] || 0) + (sec || 0); } });
+            days.forEach(key => { let day = db[key]; if (!day) return; ensureDayShape(day); totalStudy += day.totalStudy || 0; totalBreak += day.totalBreak || 0; totalQuestions += day.questionsSolved || 0; for (let [cat, sec] of Object.entries(day.subjects)) { aggregateSubjects[cat] = (aggregateSubjects[cat] || 0) + (sec || 0); } });
             dateRangeLabel = `${days[0]} → ${days[days.length - 1]}`;
             canvas = buildReportCanvas(days, type === 'weekly' ? 'Weekly Study Report' : 'Monthly Study Report');
         }
@@ -349,6 +350,7 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
                         date_range: dateRangeLabel,
                         total_study: formatReadable(totalStudy),
                         total_break: formatReadable(totalBreak),
+                        total_questions: totalQuestions,
                         streak: computeStreak(db),
                         subject_list_html: subjectHtml,
                         report_image: cleanBase64
@@ -540,7 +542,7 @@ ctx.textAlign = "left";
     // block sits with equal margins left and right, instead of being
     // pinned to the left edge while empty space collects on the right.
     ctx.font = "16px sans-serif";
-    const statusMaxWidth = Math.max(ctx.measureText("Goal Met ✅").width, ctx.measureText("Missed ❌").width);
+    const statusMaxWidth = Math.max(ctx.measureText("✅ Goal Met").width, ctx.measureText("❌ Missed").width);
     const colInnerGap = 112;   // date -> study -> break -> questions spacing within one block
     const queStatusGap = 50;   // questions -> status spacing — deliberately tighter than the rest,
                                 // since "Que" is a short number and doesn't need a full column's worth
@@ -591,7 +593,7 @@ ctx.textAlign = "left";
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
         ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
         ctx.fillStyle = d.study >= 36000 ? "#10b981" : "#ef4444";
-        ctx.fillText(d.study >= 36000 ? "Goal Met ✅" : "Missed ❌", col.status, y);
+        ctx.fillText(d.study >= 36000 ? "✅ Goal Met" : "❌ Missed", col.status, y);
     });
 
     // ---- Footer ----
