@@ -66,8 +66,8 @@
    even though both share .goal-header/.goal-note. Scoped-only overrides
    (rather than editing the shared .goal-header/.goal-note rules, which
    would also shrink the Garden card's spacing) tighten just this card. */
-.q-goal-header { margin-bottom: 2px; }
-.q-goal-note { margin-top: 0; }
+.q-goal-header { margin-bottom: 0; }
+.q-goal-note { margin-top: -4px; }
 /* BUG FIX: .garden-plot.is-today's drop-shadow glow (defined above) wraps
    the WHOLE svg, including the dotted track — so today's ring rendered
    with visibly blurrier, less-defined dots than every other day's ring in

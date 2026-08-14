@@ -541,14 +541,17 @@ ctx.textAlign = "left";
     // pinned to the left edge while empty space collects on the right.
     ctx.font = "16px sans-serif";
     const statusMaxWidth = Math.max(ctx.measureText("✅ Goal Met").width, ctx.measureText("❌ Missed").width);
-    const colInnerGap = 100;   // date -> study -> break -> questions -> status spacing within one block
-    const blockGap = 90;       // gap between the left block and the right block
-    const blockContentWidth = 4 * colInnerGap + statusMaxWidth; // date..status offset + status text width
+    const colInnerGap = 112;   // date -> study -> break -> questions spacing within one block
+    const queStatusGap = 50;   // questions -> status spacing — deliberately tighter than the rest,
+                                // since "Que" is a short number and doesn't need a full column's worth
+                                // of breathing room before "Status" starts.
+    const blockGap = 50;       // gap between the left block and the right block
+    const blockContentWidth = 3 * colInnerGap + queStatusGap + statusMaxWidth; // date..status offset + status text width
     const tableTotalWidth = blockContentWidth * 2 + blockGap;
     const tableLeftMargin = (width - tableTotalWidth) / 2;
 
     const colX = {
-        left: { date: tableLeftMargin, study: tableLeftMargin + colInnerGap, break: tableLeftMargin + 2 * colInnerGap, questions: tableLeftMargin + 3 * colInnerGap, status: tableLeftMargin + 4 * colInnerGap },
+        left: { date: tableLeftMargin, study: tableLeftMargin + colInnerGap, break: tableLeftMargin + 2 * colInnerGap, questions: tableLeftMargin + 3 * colInnerGap, status: tableLeftMargin + 3 * colInnerGap + queStatusGap },
         right: {}
     };
     colX.right = { date: colX.left.date + blockContentWidth + blockGap, study: colX.left.study + blockContentWidth + blockGap, break: colX.left.break + blockContentWidth + blockGap, questions: colX.left.questions + blockContentWidth + blockGap, status: colX.left.status + blockContentWidth + blockGap };

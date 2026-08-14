@@ -380,7 +380,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    flex neighbor pushing against it, giving clean, consistent space between
    the title and the button regardless of title length. */
 .q-modal-content { position: relative; }
-.q-modal-trash-btn { position: absolute; top: 16px; right: 16px; background: rgba(var(--tint-rose), 0.12); border: 1px solid rgba(var(--tint-rose), 0.4); color: rgb(var(--tint-rose)); border-radius: 6px; width: 26px; height: 26px; font-size: 13px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; transition: background 0.2s; }
+.q-modal-trash-btn { position: absolute; top: 23px; right: 6px; background: rgba(var(--tint-rose), 0.12); border: 1px solid rgba(var(--tint-rose), 0.4); color: rgb(var(--tint-rose)); border-radius: 6px; width: 26px; height: 26px; font-size: 13px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; transition: background 0.2s; }
 .q-modal-trash-btn:hover { background: rgba(var(--tint-rose), 0.22); }
 /* Tells the browser to render this input's native controls (including the
    number spinner's up/down arrows) using its dark-mode palette instead of

@@ -123,11 +123,12 @@ function questionRingSVG(count) {
     let pct = Math.min(Math.max(count, 0), 100) / 100;
     let color = questionRingColor(count);
     let dash = circumference * pct;
-    // Round-dot track ring — round stroke-linecap + a dash length near the
-    // stroke width itself makes each dash render as a small circular dot
-    // (rather than the old "2 5" elongated-rectangle dashes, or a plain
-    // solid ring), matching a strictly-dotted look.
-    let track = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="0.1 6.2"/>`;
+    // Thin dashed track ring — a real dash pattern (elongated segments with
+    // a butt linecap, not a near-zero dash length with a round linecap)
+    // rendered at a thinner stroke width and reduced opacity, matching the
+    // subtle, classic dashed-circle look of the reference design (as opposed
+    // to the old bold, fully-opaque round-dot track).
+    let track = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="2.5" stroke-linecap="butt" stroke-dasharray="4 3.5" stroke-opacity="0.55"/>`;
     let arc = color ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" transform="rotate(90 ${cx} ${cy})"/>` : "";
     let label = count > 0 ? count : "0";
     let textColor = color || "var(--muted)";
