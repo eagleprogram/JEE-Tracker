@@ -446,3 +446,107 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
         box-sizing: border-box;
     }
 }
+
+/* ===== Mobile app navigation and compact header =====
+   A desktop-style vertical rail leaves too little usable width on a phone,
+   and a partial-width drawer feels especially awkward in an installed PWA.
+   On touch-sized screens the rail becomes a bottom navigation bar; selecting
+   a tool opens its existing panel as a full-screen sheet. No JavaScript or
+   feature behaviour changes — only the mobile presentation changes. */
+@media (max-width: 850px) {
+    body,
+    body.panel-open {
+        padding-left: 0;
+        padding-bottom: calc(68px + env(safe-area-inset-bottom));
+    }
+
+    .sidebar {
+        top: auto;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: calc(64px + env(safe-area-inset-bottom));
+        padding: 4px 8px env(safe-area-inset-bottom);
+        flex-direction: row;
+        align-items: center;
+        overflow: visible;
+        border-top: 1px solid var(--border);
+        border-right: 0;
+        box-sizing: border-box;
+    }
+
+    .rail-icons {
+        flex: 1;
+        flex-direction: row;
+        justify-content: space-around;
+        gap: 4px;
+        padding: 0;
+    }
+
+    .menu-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 6px 0;
+    }
+
+    .menu-btn .menu-icon { font-size: 19px; width: 24px; height: 24px; }
+    .menu-btn .menu-label { font-size: 8px; }
+
+    .sidebar.expanded {
+        inset: 0;
+        width: 100vw;
+        max-width: none;
+        height: 100dvh;
+        padding: max(12px, env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom));
+        flex-direction: column;
+        align-items: stretch;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .sidebar.expanded .rail-icons {
+        flex: 0 0 auto;
+        flex-direction: row;
+        width: 100%;
+        margin: 0 0 12px;
+        padding: 8px 0 10px;
+    }
+
+    .sidebar.expanded .menu-btn {
+        flex: 1 1 0;
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 2px;
+    }
+
+    .sidebar.expanded .menu-btn .menu-label { font-size: 9px; }
+    .sidebar-content { padding-bottom: 0; }
+
+    .main-wrapper { padding: 12px; }
+    .header { padding: 14px 12px; margin-bottom: 14px; }
+
+    .header-chip-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        gap: 8px;
+    }
+
+    .countdown-chip {
+        min-width: 0;
+        padding: 10px 4px;
+        border-radius: 12px;
+    }
+
+    .countdown-chip .chip-label { font-size: 9px; letter-spacing: 0.25px; }
+    .countdown-chip .chip-days { font-size: 28px; }
+    .countdown-chip .chip-days .chip-days-unit { font-size: 10px; letter-spacing: 0.6px; }
+    .countdown-chip .chip-sub { font-size: 9px; }
+}
+
+@media (max-width: 380px) {
+    .header-chip-row { gap: 5px; }
+    .countdown-chip .chip-label { font-size: 8px; }
+    .countdown-chip .chip-days { font-size: 25px; }
+    .countdown-chip .chip-sub { font-size: 8px; }
+}
