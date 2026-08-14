@@ -593,7 +593,7 @@ ctx.textAlign = "left";
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
         ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
         ctx.fillStyle = d.study >= 36000 ? "#10b981" : "#ef4444";
-        ctx.fillText(d.study >= 36000 ? "✅ Goal Met" : "❌ Missed", col.status, y);
+        ctx.fillText(d.study >= 36000 ? "Goal Met ✅" : "Missed ❌", col.status, y);
     });
 
     // ---- Footer ----
