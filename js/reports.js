@@ -380,12 +380,16 @@ function buildReportCanvas(days, title) {
     const heatmapX = leftHalfCenter - heatmapWidth / 2;        // centered in left half
     const heatmapRows = Math.ceil(Math.min(dayData.length, 35) / 7);
     const heatmapBottomY = heatmapGridStartY + heatmapRows * (cellSize + cellGap);
+    // Color-key row (study-hours buckets) drawn just under the heatmap grid,
+    // so a shared/downloaded report is self-explanatory without the live app.
+    const heatmapLegendY = heatmapBottomY + 26;
+    const heatmapLegendBottomY = heatmapLegendY + 16;
 
     const pieCx = rightHalfCenter, pieRadius = 100;            // centered in right half
     const pieCy = sectionTitleY + 40 + pieRadius;
     const pieBottomY = pieCy + pieRadius;
 
-    const tableTitleY = Math.max(heatmapBottomY, pieBottomY) + 70;
+    const tableTitleY = Math.max(heatmapLegendBottomY, pieBottomY) + 55;
     const tableHeaderY = tableTitleY + 45;
     const tableDividerY = tableHeaderY + 15;
     const tableFirstRowY = tableDividerY + 30;
@@ -461,6 +465,29 @@ ctx.textAlign = "left";
         ctx.fillStyle = hmColors[colorIdx]; ctx.fillRect(x, y, cellSize, cellSize);
         ctx.strokeStyle = hmStrokes[colorIdx]; ctx.strokeRect(x, y, cellSize, cellSize);
     });
+
+    // ---- Heatmap color key (0h / 0–3h / 3–6h / 6–10h / 10h+) ----
+    // Centered as one block under the heatmap so it reads as a caption,
+    // not a separate section — same bucket thresholds as the coloring loop
+    // just above (hrs>0 / >3 / >6 / >=10).
+    const legendLabels = ["0h", "0–3h", "3–6h", "6–10h", "10h+"];
+    const legendSwatch = 12, legendSwatchGap = 5, legendItemGap = 13;
+    ctx.font = "12px sans-serif";
+    const legendItemWidths = legendLabels.map(l => legendSwatch + legendSwatchGap + ctx.measureText(l).width);
+    const legendTotalWidth = legendItemWidths.reduce((a, b) => a + b, 0) + legendItemGap * (legendLabels.length - 1);
+    let legendX = leftHalfCenter - legendTotalWidth / 2;
+    ctx.textBaseline = "middle";
+    legendLabels.forEach((label, idx) => {
+        ctx.fillStyle = hmColors[idx];
+        ctx.fillRect(legendX, heatmapLegendY - legendSwatch / 2, legendSwatch, legendSwatch);
+        ctx.strokeStyle = hmStrokes[idx];
+        ctx.strokeRect(legendX, heatmapLegendY - legendSwatch / 2, legendSwatch, legendSwatch);
+        ctx.fillStyle = "#94a3b8";
+        ctx.textAlign = "left";
+        ctx.fillText(label, legendX + legendSwatch + legendSwatchGap, heatmapLegendY + 1);
+        legendX += legendItemWidths[idx] + legendItemGap;
+    });
+    ctx.textBaseline = "alphabetic";
 
     // ---- Subject Breakdown pie (centered in right half) ----
     ctx.fillStyle = "#f1f5f9"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center";

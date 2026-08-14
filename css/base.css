@@ -214,7 +214,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     gap: 20px;
     background: var(--card);
     border: 1px solid var(--border);
-    padding: 16px 26px;
+    padding: 18px 30px;
     border-radius: 12px;
     margin-bottom: 20px;
 }
@@ -223,10 +223,17 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    (.app-title-row), with align-items:center on that row — this centers the
    icon exactly against the cap-height of the "J", rather than against the
    whole title+subtitle block. The subtitle/select row (.app-title-text)
-   sits below that, in normal document flow. */
-.app-title-wrap { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+   sits below that, in normal document flow.
+   BUG FIX (header restyle, round 5): title block was flush against the
+   card's left padding edge with no breathing room of its own, and the
+   icon/title/chips all sat at a "compact" size that left large dead space
+   on the right of the chip row. margin-left gives the title block its own
+   left inset (independent of .header's padding, which the chip row also
+   shares), and the icon/title/chip sizes below are scaled up ~20% so the
+   two groups fill the row the way the approved mockup shows. */
+.app-title-wrap { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; margin-left: 34px; }
 .app-title-row { display: flex; align-items: center; gap: 8px; }
-.app-title-icon { width: 46px; height: 46px; flex-shrink: 0; object-fit: contain; }
+.app-title-icon { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; }
 /* BUG FIX (header restyle): the subtitle ("STUDY TRACKER") and the exam-year
    select used to be stacked in their own column below the title row. Now
    laid out as a single inline row — label first, select right next to it —
@@ -250,7 +257,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 .app-title-main {
     font-family: 'Sora', sans-serif;
     font-weight: 800;
-    font-size: 38px;
+    font-size: 46px;
     letter-spacing: -0.5px;
     color: #2d2b63;
     white-space: nowrap;
@@ -258,8 +265,8 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 .app-title-sub {
     font-family: 'Space Grotesk', monospace;
     font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 3.5px;
+    font-size: 14px;
+    letter-spacing: 4px;
     color: var(--muted);
     text-transform: uppercase;
     white-space: nowrap;
@@ -275,8 +282,8 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    (auto width, flex 0 0 auto, compact padding) so it sits right next to
    "STUDY TRACKER" on one line, matching the intended layout. */
 #exam-year-select {
-    font-size: 13px !important;
-    padding: 4px 22px 4px 8px !important;
+    font-size: 15px !important;
+    padding: 5px 26px 5px 10px !important;
     width: auto !important;
     flex: 0 0 auto !important;
 }
@@ -284,23 +291,28 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    (space-between on .header positions this group at the right edge).
    flex-shrink:1 (the default) lets the whole group compress slightly
    before .header would ever need to wrap, giving a bit more headroom
-   on mid-size laptop widths. */
-.header-chip-row { display: flex; gap: 10px; flex-wrap: nowrap; justify-content: flex-end; }
+   on mid-size laptop widths.
+   BUG FIX (header restyle, round 5): gap widened from 10px to 26px —
+   at the old compact chip size + narrow gap, the whole chip row was
+   noticeably smaller than the (now-bigger) title block and left a lot
+   of dead space at the card's right edge instead of the two groups
+   balancing the row. */
+.header-chip-row { display: flex; gap: 26px; flex-wrap: nowrap; justify-content: flex-end; }
 
 .countdown-chip {
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 10px 18px;
+    border-radius: 16px;
+    padding: 12px 22px;
     text-align: center;
     flex-shrink: 0;
-    min-width: 128px;
+    min-width: 150px;
 }
-.countdown-chip .chip-label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 2px; white-space: nowrap; }
-.countdown-chip .chip-days { display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Space Grotesk', monospace; font-size: 34px; font-weight: 800; color: var(--success); line-height: 1; }
-.countdown-chip .chip-days .chip-days-unit { display: block; margin-top: 3px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-.countdown-chip .chip-days.exam-today { display: block; color: var(--warning); font-size: 18px; }
-.countdown-chip .chip-sub { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.countdown-chip .chip-label { display: block; font-size: 13px; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 2px; white-space: nowrap; }
+.countdown-chip .chip-days { display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Space Grotesk', monospace; font-size: 40px; font-weight: 800; color: var(--success); line-height: 1; }
+.countdown-chip .chip-days .chip-days-unit { display: block; margin-top: 3px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.countdown-chip .chip-days.exam-today { display: block; color: var(--warning); font-size: 20px; }
+.countdown-chip .chip-sub { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
 
 /* BUG FIX (header restyle, round 4): below ~850px there usually isn't
    room for the title block and 3 chips side-by-side even at the
@@ -310,9 +322,10 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    on its own row, chips centered in a wrapping row underneath. */
 @media (max-width: 850px) {
     .header { flex-direction: column; flex-wrap: wrap; align-items: center; gap: 14px; }
+    .app-title-wrap { margin-left: 0; }
     .app-title-main { font-size: 28px; }
     .app-title-icon { width: 34px; height: 34px; }
-    .header-chip-row { flex-wrap: wrap; justify-content: center; }
+    .header-chip-row { flex-wrap: wrap; justify-content: center; gap: 10px; }
 }
 
 .quote-banner {
