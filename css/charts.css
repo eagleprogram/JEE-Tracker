@@ -61,6 +61,22 @@
     font-size: 11px;
     letter-spacing: 0.4px;
 }
+/* BUG FIX: title -> Tip gap on the Question Practice Tracker card looked
+   noticeably bigger than the equivalent gap on the Garden card above it,
+   even though both share .goal-header/.goal-note. Scoped-only overrides
+   (rather than editing the shared .goal-header/.goal-note rules, which
+   would also shrink the Garden card's spacing) tighten just this card. */
+.q-goal-header { margin-bottom: 2px; }
+.q-goal-note { margin-top: 0; }
+/* BUG FIX: .garden-plot.is-today's drop-shadow glow (defined above) wraps
+   the WHOLE svg, including the dotted track — so today's ring rendered
+   with visibly blurrier, less-defined dots than every other day's ring in
+   the same row, reading as "the dots don't match." The Questions tracker
+   never asked for that glow treatment, so it's switched off specifically
+   for #questions-row, keeping every day's dotted track identical. (The
+   Garden card above still gets the glow — this only touches the Questions
+   row.) */
+#questions-row.garden-row .garden-plot.is-today svg { filter: none; }
 
 /* NOTE: the Subject-Breakdown pie chart and the Weekly Trend line chart are
    both drawn as inline SVG generated directly by charts.js (renderTrendChart)

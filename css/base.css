@@ -11,7 +11,25 @@ body {
     transition: padding-left 0.2s;
 }
 body.panel-open { padding-left: 440px; }
-@media (max-width: 700px) {
+/* BUG FIX (mobile UI broken): this breakpoint used to be max-width:700px,
+   while the header/quote/grid-2 stacking breakpoints further down this
+   file (and #live-summary-card) all switch at max-width:850px. Any real
+   device reporting a CSS viewport width somewhere between 701px and
+   850px — plenty of phones do, especially the moment the sidebar drawer
+   is open and native browser UI eats into the reported width — fell into
+   a dead zone: the header/cards below had already switched to their
+   stacked, single-column MOBILE layout, but the sidebar was still on the
+   DESKTOP behavior (a real 420px push via body.panel-open's 440px
+   padding-left above, sidebar.expanded pinned to a fixed 420px, no
+   88vw/340px overlay sizing). That desktop-width push against an
+   already-mobile-narrow content column is exactly what produced the
+   reported "left side doesn't appear fully, main content shortened and
+   squeezed, header chips pushed out of place, no usable scroll" mess —
+   two halves of the layout disagreeing about whether they were on mobile.
+   Raising this to match the 850px breakpoint everywhere else removes that
+   dead zone: the sidebar and the main content now switch to mobile layout
+   at the exact same width, together. */
+@media (max-width: 850px) {
     body { padding-left: 64px; }
     body.panel-open { padding-left: 64px; }
     .sidebar { width: 48px; }
@@ -24,12 +42,12 @@ body.panel-open { padding-left: 440px; }
        clamp() scales the size down with the actual viewport width instead
        of one fixed px value, so it stays safely inside the card on any
        phone width this media query covers (not just one tested size).
-       Desktop (>700px) is untouched. */
+       Desktop (>850px) is untouched. */
     .timer-screen { font-size: clamp(32px, 11vw, 48px); }
 }
 
 /* Timer shrinks specifically while the sidebar panel is open, on widths
-   between the phone breakpoint above (700px, already handled) and desktop
+   between the phone breakpoint above (850px, already handled) and desktop
    (1024px+, plenty of room even with the panel open). In that gap the
    sidebar's 420px push (body.panel-open's default padding-left:440px,
    see the top of this file) leaves too little room next to it for the
@@ -37,7 +55,7 @@ body.panel-open { padding-left: 440px; }
    spills past the card edge. Scoped to body.panel-open only, so closing
    the panel instantly restores the full 72px size — nothing here touches
    the timer when the sidebar is closed. */
-@media (min-width: 701px) and (max-width: 1024px) {
+@media (min-width: 851px) and (max-width: 1024px) {
     body.panel-open .timer-screen { font-size: clamp(28px, 6vw, 44px); }
 }
 
@@ -326,6 +344,29 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     .app-title-main { font-size: 28px; }
     .app-title-icon { width: 34px; height: 34px; }
     .header-chip-row { flex-wrap: wrap; justify-content: center; gap: 10px; }
+    /* Main content's desktop 24px side padding, combined with the sidebar
+       rail (48px, see the top of this file) and card padding, was eating a
+       disproportionate share of an already-narrow phone screen — part of
+       the "not utilising space properly" / squeezed-content complaint.
+       Placed here (after the base .main-wrapper rule above) so it actually
+       wins the cascade at this width. */
+    .main-wrapper { padding: 14px; }
+}
+
+/* Extra pass for genuinely small phones (~480px and under): the header's
+   three countdown chips (150px min-width each) don't comfortably fit
+   two-per-row once .header's own side padding is subtracted from a
+   360-400px screen, which is the "top countdown chips coming out of the
+   way" symptom — they were sized for tablets, not phones. Shrinking the
+   header's own padding and the chips together keeps two chips per row
+   with room to spare. */
+@media (max-width: 480px) {
+    .header { padding: 14px 16px; }
+    .countdown-chip { min-width: 120px; padding: 10px 14px; }
+    .countdown-chip .chip-days { font-size: 30px; }
+    .app-title-main { font-size: 24px; }
+    .app-title-icon { width: 28px; height: 28px; }
+    .main-wrapper { padding: 10px; }
 }
 
 .quote-banner {

@@ -555,17 +555,21 @@ ctx.textAlign = "left";
 
     ctx.fillStyle = "#f1f5f9"; ctx.font = "bold 22px sans-serif"; ctx.fillText("Daily Performance Breakdown", tableLeftMargin, tableTitleY);
 
-    // "Que." column (renamed from "Questions" to take up less horizontal
-    // space) is centered within its column slot rather than left-aligned
-    // like the others — qColCenter is the midpoint between that column's
-    // start and the next column's ("Status") start.
-    const qColCenter = colInnerGap / 2;
+    // BUG FIX: "Que." used to be center-aligned within its column slot
+    // (textAlign "center" at questions + half the column width) while
+    // every other column — Date, Study, Break, Status — was left-aligned
+    // at its own column start. That made the visual gap Break->Que
+    // noticeably wider than the gap Que->Status (or the reverse,
+    // depending on the text width), since only the Que column's text was
+    // floating around a midpoint instead of starting flush at its slot
+    // like its neighbors. Left-aligning Que the same as every other
+    // column makes all four inter-column gaps a uniform colInnerGap.
     ctx.fillStyle = "#64748b"; ctx.font = "16px sans-serif";
     ctx.fillText("Date", colX.left.date, tableHeaderY); ctx.fillText("Study", colX.left.study, tableHeaderY); ctx.fillText("Break", colX.left.break, tableHeaderY);
-    ctx.textAlign = "center"; ctx.fillText("Que.", colX.left.questions + qColCenter, tableHeaderY); ctx.textAlign = "left";
+    ctx.fillText("Que.", colX.left.questions, tableHeaderY);
     ctx.fillText("Status", colX.left.status, tableHeaderY);
     ctx.fillText("Date", colX.right.date, tableHeaderY); ctx.fillText("Study", colX.right.study, tableHeaderY); ctx.fillText("Break", colX.right.break, tableHeaderY);
-    ctx.textAlign = "center"; ctx.fillText("Que.", colX.right.questions + qColCenter, tableHeaderY); ctx.textAlign = "left";
+    ctx.fillText("Que.", colX.right.questions, tableHeaderY);
     ctx.fillText("Status", colX.right.status, tableHeaderY);
     ctx.strokeStyle = "#232f48"; ctx.beginPath(); ctx.moveTo(tableLeftMargin, tableDividerY); ctx.lineTo(width - tableLeftMargin, tableDividerY); ctx.stroke();
 
@@ -582,7 +586,7 @@ ctx.textAlign = "left";
         ctx.fillStyle = "#f1f5f9"; ctx.font = "16px sans-serif"; ctx.fillText(d.date, col.date, y);
         ctx.fillStyle = "#10b981"; ctx.fillText(formatReadable(d.study), col.study, y);
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
-        ctx.fillStyle = "#38bdf8"; ctx.textAlign = "center"; ctx.fillText(String(d.questions), col.questions + qColCenter, y); ctx.textAlign = "left";
+        ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
         ctx.fillStyle = d.study >= 36000 ? "#10b981" : "#ef4444";
         ctx.fillText(d.study >= 36000 ? "✅ Goal Met" : "❌ Missed", col.status, y);
     });
