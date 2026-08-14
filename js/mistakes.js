@@ -529,7 +529,7 @@ function renderEntryBlock(subject, chapter, entry, isEditing, entryNumber) {
                 <span class="mc-entry-meta">${entryNumber ? `<span class="mc-entry-num">#${entryNumber}</span> · ` : ''}${escapeHtml(stamp)}${entry.count > 1 ? ` · counted as ${entry.count}` : ''}</span>
                 <div style="display:flex; gap:8px;">
                     <button type="button" class="mc-icon-btn" data-mc-edit-toggle title="Edit this entry">✏️</button>
-                    <button type="button" class="mc-icon-btn" data-mc-delete-entry title="Delete this entry">🗑</button>
+                    <button type="button" class="mc-icon-btn" data-mc-delete-entry title="Delete this entry" aria-label="Delete this entry"></button>
                 </div>
             </div>
             <div class="mc-notes-view">${entry.notes ? escapeHtml(entry.notes) : '<span style="color:var(--muted);">No notes.</span>'}</div>

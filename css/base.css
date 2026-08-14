@@ -305,9 +305,15 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    dropdown arrow so it doesn't overlap the last digit of the year. */
 #exam-year-select {
     font-size: 12px !important;
-    padding: 3px 20px 3px 8px !important;
-    width: auto !important;
-    flex: 0 0 auto !important;
+    line-height: 1.15 !important;
+    padding: 3px 16px 3px 8px !important;
+    width: 103px !important;
+    min-width: 103px !important;
+    height: 28px !important;
+    box-sizing: border-box !important;
+    flex: 0 0 103px !important;
+    align-self: center;
+    transform: translateY(-1px);
 }
 /* Chips row: sits to the right of the title block as a single row
    (space-between on .header positions this group at the right edge).
