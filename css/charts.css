@@ -65,8 +65,8 @@
    (.goal-header's 8px margin-bottom + .goal-note's 6px margin-top) down
    to roughly half that — the full default read as too much air between
    the title and the Tip line on this specific card. */
-.q-goal-header { margin-bottom: 3px; }
-.q-goal-note { margin-top: 3px; }
+.q-goal-header { margin-bottom: 2px; }
+.q-goal-note { margin-top: 0px; }
 /* BUG FIX: .garden-plot.is-today's drop-shadow glow (defined above) wraps
    the WHOLE svg, including the dotted track — so today's ring rendered
    with visibly blurrier, less-defined dots than every other day's ring in
