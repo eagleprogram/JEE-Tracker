@@ -587,11 +587,18 @@
     <div class="modal-content q-modal-content" style="text-align:center;" onclick="event.stopPropagation()">
         <h3 style="margin-top:0;">Questions Solved:</h3>
         <p style="color:var(--muted); font-size:13px; margin:0 0 14px;">How many questions did you solve on <strong id="questions-modal-date" style="color:var(--text);">--</strong>?</p>
-        <input type="number" id="questions-count-input" min="0" step="1" placeholder="e.g. 56" style="text-align:center; font-size:18px;">
+        <input type="number" id="questions-count-input" min="0" step="1" placeholder="e.g. 55" style="text-align:center; font-size:18px;">
         <div style="margin-top:16px; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
             <button class="btn btn-start" onclick="saveQuestionsSolved()">Save</button>
             <button class="btn btn-pause btn-small" onclick="backQuestionsModal()">Back</button>
-            <button type="button" class="btn btn-stop btn-small q-modal-trash-btn" onclick="deleteQuestionsSolved()" title="Delete today's log" aria-label="Delete log">🗑</button>
+            <button type="button" class="btn btn-stop btn-small q-modal-trash-btn" onclick="deleteQuestionsSolved()" title="Delete today's log" aria-label="Delete log">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+            </button>
         </div>
     </div>
 </div>
