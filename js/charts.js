@@ -123,17 +123,16 @@ export function renderHeatmap() {
     // one hue (blue, matching --primary/--tint-sky used everywhere else in
     // the app) with 5 brightness/saturation steps.
     //
-    // FOLLOW-UP FIX #2: the previous "fix" (#13192b) was STILL basically
-    // the same near-invisible navy as the page background (--bg), so with
-    // most days at 0h (a fresh tracker, or just days you haven't logged
-    // yet), the whole grid still read as empty hollow outlines rather than
-    // filled squares. Bucket 0 is now a clearly visible solid slate-blue
-    // (#33415c) that reads as an actual filled tile against the dark
-    // background — still the dimmest step (every bucket above it is
-    // strictly brighter/more saturated, so "more hours = more intense" is
-    // untouched), just no longer camouflaged into the page itself.
-    const hmColors = ["#33415c", "#3d4f82", "#4a5da0", "#5b70c0", "#7e89d8"];
-    const hmStrokes = ["#4b5b7f", "#5566a8", "#6272c0", "#7484d4", "#98a2e6"];
+    // FOLLOW-UP FIX #3: the 0h tile (#33415c) read as too strong/too close
+    // in brightness to the filled tiles above it — at a glance the "empty"
+    // days weren't clearly receding into the background the way an empty
+    // cell should. Swapped in the requested darker 5-step palette: 0h now
+    // sits much closer to the page background (quiet, clearly "no data")
+    // while 10h+ is a bright, saturated sky blue, so the ramp reads as a
+    // clean gradient from "nothing logged" to "goal hit" instead of every
+    // bucket fighting for attention equally.
+    const hmColors = ["#141e30", "#1c4470", "#2978ab", "#48b1d9", "#8dd6f5"];
+    const hmStrokes = ["#1f2e4a", "#2e5d8e", "#4194c3", "#62c4e6", "#a6e3fa"];
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
             if (day.date > today) return;

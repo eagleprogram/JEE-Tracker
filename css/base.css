@@ -193,9 +193,19 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 /* ===== Header: logo, title, countdown chips, quote ===== */
 .header {
     display: flex;
-    justify-content: flex-start;
+    /* BUG FIX (header restyle): was flex-start, which pinned the title
+       block flush against the card's left padding edge with the 3
+       countdown chips trailing off to the right, leaving a big dead gap
+       on the right side whenever the card was wider than its content
+       (which it usually is — .header isn't width-constrained on its own,
+       and .main-wrapper's max-width still leaves it fairly wide). Centering
+       the whole content group (title block + gap + 3 chips, as one row)
+       within the card is what "keep it middle" in the reference screenshot
+       shows — the title block sits with breathing room on both sides
+       instead of glued to the left edge. */
+    justify-content: center;
     align-items: center;
-    gap: 48px;
+    gap: 64px;
     background: var(--card);
     border: 1px solid var(--border);
     padding: 16px 24px;
@@ -211,12 +221,23 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    sits below that, in normal document flow. */
 .app-title-wrap { display: flex; flex-direction: column; gap: 4px; }
 .app-title-row { display: flex; align-items: center; gap: 10px; }
-.app-title-icon { width: 52px; height: 52px; flex-shrink: 0; object-fit: contain; }
+.app-title-icon { width: 58px; height: 58px; flex-shrink: 0; object-fit: contain; }
 /* BUG FIX (header restyle): the subtitle ("STUDY TRACKER") and the exam-year
    select used to be stacked in their own column below the title row. Now
    laid out as a single inline row — label first, select right next to it —
    to match the requested header layout. */
-.app-title-text { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px; line-height: 1.05; }
+/* BUG FIX (header restyle): .app-title-wrap is a column flex container with
+   no explicit width, so its own width shrinks to whichever row is widest —
+   in practice always .app-title-row (icon + "JEE 2027"), since that's wider
+   than the subtitle+select row below it. With align-items left at its
+   flex default (stretch), the subtitle row still gets stretched to that
+   same width, but its own content (justify-content was unset, i.e.
+   flex-start) stayed pinned to the left edge of that stretched box — so it
+   lined up flush under the icon instead of under the title text as a
+   whole. Centering the subtitle row's own content within that width is
+   what produces the indented "STUDY TRACKER [select]" position in the
+   reference screenshot. */
+.app-title-text { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 8px; line-height: 1.05; }
 /* Single, solid title color instead of the old lighter blue-purple — set
    directly here (not via the shared --title variable) so it doesn't also
    darken the unrelated account/guest person-icon mask that also reads
@@ -224,7 +245,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 .app-title-main {
     font-family: 'Sora', sans-serif;
     font-weight: 800;
-    font-size: 48px;
+    font-size: 54px;
     letter-spacing: -0.5px;
     color: #2d2b63;
 }
@@ -259,13 +280,13 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 12px 28px;
+    padding: 14px 34px;
     text-align: center;
     flex-shrink: 0;
-    min-width: 150px;
+    min-width: 160px;
 }
 .countdown-chip .chip-label { display: block; font-size: 13px; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 2px; }
-.countdown-chip .chip-days { display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Space Grotesk', monospace; font-size: 46px; font-weight: 800; color: var(--success); line-height: 1; }
+.countdown-chip .chip-days { display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Space Grotesk', monospace; font-size: 50px; font-weight: 800; color: var(--success); line-height: 1; }
 .countdown-chip .chip-days .chip-days-unit { display: block; margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
 .countdown-chip .chip-days.exam-today { display: block; color: var(--warning); font-size: 22px; }
 .countdown-chip .chip-sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }

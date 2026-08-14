@@ -406,9 +406,29 @@ export function takeBreak() {
     // cross-tab check as a fresh Start. Coming from STUDYING/PAUSED, this
     // tab already owns the session, so no check needed there.
     if (timerState === "IDLE" && blockedByOtherTab()) return;
+    // Captured before commitActiveSegment()/the prompt can change anything,
+    // so a Cancel below knows exactly what state to resume.
+    let previousState = timerState;
     commitActiveSegment(); cancelAnimationFrame(animFrame);
     let reason = prompt("Break Reason (e.g. Lunch, Walk, Phone):");
-    if (!reason || !reason.trim()) reason = "Short Break";
+    // BUG FIX: prompt() returns null ONLY when the user hits Cancel/Esc —
+    // OK with an empty field returns "" instead, which is falsy too but
+    // means something different (use the default reason, still start the
+    // break). The old `if (!reason || ...)` treated both the same way, so
+    // clicking Cancel silently fell into the "use default reason" branch
+    // and started the break anyway instead of aborting, which is exactly
+    // what was reported. Checking specifically for null separates "user
+    // cancelled" from "user left it blank and hit OK". On Cancel from
+    // STUDYING, the segment was already committed and its tick loop
+    // stopped just above — restart both so the study session keeps running
+    // exactly as if Break had never been clicked. From PAUSED/IDLE nothing
+    // was ticking yet (commitActiveSegment() is a no-op in those states),
+    // so there's nothing to restart — just bail out with state unchanged.
+    if (reason === null) {
+        if (previousState === "STUDYING") { startSegment(); tick(); }
+        return;
+    }
+    if (!reason.trim()) reason = "Short Break";
     activeBreakReason = reason;
     // Fresh break (as opposed to the same break resuming after an autosave/
     // tab-hide restart, which goes through flushAndRestartSegment() instead
@@ -417,6 +437,12 @@ export function takeBreak() {
     sessionBreakSec = 0;
     timerState = "BREAK"; currentSegmentId++; startSegment();
     updateUIState(); tick();
+    // Break now drops into Zen Mode exactly like a fresh study start
+    // (confirmStartStudy()/resumeStudy() above do the same thing). The zen
+    // visuals in components.css key off body.zen-mode only, not timerState,
+    // so they render identically for a break as they do while studying —
+    // no separate CSS was needed for this.
+    enterZenMode();
 }
 
 export function changeSubjectMidSession() { activeSubject = document.getElementById("switch-subject-select").value; updateLiveSummary(); }

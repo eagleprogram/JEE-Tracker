@@ -437,11 +437,16 @@ ctx.textAlign = "left";
     // ---- Study Heatmap (centered in left half) ----
     ctx.fillStyle = "#f1f5f9"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center";
     ctx.fillText("Study Heatmap", leftHalfCenter, sectionTitleY);
-    // Kept in sync with charts.js's renderHeatmap() — multi-hue scale
-    // (reusing the app's own --tint-sky/emerald/amber/rose colors) instead
-    // of a single-hue brightness ramp, since same-hue steps were too hard
-    // to tell apart at small sizes no matter how far the lightness spread.
-    const hmColors = ["#2b3852", "#38bdf8", "#34d399", "#f59e0b", "#f43f5e"];
+    // BUG FIX: this canvas heatmap had drifted out of sync with charts.js's
+    // renderHeatmap() — it was still on an older multi-hue (blue/green/
+    // amber/rose) scale instead of the single-hue palette the live in-app
+    // heatmap uses, so a downloaded/shared report looked visibly different
+    // from what the app itself shows. Now uses the same 5-step palette
+    // (and matching per-bucket stroke colors instead of one flat outline)
+    // as charts.js's hmColors/hmStrokes, so the report image always
+    // matches the live heatmap.
+    const hmColors = ["#141e30", "#1c4470", "#2978ab", "#48b1d9", "#8dd6f5"];
+    const hmStrokes = ["#1f2e4a", "#2e5d8e", "#4194c3", "#62c4e6", "#a6e3fa"];
     const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     ctx.fillStyle = "#64748b"; ctx.font = "12px sans-serif";
     for (let j = 0; j < 7; j++) { ctx.fillText(dow[j], heatmapX + 11 + j * (cellSize + cellGap), heatmapDowY); }
@@ -454,7 +459,7 @@ ctx.textAlign = "left";
         let x = heatmapX + adjustedCol * (cellSize + cellGap);
         let y = heatmapGridStartY + row * (cellSize + cellGap);
         ctx.fillStyle = hmColors[colorIdx]; ctx.fillRect(x, y, cellSize, cellSize);
-        ctx.strokeStyle = "#1e293b"; ctx.strokeRect(x, y, cellSize, cellSize);
+        ctx.strokeStyle = hmStrokes[colorIdx]; ctx.strokeRect(x, y, cellSize, cellSize);
     });
 
     // ---- Subject Breakdown pie (centered in right half) ----
