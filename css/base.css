@@ -198,16 +198,23 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    a full-width centered row underneath, both inside the same card.
    Switched .header to a column flex container with two centered rows
    instead of one row with two side-by-side groups. */
+/* ===== Header: logo, title, countdown chips, quote ===== */
+/* Single row: title block on the left, the 3 countdown chips as a group
+   on the right, both vertically centered. justify-content:space-between
+   pins the title to the left edge and the chip group to the right edge —
+   matching the reference layout exactly. */
 .header {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: space-between;
     align-items: center;
     gap: 24px;
     background: var(--card);
     border: 1px solid var(--border);
-    padding: 28px 40px;
+    padding: 20px 32px;
     border-radius: 12px;
     margin-bottom: 20px;
+    flex-wrap: wrap;
 }
 
 /* The icon sits in its OWN row alongside just the "JEE 2027" text
@@ -272,9 +279,9 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 }
 @media (max-width: 850px) { .app-title-main { font-size: 30px; } .app-title-icon { width: 36px; height: 36px; } .header { gap: 20px; } }
 
-/* Chips row: full-width, evenly spaced, centered — sits below the title
-   block as its own row within the .header card. */
-.header-chip-row { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; width: 100%; }
+/* Chips row: sits to the right of the title block as a single row
+   (space-between on .header positions this group at the right edge). */
+.header-chip-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
 
 .countdown-chip {
     background: var(--bg);
