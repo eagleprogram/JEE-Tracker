@@ -65,7 +65,7 @@ import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
 
 import {
     openQuestionsModal, closeQuestionsModal, saveQuestionsSolved,
-    skipQuestionsModal, openTodayQuestionsModal, renderQuestionsWidget
+    backQuestionsModal, deleteQuestionsSolved, openTodayQuestionsModal, renderQuestionsWidget
 } from './questions.js';
 
 import {
@@ -115,7 +115,7 @@ Object.assign(window, {
     renderGarden, renderHeatmap, renderTrendChart,
     // questions.js
     openQuestionsModal, closeQuestionsModal, saveQuestionsSolved,
-    skipQuestionsModal, openTodayQuestionsModal,
+    backQuestionsModal, deleteQuestionsSolved, openTodayQuestionsModal,
     // history.js
     loadHistoryData, deleteSubjectEntry, deleteStudySessionEntry,
     deleteBreakEntry, deleteStudyLog, deleteBreakLog, addMissedBreak,

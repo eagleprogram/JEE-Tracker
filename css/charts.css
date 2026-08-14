@@ -29,6 +29,27 @@
 .q-legend-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .q-legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .q-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+/* The "Log Today's Questions" button sits top-right of the card header,
+   with the legend stacked underneath it (see .q-header-actions in
+   index.html) — only this card's .goal-header needs its right side to be
+   two rows instead of the single-row title+pill layout the Garden card
+   above uses, so this is scoped to #questions-row's parent card via the
+   sibling class rather than changing .goal-header itself. */
+.q-header-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+/* Day names move BELOW each ring (not above, like the Garden's hour
+   plots) and are dimmed down from the Garden's bright white label —
+   scoped to #questions-row only so the Garden's own dow-labels above are
+   untouched. */
+#questions-row.garden-row .garden-plot { display: flex; flex-direction: column; align-items: center; }
+#questions-row.garden-row .garden-plot .dow-label {
+    order: 1;
+    margin-top: 6px;
+    margin-bottom: 0;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+}
 
 /* NOTE: the Subject-Breakdown pie chart and the Weekly Trend line chart are
    both drawn as inline SVG generated directly by charts.js (renderTrendChart)

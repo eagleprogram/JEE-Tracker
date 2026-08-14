@@ -76,17 +76,30 @@ export function saveQuestionsSolved() {
     showToast(`✅ ${val} question${val === 1 ? '' : 's'} solved logged for ${formatDateDDMMYYYY(dateKey)}.`);
 }
 
-export function skipQuestionsModal() {
+// "Back" just closes the modal without saving anything — unlike the old
+// "Skip" button, it does NOT mark the day as asked, so maybeAskQuestionsSolved()
+// will still prompt again next time a sleep log is saved for this day.
+export function backQuestionsModal() {
+    closeQuestionsModal();
+}
+
+// Clears a previously-logged count for the open day (e.g. logged by mistake)
+// and re-opens it up for the auto-prompt (see backQuestionsModal's comment
+// above re: questionsAsked).
+export function deleteQuestionsSolved() {
     if (!activeQuestionsDateKey) { closeQuestionsModal(); return; }
     let dateKey = activeQuestionsDateKey;
     let db = getDB();
     let day = db[dateKey] || initDay(dateKey);
     ensureDayShape(day);
-    day.questionsAsked = true;
+    day.questionsSolved = 0;
+    day.questionsAsked = false;
     db[dateKey] = day;
     saveDB(db);
     closeQuestionsModal();
-    showToast("Skipped — tap \"Log Today's Questions\" any time to add it later.");
+    renderQuestionsWidget();
+    renderHeatmap();
+    showToast(`🗑 Questions log deleted for ${formatDateDDMMYYYY(dateKey)}.`);
 }
 
 // ---------------- WEEKLY QUESTION-PRACTICE RING WIDGET ----------------
@@ -110,7 +123,9 @@ function questionRingSVG(count) {
     let pct = Math.min(Math.max(count, 0), 100) / 100;
     let color = questionRingColor(count);
     let dash = circumference * pct;
-    let track = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${strokeW}" stroke-dasharray="2 5"/>`;
+    // Solid (not dashed) track ring — the old sparse "2 5" dash pattern
+    // read as a loose ring of dots rather than a continuous circle.
+    let track = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${strokeW}"/>`;
     let arc = color ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" transform="rotate(90 ${cx} ${cy})"/>` : "";
     let label = count > 0 ? count : "0";
     let textColor = color || "var(--muted)";
