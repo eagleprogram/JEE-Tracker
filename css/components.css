@@ -372,15 +372,11 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 .modal-content.wide { width: min(680px, 92vw); max-height: 85vh; display: flex; flex-direction: column; }
 .modal-content.wide #planner-task-input { font-size: 16px; padding: 14px; }
 .modal-content.wide #planner-task-list { flex: 1; max-height: none !important; }
-/* BUG FIX: the trash icon used to sit inline with the "Questions Solved"
-   text inside a centered flex h3, so the button hugged the last letter of
-   the title with barely any gap. Moved to an absolutely-positioned corner
-   button instead — .q-modal-content gets position:relative as the
-   positioning context, and the title text now centers on its own with no
-   flex neighbor pushing against it, giving clean, consistent space between
-   the title and the button regardless of title length. */
-.q-modal-content { position: relative; }
-.q-modal-trash-btn { width: 44px; flex: 0 0 auto; padding-left: 0; padding-right: 0; font-size: 15px; }
+/* Delete button lives inline in the Save/Back button row as a third
+   compact, icon-only button (.btn.btn-stop.btn-small for the same rose
+   tint, rounded corners, and height as its neighbors) — width is capped
+   here so it stays a tight square instead of stretching like Save/Back. */
+.q-modal-trash-btn { width: 44px; flex: 0 0 auto; padding-left: 0; padding-right: 0; }
 /* Tells the browser to render this input's native controls (including the
    number spinner's up/down arrows) using its dark-mode palette instead of
    the default light-on-light arrows that looked out of place against the

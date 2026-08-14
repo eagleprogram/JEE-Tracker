@@ -61,13 +61,9 @@
     font-size: 11px;
     letter-spacing: 0.4px;
 }
-/* BUG FIX: title -> Tip gap on the Question Practice Tracker card looked
-   noticeably bigger than the equivalent gap on the Garden card above it,
-   even though both share .goal-header/.goal-note. Scoped-only overrides
-   (rather than editing the shared .goal-header/.goal-note rules, which
-   would also shrink the Garden card's spacing) tighten just this card. */
-.q-goal-header { margin-bottom: 0; }
-.q-goal-note { margin-top: -4px; }
+/* Title -> Tip gap on this card now matches the shared default
+   (.goal-header's margin-bottom + .goal-note's margin-top), same as the
+   Garden card above it — no scoped override needed. */
 /* BUG FIX: .garden-plot.is-today's drop-shadow glow (defined above) wraps
    the WHOLE svg, including the dotted track — so today's ring rendered
    with visibly blurrier, less-defined dots than every other day's ring in
