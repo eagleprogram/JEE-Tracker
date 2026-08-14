@@ -382,7 +382,7 @@ function buildReportCanvas(days, title) {
     const heatmapBottomY = heatmapGridStartY + heatmapRows * (cellSize + cellGap);
     // Color-key row (study-hours buckets) drawn just under the heatmap grid,
     // so a shared/downloaded report is self-explanatory without the live app.
-    const heatmapLegendY = heatmapBottomY + 26;
+    const heatmapLegendY = heatmapBottomY + 44;
     const heatmapLegendBottomY = heatmapLegendY + 16;
 
     const pieCx = rightHalfCenter, pieRadius = 100;            // centered in right half
