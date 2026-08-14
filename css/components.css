@@ -374,11 +374,31 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 .modal-content.wide #planner-task-list { flex: 1; max-height: none !important; }
 /* Delete button lives inline in the Save/Back button row as a third
    compact, icon-only button (.btn.btn-stop.btn-small for the same rose
-   tint, rounded corners, and height as its neighbors) — width is capped
-   here so it stays a tight square instead of stretching like Save/Back.
-   font-size bumped up from the inherited .btn-small 12px so the 🗑 glyph
-   renders clearly instead of looking like a tiny blurred blob. */
-.q-modal-trash-btn { width: 44px; flex: 0 0 auto; padding-left: 0; padding-right: 0; font-size: 18px; }
+   tint, rounded corners as its neighbors). Swapped the emoji for an inline
+   SVG (see index.html) since emoji glyph rendering varies by OS/font and
+   read as blurry at small sizes — SVG stays crisp at any size. Vertical
+   padding (8px) is kept matching .btn-small so the button's HEIGHT still
+   lines up with Save/Back; only horizontal padding is zeroed so it stays
+   a tight square instead of stretching. font-size:0 stops any stray text
+   node from affecting sizing now that the icon is an SVG, not a glyph. */
+.q-modal-trash-btn {
+    width: 44px;
+    flex: 0 0 auto;
+    padding: 8px 0;
+    font-size: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.q-modal-trash-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
 /* Tells the browser to render this input's native controls (including the
    number spinner's up/down arrows) using its dark-mode palette instead of
    the default light-on-light arrows that looked out of place against the
