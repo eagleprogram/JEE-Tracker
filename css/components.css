@@ -342,10 +342,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    it's the last thing in the card now, so that bottom margin just becomes
    dead space under the card. Scoped override zeroes it out; margin-top
    (the gap between the rings and the tip) is left untouched. */
-.q-goal-note {
-    margin-top: 20px;
-    margin-bottom: 0;
-}
+.q-goal-note { margin-bottom: 0; }
 .goal-note-emphasis { color: var(--text); font-weight: 800; }
 .session-log-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); padding: 6px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; }
 
@@ -399,7 +396,6 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
     display: flex;
     align-items: center;
     justify-content: center;
-    line-height: 0;
 }
 /* BUG FIX: stroke:currentColor picked up .btn-stop's rose text color, which
    is far too close to the button's own rose-tinted background (rgba tint at
@@ -408,16 +404,13 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    (near-white) instead for real contrast against the red button, and
    thickened the stroke slightly so it stays crisp at 20px. */
 .q-modal-trash-btn svg {
-    display: block;
     width: 20px;
     height: 20px;
-    flex: 0 0 20px;
-    stroke: var(--text) !important;
-    fill: none !important;
+    stroke: var(--text);
+    fill: none;
     stroke-width: 2.1;
     stroke-linecap: round;
     stroke-linejoin: round;
-    overflow: visible;
 }
 /* Tells the browser to render this input's native controls (including the
    number spinner's up/down arrows) using its dark-mode palette instead of
@@ -435,8 +428,8 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
     color-scheme: dark;
     border: 1.5px solid var(--text);
     padding: 6px 8px;
-    width: 176px;
-    max-width: min(176px, 70vw);
+    width: 55%;
+    max-width: 140px;
     margin-left: auto;
     margin-right: auto;
     font-size: 15px;
@@ -451,106 +444,6 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 .task-item button.del { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 18px; }
 button.del { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 13px; padding: 2px 4px; }
 button.del:hover { color: #fca5a5; }
-
-/* ===== Shared delete/trash icon =====
-   All compact delete controls use one crisp SVG mask instead of emoji/X glyphs.
-   This keeps the icon visually consistent across Windows, Chrome, Edge and
-   different installed fonts, while still inheriting the surrounding danger color. */
-:root {
-    --trash-icon-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M9 3h6v2h5v2h-1v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7H4V5h5V3Zm0 4H7v13h10V7H9Zm1.5 3h2v8h-2v-8Zm4 0h2v8h-2v-8Z'/%3E%3C/svg%3E");
-}
-
-button.del {
-    font-size: 0 !important;
-    line-height: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    padding: 2px;
-    flex: 0 0 24px;
-}
-button.del::before {
-    content: "";
-    display: block;
-    width: 15px;
-    height: 15px;
-    background: currentColor;
-    -webkit-mask-image: var(--trash-icon-mask);
-    mask-image: var(--trash-icon-mask);
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-}
-
-/* Mistakes: the per-entry icon-only delete button used to contain an emoji. */
-.mc-icon-btn[data-mc-delete-entry] {
-    font-size: 0;
-    color: var(--danger);
-}
-.mc-icon-btn[data-mc-delete-entry]::before {
-    content: "";
-    display: block;
-    width: 16px;
-    height: 16px;
-    background: currentColor;
-    -webkit-mask-image: var(--trash-icon-mask);
-    mask-image: var(--trash-icon-mask);
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-}
-
-/* Sleep history: replace the old red X with the same trash-can glyph. */
-button[title="Delete"] {
-    font-size: 0 !important;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-}
-button[title="Delete"]::before {
-    content: "";
-    display: block;
-    width: 15px;
-    height: 15px;
-    background: currentColor;
-    -webkit-mask-image: var(--trash-icon-mask);
-    mask-image: var(--trash-icon-mask);
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-}
-
-/* The full-size danger buttons keep their text; only their small trash glyph
-   is rendered as the shared SVG-style mask. */
-.trash-icon {
-    display: inline-block;
-    width: 13px;
-    height: 13px;
-    flex: 0 0 13px;
-    vertical-align: -2px;
-    background: currentColor;
-    -webkit-mask-image: var(--trash-icon-mask);
-    mask-image: var(--trash-icon-mask);
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-}
 
 /* ===== Toasts =====
    Deliberately softer than a full-strength alert: a thin low-opacity border
@@ -731,3 +624,26 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mistake-view-toggle button { flex: 1 1 50%; background: var(--card); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 9px 6px; font-size: 12px; font-weight: 700; cursor: pointer; }
 .mistake-view-toggle button.active { background: var(--primary); border-color: var(--primary); color: #04121f; }
 .mistake-search-box { margin-top: 4px; }
+
+/* ===== Consistent delete/trash glyph =====
+   Used only for controls that are genuinely trash/delete actions.
+   Existing X/cross controls use their original ✕ glyph and are deliberately
+   not targeted by this class. */
+.delete-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M5 7l1 14h12l1-14'/%3E%3Cpath d='M9 7V4h6v3'/%3E%3C/svg%3E") no-repeat center / contain;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M5 7l1 14h12l1-14'/%3E%3Cpath d='M9 7V4h6v3'/%3E%3C/svg%3E") no-repeat center / contain;
+    vertical-align: -3px;
+}
+
+/* The compact destructive buttons already use .btn-stop, so only normalize
+   the glyph size/alignment here. */
+.btn-stop .delete-icon { width: 16px; height: 16px; }
+
+/* Mistakes entry icon button: keep the existing compact button geometry and
+   let the shared trash glyph inherit the button's danger color. */
+.mc-icon-btn .delete-icon { width: 17px; height: 17px; vertical-align: middle; }
