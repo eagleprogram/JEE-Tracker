@@ -208,7 +208,16 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     gap: 64px;
     background: var(--card);
     border: 1px solid var(--border);
-    padding: 16px 24px;
+    /* BUG FIX (header restyle, round 2): justify-content:center alone
+       centers the content group within .header's own content-box, but the
+       reported result still left visible dead space specifically on the
+       RIGHT — asymmetric padding shifts that same centered group right by
+       exactly the left/right difference (40px here), since the content-box
+       centering math runs on whatever space padding leaves available, not
+       on the card's outer edges. This is a direct, predictable nudge, not
+       a different layout — everything else about the centering above is
+       unchanged. */
+    padding: 16px 24px 16px 64px;
     border-radius: 12px;
     margin-bottom: 20px;
     flex-wrap: wrap;

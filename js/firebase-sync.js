@@ -148,19 +148,20 @@ export function resolveInitialAuthAndSync() {
         if (!initFirebaseAuthIfNeeded()) { resolve(); return; } // sync not configured — nothing to wait for
         let settled = false;
         let finish = () => { if (!settled) { settled = true; resolve(); } };
-        // BUG FIX: was 4000ms. On a slow/just-reconnected network (e.g. right
-        // after "Delete Cookies & Reload", or a flaky mobile connection) the
-        // real auth-state + cloud-auto-load round trip can take longer than
-        // that, so this timeout could fire and let main.js's boot sequence
-        // (including runBootSignInGate()) proceed while the actual sign-in
-        // was still resolving — the exact race behind "to-do transfer came,
-        // I accepted, then sign-in came and everything went away." 8s gives
-        // a slow reconnect a real chance to finish first. If the real
-        // sign-in DOES land after this timeout anyway, onAuthStateChanged's
-        // signed-in branch still calls hideGuestSignInReminder() itself
-        // (see above), which quietly dismisses any sign-in prompt that's
-        // still on screen at that point — never a silent overwrite.
-        let timeoutId = setTimeout(finish, 8000); // never hold first paint hostage to a dead network forever
+        // BUG FIX: was 8000ms. Reported again as "todo transfer runs, THEN
+        // the sign-in toast appears, so the transfer never actually syncs"
+        // — happening only on the installed mobile PWA, never on desktop.
+        // A cold PWA launch has to activate its service worker and warm up
+        // IndexedDB (where Firebase Auth's persisted session lives) before
+        // the auth SDK can even start resolving — on a slow device/network
+        // that alone can eat past 8s, well before any real sign-in check
+        // has happened. 20s gives a cold mobile launch a realistic margin.
+        // If the real sign-in DOES land after this timeout anyway,
+        // onAuthStateChanged's signed-in branch still calls
+        // hideGuestSignInReminder() itself (see above), which quietly
+        // dismisses any sign-in prompt still on screen at that point —
+        // never a silent overwrite.
+        let timeoutId = setTimeout(finish, 20000); // never hold first paint hostage to a dead network forever
         let unsub = fbAuth.onAuthStateChanged(async (user) => {
             if (typeof unsub === "function") unsub();
             if (user) {
@@ -169,9 +170,38 @@ export function resolveInitialAuthAndSync() {
                 // first, so it always runs before this one for the same
                 // auth event, guaranteeing the promise exists by now.
                 try { await initialAutoLoadPromise; } catch (e) { /* already logged inside autoLoadCloudDataIfNeeded */ }
+                clearTimeout(timeoutId);
+                finish();
+                return;
             }
-            clearTimeout(timeoutId);
-            finish();
+            // BUG FIX: this is the actual root cause of the mobile-only
+            // report above. Firebase Auth can fire its FIRST
+            // onAuthStateChanged callback with user === null even on a
+            // device that's genuinely still signed in — the persisted
+            // session hasn't finished hydrating from IndexedDB at the
+            // exact instant this very first callback runs, most commonly
+            // right after a cold PWA launch. Resolving immediately on that
+            // transient null (the old behavior) let main.js treat an
+            // actually-signed-in device as a guest for a brief window —
+            // long enough for the todo-carryover dialog to show and get
+            // approved against local data — and moments later the REAL
+            // sign-in would land (via the separate MAIN listener in
+            // initFirebaseAuthIfNeeded, which is registered first and
+            // still running), pop the "Signed in as …" toast, and pull/
+            // overwrite what was just approved. This waits a short grace
+            // window before treating a null as final: if the MAIN
+            // listener's `currentUser` module variable has since been set
+            // by a delayed correction, this proceeds exactly like the
+            // signed-in branch above instead of resolving as a guest. A
+            // genuinely signed-out device just resolves ~1.2s later than
+            // before — not noticeable.
+            setTimeout(async () => {
+                if (currentUser) {
+                    try { await initialAutoLoadPromise; } catch (e) { /* already logged inside autoLoadCloudDataIfNeeded */ }
+                }
+                clearTimeout(timeoutId);
+                finish();
+            }, 1200);
         });
     });
 }
