@@ -61,9 +61,12 @@
     font-size: 11px;
     letter-spacing: 0.4px;
 }
-/* Title -> Tip gap on this card now matches the shared default
-   (.goal-header's margin-bottom + .goal-note's margin-top), same as the
-   Garden card above it — no scoped override needed. */
+/* Title -> Tip gap on this card, tightened from the shared default
+   (.goal-header's 8px margin-bottom + .goal-note's 6px margin-top) down
+   to roughly half that — the full default read as too much air between
+   the title and the Tip line on this specific card. */
+.q-goal-header { margin-bottom: 3px; }
+.q-goal-note { margin-top: 3px; }
 /* BUG FIX: .garden-plot.is-today's drop-shadow glow (defined above) wraps
    the WHOLE svg, including the dotted track — so today's ring rendered
    with visibly blurrier, less-defined dots than every other day's ring in

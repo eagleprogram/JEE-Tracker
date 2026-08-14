@@ -375,13 +375,27 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 /* Delete button lives inline in the Save/Back button row as a third
    compact, icon-only button (.btn.btn-stop.btn-small for the same rose
    tint, rounded corners, and height as its neighbors) — width is capped
-   here so it stays a tight square instead of stretching like Save/Back. */
-.q-modal-trash-btn { width: 44px; flex: 0 0 auto; padding-left: 0; padding-right: 0; }
+   here so it stays a tight square instead of stretching like Save/Back.
+   font-size bumped up from the inherited .btn-small 12px so the 🗑 glyph
+   renders clearly instead of looking like a tiny blurred blob. */
+.q-modal-trash-btn { width: 44px; flex: 0 0 auto; padding-left: 0; padding-right: 0; font-size: 18px; }
 /* Tells the browser to render this input's native controls (including the
    number spinner's up/down arrows) using its dark-mode palette instead of
    the default light-on-light arrows that looked out of place against the
-   popup's dark background. */
-#questions-count-input { color-scheme: dark; }
+   popup's dark background. A brighter, always-visible border (instead of
+   the barely-there --border default) and tighter padding make the field
+   read as a compact, clearly-bounded input box rather than a plain slab.
+   The spin-button opacity rule forces the up/down arrows to stay visible
+   at rest — by default WebKit only fades them in on hover/focus. */
+#questions-count-input {
+    color-scheme: dark;
+    border: 1.5px solid var(--text);
+    padding: 8px 10px;
+}
+#questions-count-input::-webkit-inner-spin-button,
+#questions-count-input::-webkit-outer-spin-button {
+    opacity: 1;
+}
 .task-item { display: flex; align-items: center; gap: 10px; background: var(--bg); padding: 12px; border-radius: 8px; margin-top: 8px; font-size: 15px; }
 .task-item .task-text { flex: 1; }
 .task-item .task-text.done { text-decoration: line-through; color: var(--muted); }
