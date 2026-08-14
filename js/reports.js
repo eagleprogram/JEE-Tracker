@@ -445,7 +445,7 @@ ctx.textAlign = "left";
     // (and matching per-bucket stroke colors instead of one flat outline)
     // as charts.js's hmColors/hmStrokes, so the report image always
     // matches the live heatmap.
-    const hmColors = ["#141e30", "#1c4470", "#2978ab", "#48b1d9", "#8dd6f5"];
+    const hmColors = ["#233252", "#2c5a9e", "#3a91c9", "#5cc0e8", "#a3e0f8"];
     const hmStrokes = ["#1f2e4a", "#2e5d8e", "#4194c3", "#62c4e6", "#a6e3fa"];
     const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     ctx.fillStyle = "#64748b"; ctx.font = "12px sans-serif";

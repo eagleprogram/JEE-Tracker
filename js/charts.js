@@ -136,7 +136,16 @@ export function renderHeatmap() {
     // while 10h+ is a bright, saturated sky blue, so the ramp reads as a
     // clean gradient from "nothing logged" to "goal hit" instead of every
     // bucket fighting for attention equally.
-    const hmColors = ["#141e30", "#1c4470", "#2978ab", "#48b1d9", "#8dd6f5"];
+    // BUG FIX (round 4): the whole ramp, not just the 0h tile, was too
+    // close to the card background (--card: #131b2b) to read as distinct
+    // squares — "dark" was overshooting into "invisible" across every
+    // bucket. Brightened all 5 steps by a consistent amount (keeping the
+    // same hue progression and relative spacing between buckets) so every
+    // tile is clearly a square against the background, while still
+    // staying a low-contrast, GitHub-style dark scale rather than the
+    // earlier bright/saturated version. Geometry and the stroke-free fill
+    // are untouched.
+    const hmColors = ["#233252", "#2c5a9e", "#3a91c9", "#5cc0e8", "#a3e0f8"];
     // BUG FIX (round 2): GitHub's real contribution grid has NO stroke at
     // all — flat, solid fills only, with adjacent cells separated purely
     // by the gap between them, not by a border. The previous "hairline"
