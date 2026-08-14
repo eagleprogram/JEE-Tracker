@@ -486,8 +486,8 @@
                 </span>
             </div>
         </div>
-        <div class="goal-note q-goal-note"><strong class="goal-note-emphasis">Tip:</strong> Asked automatically after each sleep log — click Log Today's Questions button to add or update it.</div>
         <div class="garden-row" id="questions-row"></div>
+        <div class="goal-note q-goal-note"><strong class="goal-note-emphasis">Tip:</strong> Asked automatically after each sleep log — click Log Today's Questions button to add or update it.</div>
     </div>
 
     <div class="card" style="margin-top:20px;">
@@ -587,7 +587,7 @@
     <div class="modal-content q-modal-content" style="text-align:center;" onclick="event.stopPropagation()">
         <h3 style="margin-top:0;">Questions Solved:</h3>
         <p style="color:var(--muted); font-size:13px; margin:0 0 14px;">How many questions did you solve on <strong id="questions-modal-date" style="color:var(--text);">--</strong>?</p>
-        <input type="number" id="questions-count-input" min="0" step="1" placeholder="e.g. 55" style="text-align:center; font-size:18px;">
+        <input type="number" id="questions-count-input" min="0" step="1" placeholder="e.g. 55" style="text-align:center;">
         <div style="margin-top:16px; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
             <button class="btn btn-start" onclick="saveQuestionsSolved()">Save</button>
             <button class="btn btn-pause btn-small" onclick="backQuestionsModal()">Back</button>

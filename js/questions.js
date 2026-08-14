@@ -118,7 +118,10 @@ function questionRingColor(count) {
 }
 
 function questionRingSVG(count) {
-    let r = 24, cx = 30, cy = 30, strokeW = 5;
+    // Ring bumped up from the old r=24/cx,cy=30/viewBox 60x60 — kept the
+    // same stroke-to-radius ratio (strokeW/r) so the ring doesn't look
+    // proportionally thinner or thicker, just slightly bigger overall.
+    let r = 27, cx = 34, cy = 34, strokeW = 5.5;
     let circumference = 2 * Math.PI * r;
     let pct = Math.min(Math.max(count, 0), 100) / 100;
     let color = questionRingColor(count);
@@ -132,9 +135,9 @@ function questionRingSVG(count) {
     let arc = color ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" transform="rotate(90 ${cx} ${cy})"/>` : "";
     let label = count > 0 ? count : "0";
     let textColor = color || "var(--muted)";
-    return `<svg width="100%" height="64" viewBox="0 0 60 60" style="max-width:60px;">
+    return `<svg width="100%" height="72" viewBox="0 0 68 68" style="max-width:68px;">
         ${track}${arc}
-        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="800" fill="${textColor}">${label}</text>
+        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="800" fill="${textColor}">${label}</text>
     </svg>`;
 }
 

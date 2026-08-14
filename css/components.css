@@ -336,6 +336,13 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    overflow-x falls back to a thin horizontal scroll rather than wrapping
    or truncating — the full text stays intact and on one line either way. */
 .goal-note { font-size: clamp(9px, 1.4vw, 10.5px); color: #94a3b8; margin-top: 6px; margin-bottom: 10px; line-height: 1.5; white-space: nowrap; overflow-x: auto; padding-bottom: 2px; }
+/* Question Practice Tracker's Tip note now sits BELOW the ring row
+   (index.html was reordered so the rings lead and the tip trails), so its
+   trailing margin-bottom no longer needs to push a row of rings down —
+   it's the last thing in the card now, so that bottom margin just becomes
+   dead space under the card. Scoped override zeroes it out; margin-top
+   (the gap between the rings and the tip) is left untouched. */
+.q-goal-note { margin-bottom: 0; }
 .goal-note-emphasis { color: var(--text); font-weight: 800; }
 .session-log-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); padding: 6px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; }
 
@@ -390,12 +397,18 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
     align-items: center;
     justify-content: center;
 }
+/* BUG FIX: stroke:currentColor picked up .btn-stop's rose text color, which
+   is far too close to the button's own rose-tinted background (rgba tint at
+   low opacity, but still rose-on-rose) — the trash icon was reading as
+   essentially invisible at this button's small size. Pinned to --text
+   (near-white) instead for real contrast against the red button, and
+   thickened the stroke slightly so it stays crisp at 20px. */
 .q-modal-trash-btn svg {
     width: 20px;
     height: 20px;
-    stroke: currentColor;
+    stroke: var(--text);
     fill: none;
-    stroke-width: 1.8;
+    stroke-width: 2.1;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -407,10 +420,19 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    read as a compact, clearly-bounded input box rather than a plain slab.
    The spin-button opacity rule forces the up/down arrows to stay visible
    at rest — by default WebKit only fades them in on hover/focus. */
+/* Shrunk from the old full-width/18px box (which read as oversized against
+   the small 320px popup) down to a compact, centered field — width capped
+   instead of the generic input[type=number] rule's 100%, with matching
+   auto side margins to keep it centered under the "How many..." question. */
 #questions-count-input {
     color-scheme: dark;
     border: 1.5px solid var(--text);
-    padding: 8px 10px;
+    padding: 6px 8px;
+    width: 55%;
+    max-width: 140px;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 15px;
 }
 #questions-count-input::-webkit-inner-spin-button,
 #questions-count-input::-webkit-outer-spin-button {

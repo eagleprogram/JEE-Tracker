@@ -299,9 +299,13 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    itself rendered oversized. The select now sizes to its own content
    (auto width, flex 0 0 auto, compact padding) so it sits right next to
    "STUDY TRACKER" on one line, matching the intended layout. */
+/* Shrunk from 15px/26px-10px padding — against the compact "STUDY TRACKER"
+   label next to it, the select was noticeably chunkier than everything
+   else in the header row. Kept enough right padding to clear the native
+   dropdown arrow so it doesn't overlap the last digit of the year. */
 #exam-year-select {
-    font-size: 15px !important;
-    padding: 5px 26px 5px 10px !important;
+    font-size: 12px !important;
+    padding: 3px 20px 3px 8px !important;
     width: auto !important;
     flex: 0 0 auto !important;
 }
