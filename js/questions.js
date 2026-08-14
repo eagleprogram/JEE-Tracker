@@ -99,7 +99,7 @@ export function deleteQuestionsSolved() {
     closeQuestionsModal();
     renderQuestionsWidget();
     renderHeatmap();
-    showToast(`🗑 Questions log deleted for ${formatDateDDMMYYYY(dateKey)}.`);
+    showToast(`Questions log deleted for ${formatDateDDMMYYYY(dateKey)}.`);
 }
 
 // ---------------- WEEKLY QUESTION-PRACTICE RING WIDGET ----------------
