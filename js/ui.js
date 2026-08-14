@@ -7,6 +7,12 @@ import { renderSidebarTools, renderPlannerCalendar, carryOverIncompleteTodos } f
 // have no dependency back on ui.js, so this is a normal (non-circular) import.
 import { loadHistoryData } from './history.js';
 import { renderGarden } from './charts.js';
+// Forward reference — questions.js only needs to be safe to call once the
+// full module graph is wired in main.js (same circular-import pattern
+// already used for the other forward references in this file). Keeps the
+// weekly question-practice ring widget's "is today" highlight in sync the
+// same way renderGarden() below does.
+import { renderQuestionsWidget } from './questions.js';
 import { runNotificationChecks, isAlarmRinging } from './notifications.js';
 import { renderMockTestList } from './mocktest.js';
 import { renderSyllabusTracker } from './syllabus.js';
@@ -781,4 +787,5 @@ export function tickCountdowns() {
     if (bucket !== lastQuoteBucket) { renderQuoteOfDay(); lastQuoteBucket = bucket; }
     runNotificationChecks();
     renderGarden();
+    renderQuestionsWidget();
 }

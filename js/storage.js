@@ -13,7 +13,13 @@ export const BASE_EXAM_DATES = { mains1: "2027-01-21T00:00:00+05:30", mains2: "2
 
 // ----------------- STUDY DAY DB -----------------
 export function blankDay() {
-    return { subjects: { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Preparation": 0, "Mock Test / Analysis": 0 }, breaks: [], studySessions: [], todos: [], slots: [], totalStudy: 0, totalBreak: 0 };
+    // questionsSolved: approximate no. of questions solved that day (set via
+    // the post-sleep-log popup, or the "Log Today's Questions" button — see
+    // questions.js). questionsAsked: whether the popup has already been
+    // shown/answered (or explicitly skipped) for this day, so the same day
+    // is never nagged twice — 0 is a valid answer, so a separate boolean is
+    // needed rather than checking questionsSolved > 0.
+    return { subjects: { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Preparation": 0, "Mock Test / Analysis": 0 }, breaks: [], studySessions: [], todos: [], slots: [], totalStudy: 0, totalBreak: 0, questionsSolved: 0, questionsAsked: false };
 }
 
 // One-time rename map for subject keys that changed after data already
@@ -54,6 +60,11 @@ export function ensureDayShape(day) {
     // relies on id, not array position.
     day.studySessions.forEach(s => { if (!s.id) s.id = generateId(); });
     day.breaks.forEach(b => { if (!b.id) b.id = generateId(); });
+    // Backfill the questions-solved fields for any day saved before this
+    // feature existed, so old data reads as "0, not yet asked" instead of
+    // undefined.
+    if (typeof day.questionsSolved !== "number" || isNaN(day.questionsSolved)) day.questionsSolved = 0;
+    if (typeof day.questionsAsked !== "boolean") day.questionsAsked = false;
     return day;
 }
 

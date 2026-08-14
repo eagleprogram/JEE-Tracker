@@ -7,6 +7,11 @@ import { showToast } from './ui.js';
 // saved, so History's "Add Missed Break" reflects it immediately without
 // requiring the user to touch the history date picker first.
 import { refreshMissedBreakConstraints } from './history.js';
+// Forward reference — questions.js only needs to be safe to call once the
+// full module graph is wired in main.js (same pattern as the ui.js import
+// above). Triggers the "how many questions did you solve" popup for the
+// day a sleep log entry just closed out.
+import { maybeAskQuestionsSolved } from './questions.js';
 
 // A "pending" entry is always type 'sleep' now (bedtime logged, wake still
 // to come). Older saved data may still have a leftover type:'wake' pending
@@ -76,6 +81,10 @@ export function saveSleepLog() {
         renderSleepLog();
         renderSleepPendingBanner();
         showToast("Bedtime logged — log your wake time to complete it.");
+        // Bedtime logged = today's study day is effectively "closed out" —
+        // this is the natural moment to ask how many questions were solved
+        // today. No-ops if today was already asked (see the function).
+        maybeAskQuestionsSolved(sleepDate);
         return;
     }
 
@@ -106,6 +115,9 @@ export function saveSleepLog() {
             setSleepPending(null);
             refreshMissedBreakConstraints();
             showToast("Sleep log completed!");
+            // pending.date is the day that bedtime was logged for — i.e.
+            // the study day this sleep cycle closes out.
+            maybeAskQuestionsSolved(pending.date);
         } else {
             // 2b: Nothing pending — the realistic first-time-opening-the-app
             // case (no prior bedtime on record to attach to). Save this as
@@ -161,6 +173,7 @@ export function saveSleepLog() {
         renderSleepLog();
         renderSleepPendingBanner();
         showToast("Sleep log saved.");
+        maybeAskQuestionsSolved(sleepDate);
     }
 }
 

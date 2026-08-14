@@ -64,6 +64,11 @@ import {
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
 
 import {
+    openQuestionsModal, closeQuestionsModal, saveQuestionsSolved,
+    skipQuestionsModal, openTodayQuestionsModal, renderQuestionsWidget
+} from './questions.js';
+
+import {
     downloadDayLog, shareDayLog, sendReportViaEmail, downloadReport, shareReport
 } from './reports.js';
 
@@ -108,6 +113,9 @@ Object.assign(window, {
     openDatePicker,
     // charts.js
     renderGarden, renderHeatmap, renderTrendChart,
+    // questions.js
+    openQuestionsModal, closeQuestionsModal, saveQuestionsSolved,
+    skipQuestionsModal, openTodayQuestionsModal,
     // history.js
     loadHistoryData, deleteSubjectEntry, deleteStudySessionEntry,
     deleteBreakEntry, deleteStudyLog, deleteBreakLog, addMissedBreak,
@@ -254,6 +262,7 @@ async function initApp() {
     // Charts.
     renderHeatmap();
     renderTrendChart();
+    renderQuestionsWidget();
 
     // Seed the backup-reminder timestamp on first run so it has a baseline.
     if (!getLastBackupAt()) markBackupDone();

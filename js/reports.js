@@ -15,6 +15,7 @@ export
         let lines = [`📚 Study Log — ${formatDateDDMMYYYY(dt)}`, `⏱ Total Study: ${formatReadable(day.totalStudy)}`, `☕ Total Break: ${formatReadable(day.totalBreak)}`, ``];
         lines.push(`Subject breakdown:`);
         for (let [cat, sec] of Object.entries(day.subjects)) if (sec > 0) lines.push(`• ${cat}: ${formatReadable(sec)}`);
+        lines.push(``, `🧮 Questions Solved: ${day.questionsSolved || 0}`);
         lines.push(``, `Tracked with @ẞhì's JEE Study Tracker 🎯`);
         return lines.join("\n");
     }
@@ -33,8 +34,18 @@ function buildShareCanvas(dt) {
     let width = 720;
     let legendItemHeight = 32;
     let legendHeight = hasData ? (entries.length * legendItemHeight + 30) : 60;
-    let height = 280 + 200 + legendHeight + 40; // title + stats + chart + legend + footer
-    
+    // legendSectionYPrecalc mirrors chartTopY(245) + chartHeight(200) + 20
+    // = 465, the same constants used further down when the donut chart is
+    // drawn (kept as a separate name from the later legendSectionY so both
+    // declarations coexist in this scope) — computed here purely so the
+    // extra "Questions Solved" block below can reserve its own space
+    // up front, before canvas.height is set.
+    let legendSectionYPrecalc = 465;
+    let qDividerY = legendSectionYPrecalc + legendHeight - 5;
+    let qLabelY = qDividerY + 30;
+    let footerY = qLabelY + 38;
+    let height = footerY + 22; // title + stats + chart + legend + questions solved + footer
+
     let canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
@@ -204,13 +215,27 @@ function buildShareCanvas(dt) {
         ctx.fillText("No subject-wise study time logged.", 32, legendY);
     }
     
-    // ============= FOOTER =============
-    ctx.fillStyle = "#64748b";
-    ctx.font = "13px sans-serif";
+    // ============= QUESTIONS SOLVED =============
+    ctx.strokeStyle = "#232f48";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(32, qDividerY);
+    ctx.lineTo(width - 32, qDividerY);
+    ctx.stroke();
+
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "bold 18px sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    ctx.fillText("Made with ❤️ by @ẞhì's JEE Study Tracker", 32, height - 15);
-    
+    ctx.fillText(`🧮 Questions Solved: ${day.questionsSolved || 0}`, 32, qLabelY);
+
+    // ============= FOOTER =============
+    // Centered, matching the weekly/monthly report's footer style.
+    ctx.fillStyle = "#64748b";
+    ctx.font = "16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Made with ❤️ by @ẞhì's JEE Study Tracker", width / 2, footerY);
+
     return canvas;
 }
 
@@ -357,7 +382,7 @@ function buildReportCanvas(days, title) {
         totalStudy += day.totalStudy || 0;
         totalBreak += day.totalBreak || 0;
         for (let [cat, sec] of Object.entries(day.subjects)) { aggregateSubjects[cat] = (aggregateSubjects[cat] || 0) + (sec || 0); }
-        dayData.push({ date: key, study: day.totalStudy || 0, break: day.totalBreak || 0 });
+        dayData.push({ date: key, study: day.totalStudy || 0, break: day.totalBreak || 0, questions: day.questionsSolved || 0 });
     });
     let entries = Object.entries(aggregateSubjects).filter(([, sec]) => sec > 0);
     let totalSubjectSec = entries.reduce((sum, [, sec]) => sum + sec, 0);
@@ -516,23 +541,23 @@ ctx.textAlign = "left";
     // pinned to the left edge while empty space collects on the right.
     ctx.font = "16px sans-serif";
     const statusMaxWidth = Math.max(ctx.measureText("✅ Goal Met").width, ctx.measureText("❌ Missed").width);
-    const colInnerGap = 120;   // date -> study -> break -> status spacing within one block
-    const blockGap = 100;      // gap between the left block and the right block
-    const blockContentWidth = 3 * colInnerGap + statusMaxWidth; // date..status offset + status text width
+    const colInnerGap = 100;   // date -> study -> break -> questions -> status spacing within one block
+    const blockGap = 90;       // gap between the left block and the right block
+    const blockContentWidth = 4 * colInnerGap + statusMaxWidth; // date..status offset + status text width
     const tableTotalWidth = blockContentWidth * 2 + blockGap;
     const tableLeftMargin = (width - tableTotalWidth) / 2;
 
     const colX = {
-        left: { date: tableLeftMargin, study: tableLeftMargin + colInnerGap, break: tableLeftMargin + 2 * colInnerGap, status: tableLeftMargin + 3 * colInnerGap },
+        left: { date: tableLeftMargin, study: tableLeftMargin + colInnerGap, break: tableLeftMargin + 2 * colInnerGap, questions: tableLeftMargin + 3 * colInnerGap, status: tableLeftMargin + 4 * colInnerGap },
         right: {}
     };
-    colX.right = { date: colX.left.date + blockContentWidth + blockGap, study: colX.left.study + blockContentWidth + blockGap, break: colX.left.break + blockContentWidth + blockGap, status: colX.left.status + blockContentWidth + blockGap };
+    colX.right = { date: colX.left.date + blockContentWidth + blockGap, study: colX.left.study + blockContentWidth + blockGap, break: colX.left.break + blockContentWidth + blockGap, questions: colX.left.questions + blockContentWidth + blockGap, status: colX.left.status + blockContentWidth + blockGap };
 
     ctx.fillStyle = "#f1f5f9"; ctx.font = "bold 22px sans-serif"; ctx.fillText("Daily Performance Breakdown", tableLeftMargin, tableTitleY);
 
     ctx.fillStyle = "#64748b"; ctx.font = "16px sans-serif";
-    ctx.fillText("Date", colX.left.date, tableHeaderY); ctx.fillText("Study", colX.left.study, tableHeaderY); ctx.fillText("Break", colX.left.break, tableHeaderY); ctx.fillText("Status", colX.left.status, tableHeaderY);
-    ctx.fillText("Date", colX.right.date, tableHeaderY); ctx.fillText("Study", colX.right.study, tableHeaderY); ctx.fillText("Break", colX.right.break, tableHeaderY); ctx.fillText("Status", colX.right.status, tableHeaderY);
+    ctx.fillText("Date", colX.left.date, tableHeaderY); ctx.fillText("Study", colX.left.study, tableHeaderY); ctx.fillText("Break", colX.left.break, tableHeaderY); ctx.fillText("Questions", colX.left.questions, tableHeaderY); ctx.fillText("Status", colX.left.status, tableHeaderY);
+    ctx.fillText("Date", colX.right.date, tableHeaderY); ctx.fillText("Study", colX.right.study, tableHeaderY); ctx.fillText("Break", colX.right.break, tableHeaderY); ctx.fillText("Questions", colX.right.questions, tableHeaderY); ctx.fillText("Status", colX.right.status, tableHeaderY);
     ctx.strokeStyle = "#232f48"; ctx.beginPath(); ctx.moveTo(tableLeftMargin, tableDividerY); ctx.lineTo(width - tableLeftMargin, tableDividerY); ctx.stroke();
 
     // BUG FIX: was filling row-major (alternating left/right by index parity —
@@ -548,6 +573,7 @@ ctx.textAlign = "left";
         ctx.fillStyle = "#f1f5f9"; ctx.font = "16px sans-serif"; ctx.fillText(d.date, col.date, y);
         ctx.fillStyle = "#10b981"; ctx.fillText(formatReadable(d.study), col.study, y);
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
+        ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
         ctx.fillStyle = d.study >= 36000 ? "#10b981" : "#ef4444";
         ctx.fillText(d.study >= 36000 ? "✅ Goal Met" : "❌ Missed", col.status, y);
     });
@@ -577,17 +603,18 @@ export function downloadReport(type) {
 // style but sums across the whole date range instead of a single day.
 function buildReportShareText(days, type) {
     let db = getDB();
-    let totalStudy = 0, totalBreak = 0;
+    let totalStudy = 0, totalBreak = 0, totalQuestions = 0;
     let aggregateSubjects = { ...blankDay().subjects };
     days.forEach(key => {
         let day = db[key]; if (!day) return;
         ensureDayShape(day);
         totalStudy += day.totalStudy || 0;
         totalBreak += day.totalBreak || 0;
+        totalQuestions += day.questionsSolved || 0;
         for (let [cat, sec] of Object.entries(day.subjects)) aggregateSubjects[cat] = (aggregateSubjects[cat] || 0) + (sec || 0);
     });
     let label = type === 'weekly' ? '📊 Weekly Study Report' : '📊 Monthly Study Report';
-    let lines = [label, `🗓 ${days[0]} → ${days[days.length - 1]}`, `⏱ Total Study: ${formatReadable(totalStudy)}`, `☕ Total Break: ${formatReadable(totalBreak)}`, `🔥 Streak: ${computeStreak(db)} days`, ``];
+    let lines = [label, `🗓 ${days[0]} → ${days[days.length - 1]}`, `⏱ Total Study: ${formatReadable(totalStudy)}`, `☕ Total Break: ${formatReadable(totalBreak)}`, `🔥 Streak: ${computeStreak(db)} days`, `🧮 Total Questions Solved: ${totalQuestions}`, ``];
     lines.push(`Subject breakdown:`);
     for (let [cat, sec] of Object.entries(aggregateSubjects)) if (sec > 0) lines.push(`• ${cat}: ${formatReadable(sec)}`);
     lines.push(``, `Tracked with @ẞhì's JEE Study Tracker 🎯`);
