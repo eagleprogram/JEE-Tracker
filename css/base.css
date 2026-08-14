@@ -410,3 +410,39 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
        let it fall back to normal (only) column placement. */
     #live-summary-card { grid-column: 1; }
 }
+
+/* ===== Mobile drawer and viewport guard =====
+   These rules deliberately live after the desktop sidebar definitions.
+   The earlier mobile sidebar block is parsed before `.sidebar` and
+   `.sidebar.expanded` above, which have the same selector specificity.
+   Consequently, CSS's normal cascade restored the 64px rail and, more
+   importantly, the 420px desktop drawer on a phone. Opening any tool panel
+   then made the whole page wider than the screen and squeezed the dashboard
+   into the remaining strip. Keeping the mobile overrides here guarantees
+   that the drawer is an overlay on every phone/tablet viewport. */
+@media (max-width: 850px) {
+    body {
+        padding-left: 48px;
+        overflow-x: clip;
+    }
+
+    body.panel-open { padding-left: 48px; }
+
+    .sidebar {
+        width: 48px;
+        box-sizing: border-box;
+    }
+
+    .sidebar.expanded {
+        width: min(88vw, 340px);
+        max-width: calc(100vw - 12px);
+        box-sizing: border-box;
+        padding: 12px 12px calc(28px + env(safe-area-inset-bottom));
+    }
+
+    .main-wrapper {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
+}
