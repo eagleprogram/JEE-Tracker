@@ -540,7 +540,7 @@ ctx.textAlign = "left";
     // block sits with equal margins left and right, instead of being
     // pinned to the left edge while empty space collects on the right.
     ctx.font = "16px sans-serif";
-    const statusMaxWidth = Math.max(ctx.measureText("✅ Goal Met").width, ctx.measureText("❌ Missed").width);
+    const statusMaxWidth = Math.max(ctx.measureText("Goal Met ✅").width, ctx.measureText("Missed ❌").width);
     const colInnerGap = 112;   // date -> study -> break -> questions spacing within one block
     const queStatusGap = 50;   // questions -> status spacing — deliberately tighter than the rest,
                                 // since "Que" is a short number and doesn't need a full column's worth
@@ -591,7 +591,7 @@ ctx.textAlign = "left";
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
         ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
         ctx.fillStyle = d.study >= 36000 ? "#10b981" : "#ef4444";
-        ctx.fillText(d.study >= 36000 ? "✅ Goal Met" : "❌ Missed", col.status, y);
+        ctx.fillText(d.study >= 36000 ? "Goal Met ✅" : "Missed ❌", col.status, y);
     });
 
     // ---- Footer ----

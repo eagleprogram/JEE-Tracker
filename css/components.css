@@ -342,7 +342,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    it's the last thing in the card now, so that bottom margin just becomes
    dead space under the card. Scoped override zeroes it out; margin-top
    (the gap between the rings and the tip) is left untouched. */
-.q-goal-note { margin-bottom: 0; }
+.q-goal-note { margin-top: 24px; margin-bottom: 0; }
 .goal-note-emphasis { color: var(--text); font-weight: 800; }
 .session-log-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); padding: 6px 8px; border-radius: 6px; margin-top: 4px; font-size: 12px; }
 
@@ -389,7 +389,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    a tight square instead of stretching. font-size:0 stops any stray text
    node from affecting sizing now that the icon is an SVG, not a glyph. */
 .q-modal-trash-btn {
-    width: 44px;
+    width: 54px;
     flex: 0 0 auto;
     padding: 8px 0;
     font-size: 0;
@@ -397,21 +397,25 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
     align-items: center;
     justify-content: center;
 }
-/* BUG FIX: stroke:currentColor picked up .btn-stop's rose text color, which
-   is far too close to the button's own rose-tinted background (rgba tint at
-   low opacity, but still rose-on-rose) — the trash icon was reading as
-   essentially invisible at this button's small size. Pinned to --text
-   (near-white) instead for real contrast against the red button, and
-   thickened the stroke slightly so it stays crisp at 20px. */
-.q-modal-trash-btn svg {
-    width: 20px;
-    height: 20px;
-    stroke: var(--text);
+.q-modal-trash-btn .trash-icon,
+.history-delete-btn .trash-icon,
+.mc-icon-btn .trash-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
     fill: none;
-    stroke-width: 2.1;
+    stroke: currentColor;
+    stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+    flex: 0 0 auto;
 }
+.history-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
 /* Tells the browser to render this input's native controls (including the
    number spinner's up/down arrows) using its dark-mode palette instead of
    the default light-on-light arrows that looked out of place against the
@@ -427,12 +431,12 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 #questions-count-input {
     color-scheme: dark;
     border: 1.5px solid var(--text);
-    padding: 6px 8px;
-    width: 55%;
-    max-width: 140px;
+    padding: 7px 10px;
+    width: 230px;
+    max-width: 100%;
     margin-left: auto;
     margin-right: auto;
-    font-size: 15px;
+    font-size: 16px;
 }
 #questions-count-input::-webkit-inner-spin-button,
 #questions-count-input::-webkit-outer-spin-button {
@@ -615,6 +619,7 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mc-notes-view { padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .mc-icon-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; width: 30px; height: 30px; font-size: 14px; line-height: 1; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
 .mc-icon-btn:hover { border-color: var(--primary); }
+.mc-icon-btn[data-mc-delete-entry] { color: var(--danger); }
 
 /* Add Mistake / View Mistakes sub-tabs — two equal-width (X/2) segments
    spanning the same width as the rest of the sidebar panel, mirroring the
@@ -624,26 +629,3 @@ textarea.mock-notes { width: 100%; padding: 10px; background: var(--bg); border:
 .mistake-view-toggle button { flex: 1 1 50%; background: var(--card); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 9px 6px; font-size: 12px; font-weight: 700; cursor: pointer; }
 .mistake-view-toggle button.active { background: var(--primary); border-color: var(--primary); color: #04121f; }
 .mistake-search-box { margin-top: 4px; }
-
-/* ===== Consistent delete/trash glyph =====
-   Used only for controls that are genuinely trash/delete actions.
-   Existing X/cross controls use their original ✕ glyph and are deliberately
-   not targeted by this class. */
-.delete-icon {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    flex: 0 0 16px;
-    background-color: currentColor;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M5 7l1 14h12l1-14'/%3E%3Cpath d='M9 7V4h6v3'/%3E%3C/svg%3E") no-repeat center / contain;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M5 7l1 14h12l1-14'/%3E%3Cpath d='M9 7V4h6v3'/%3E%3C/svg%3E") no-repeat center / contain;
-    vertical-align: -3px;
-}
-
-/* The compact destructive buttons already use .btn-stop, so only normalize
-   the glyph size/alignment here. */
-.btn-stop .delete-icon { width: 16px; height: 16px; }
-
-/* Mistakes entry icon button: keep the existing compact button geometry and
-   let the shared trash glyph inherit the button's danger color. */
-.mc-icon-btn .delete-icon { width: 17px; height: 17px; vertical-align: middle; }
