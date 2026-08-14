@@ -191,36 +191,23 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 }
 
 /* ===== Header: logo, title, countdown chips, quote ===== */
+/* BUG FIX (header restyle, round 3): the single-row layout (title block
+   left, 3 chips right, centered as one group) still didn't match the
+   requested reference — that reference is a STACKED layout: the title
+   block on its own centered row on top, then the 3 countdown chips on
+   a full-width centered row underneath, both inside the same card.
+   Switched .header to a column flex container with two centered rows
+   instead of one row with two side-by-side groups. */
 .header {
     display: flex;
-    /* BUG FIX (header restyle): was flex-start, which pinned the title
-       block flush against the card's left padding edge with the 3
-       countdown chips trailing off to the right, leaving a big dead gap
-       on the right side whenever the card was wider than its content
-       (which it usually is — .header isn't width-constrained on its own,
-       and .main-wrapper's max-width still leaves it fairly wide). Centering
-       the whole content group (title block + gap + 3 chips, as one row)
-       within the card is what "keep it middle" in the reference screenshot
-       shows — the title block sits with breathing room on both sides
-       instead of glued to the left edge. */
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    gap: 64px;
+    gap: 24px;
     background: var(--card);
     border: 1px solid var(--border);
-    /* BUG FIX (header restyle, round 2): justify-content:center alone
-       centers the content group within .header's own content-box, but the
-       reported result still left visible dead space specifically on the
-       RIGHT — asymmetric padding shifts that same centered group right by
-       exactly the left/right difference (40px here), since the content-box
-       centering math runs on whatever space padding leaves available, not
-       on the card's outer edges. This is a direct, predictable nudge, not
-       a different layout — everything else about the centering above is
-       unchanged. */
-    padding: 16px 24px 16px 64px;
+    padding: 28px 40px;
     border-radius: 12px;
     margin-bottom: 20px;
-    flex-wrap: wrap;
 }
 
 /* The icon sits in its OWN row alongside just the "JEE 2027" text
@@ -285,6 +272,10 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 }
 @media (max-width: 850px) { .app-title-main { font-size: 30px; } .app-title-icon { width: 36px; height: 36px; } .header { gap: 20px; } }
 
+/* Chips row: full-width, evenly spaced, centered — sits below the title
+   block as its own row within the .header card. */
+.header-chip-row { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; width: 100%; }
+
 .countdown-chip {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -315,7 +306,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 
 /* ===== Two-column page grid ===== */
 .grid-2 { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; }
-@media (max-width: 850px) { .grid-2 { grid-template-columns: 1fr; } .header { flex-direction: column; align-items: stretch; } }
+@media (max-width: 850px) { .grid-2 { grid-template-columns: 1fr; } }
 
 /* BUG FIX: body.zen-mode .timer-card (components.css) switches the timer
    card to `position: fixed` the instant zen mode turns on. That takes it

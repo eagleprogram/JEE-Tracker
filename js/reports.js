@@ -508,9 +508,15 @@ ctx.textAlign = "left";
     ctx.fillText("Date", colX.right.date, tableHeaderY); ctx.fillText("Study", colX.right.study, tableHeaderY); ctx.fillText("Break", colX.right.break, tableHeaderY); ctx.fillText("Status", colX.right.status, tableHeaderY);
     ctx.strokeStyle = "#232f48"; ctx.beginPath(); ctx.moveTo(tableLeftMargin, tableDividerY); ctx.lineTo(width - tableLeftMargin, tableDividerY); ctx.stroke();
 
+    // BUG FIX: was filling row-major (alternating left/right by index parity —
+    // item 10 left, 11 right, 12 left, 13 right...), which scatters a
+    // logical run of dates across both columns out of vertical order.
+    // Now fills column-major: the left column gets the first `rowsPerColumn`
+    // entries top-to-bottom, then the right column continues with the rest —
+    // so 10, 11, 12... read straight down one column before continuing.
     dayData.forEach((d, i) => {
-        let col = (i % 2 === 0) ? colX.left : colX.right;
-        let rowIdx = Math.floor(i / 2);
+        let col = (i < rowsPerColumn) ? colX.left : colX.right;
+        let rowIdx = (i < rowsPerColumn) ? i : i - rowsPerColumn;
         let y = tableFirstRowY + rowIdx * rowH;
         ctx.fillStyle = "#f1f5f9"; ctx.font = "16px sans-serif"; ctx.fillText(d.date, col.date, y);
         ctx.fillStyle = "#10b981"; ctx.fillText(formatReadable(d.study), col.study, y);

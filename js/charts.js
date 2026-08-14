@@ -113,13 +113,12 @@ export function renderHeatmap() {
         }
         weeks.push(week);
     }
-    // BUG FIX: switched from a chunky 13px/rx3/1px-border tile to GitHub's
-    // own contribution-graph proportions (small square, tight 3px gap,
-    // barely-rounded rx2, and a hairline border in a shade barely lighter
-    // than the fill instead of a separate bright accent color) — matching
-    // the reference screenshot the user attached, while keeping this app's
-    // own blue palette (hmColors/hmStrokes below) instead of GitHub's green.
-    let cell = 11; let gap = 3; let width = weeks.length * (cell + gap) + 16; let height = 7 * (cell + gap) + 10; let svg = `<svg width="${width}" height="${height}">`;
+    // BUG FIX (round 2): reverted to the original larger tile geometry
+    // (13px cell, 4px gap, rx3) the user wants back — the small/tight
+    // GitHub-proportioned tiles from the previous fix were the wrong
+    // target; only the COLOR treatment (below) should follow GitHub's
+    // dark, low-contrast style, not the size.
+    let cell = 13; let gap = 4; let width = weeks.length * (cell + gap) + 16; let height = 7 * (cell + gap) + 10; let svg = `<svg width="${width}" height="${height}">`;
     // BUG FIX: the previous version used a genuine multi-hue scale (blue ->
     // green -> amber -> rose per bucket) specifically because a single-hue
     // ramp was hard to split into confident buckets. Feedback was the exact
@@ -138,11 +137,11 @@ export function renderHeatmap() {
     // clean gradient from "nothing logged" to "goal hit" instead of every
     // bucket fighting for attention equally.
     const hmColors = ["#141e30", "#1c4470", "#2978ab", "#48b1d9", "#8dd6f5"];
-    // Hairline borders now sit MUCH closer to their own fill (barely a shade
-    // lighter) instead of jumping to a distinctly brighter accent color —
-    // GitHub's real grid uses a near-invisible border, just enough to
-    // separate adjacent same-color tiles, not a highlighted outline.
-    const hmStrokes = ["#1a2540", "#234f80", "#2f84ba", "#52bce4", "#97ddf8"];
+    // BUG FIX (round 2): GitHub's real contribution grid has NO stroke at
+    // all — flat, solid fills only, with adjacent cells separated purely
+    // by the gap between them, not by a border. The previous "hairline"
+    // stroke was still a visible outline against the dark background.
+    // Dropped stroke/stroke-width entirely.
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
             if (day.date > today) return;
@@ -151,7 +150,7 @@ export function renderHeatmap() {
             // color is only reached at the actual goal (10h+), not 9h —
             // matches the updated "10h+" legend label in index.html.
             let colorIdx = day.hrs >= 10 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
-            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${hmColors[colorIdx]}" stroke="${hmStrokes[colorIdx]}" stroke-width="1"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
+            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="${hmColors[colorIdx]}"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}h</title></rect>`;
         });
     });
     svg += `</svg>`;
