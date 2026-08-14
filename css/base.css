@@ -30,19 +30,7 @@ body.panel-open { padding-left: 440px; }
    dead zone: the sidebar and the main content now switch to mobile layout
    at the exact same width, together. */
 @media (max-width: 850px) {
-    body { padding-left: 64px; }
-    body.panel-open { padding-left: 64px; }
-    .sidebar { width: 48px; }
-    .sidebar.expanded { width: 88vw; max-width: 340px; }
-    /* .timer-screen has no mobile override anywhere else — its 72px desktop
-       size (defined in components.css) has no headroom against a ~360-400px
-       phone viewport once the card's own 24px side padding is subtracted,
-       and .card has no overflow:hidden, so the digits can render wider than
-       the card and visually spill out past its rounded border on the sides.
-       clamp() scales the size down with the actual viewport width instead
-       of one fixed px value, so it stays safely inside the card on any
-       phone width this media query covers (not just one tested size).
-       Desktop (>850px) is untouched. */
+    /* Keep the timer readable on phones without changing the desktop scale. */
     .timer-screen { font-size: clamp(32px, 11vw, 48px); }
 }
 
@@ -411,142 +399,260 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     #live-summary-card { grid-column: 1; }
 }
 
-/* ===== Mobile drawer and viewport guard =====
-   These rules deliberately live after the desktop sidebar definitions.
-   The earlier mobile sidebar block is parsed before `.sidebar` and
-   `.sidebar.expanded` above, which have the same selector specificity.
-   Consequently, CSS's normal cascade restored the 64px rail and, more
-   importantly, the 420px desktop drawer on a phone. Opening any tool panel
-   then made the whole page wider than the screen and squeezed the dashboard
-   into the remaining strip. Keeping the mobile overrides here guarantees
-   that the drawer is an overlay on every phone/tablet viewport. */
-@media (max-width: 850px) {
+/* ===== Mobile layout =====
+   Phones/tablets keep the familiar left navigation rail, but the tool panel
+   opens as an overlay instead of pushing the dashboard sideways. This keeps
+   the dashboard at the full usable viewport width and preserves normal page
+   scrolling in the installed PWA as well as in the browser.
+
+   The pointer/coarse clause also catches touch devices whose browser reports
+   a wider CSS viewport than their physical screen (for example some Android
+   browser/PWA configurations). Desktop layouts above this range are untouched. */
+@media (max-width: 900px), (max-width: 1100px) and (pointer: coarse) {
+    html,
     body {
-        padding-left: 48px;
-        overflow-x: clip;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
     }
 
-    body.panel-open { padding-left: 48px; }
+    body,
+    body.panel-open {
+        padding-left: 54px;
+        padding-bottom: 0;
+        min-height: 100dvh;
+    }
 
     .sidebar {
-        width: 48px;
+        top: 0;
+        left: 0;
+        right: auto;
+        bottom: auto;
+        width: 54px;
+        height: 100dvh;
+        padding: 10px 4px;
         box-sizing: border-box;
+        flex-direction: column;
+        align-items: stretch;
+        overflow-x: hidden;
+        overflow-y: auto;
+        border-right: 1px solid var(--border);
+        border-top: 0;
+        box-shadow: 4px 0 18px rgba(0, 0, 0, 0.18);
     }
 
+    .rail-icons {
+        width: 100%;
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 3px;
+        padding: 8px 0;
+    }
+
+    .menu-btn {
+        width: 100%;
+        min-width: 0;
+        flex: 0 0 auto;
+        padding: 10px 0;
+        gap: 3px;
+    }
+
+    .menu-btn .menu-icon {
+        width: 24px;
+        height: 24px;
+        font-size: 19px;
+    }
+
+    .menu-btn .menu-label {
+        font-size: 8px;
+        line-height: 1.1;
+    }
+
+    /* Opening a tool is a true overlay: the dashboard never gets squeezed. */
     .sidebar.expanded {
-        width: min(88vw, 340px);
-        max-width: calc(100vw - 12px);
+        inset: 0 auto 0 0;
+        width: min(88vw, 360px);
+        max-width: calc(100vw - 10px);
+        height: 100dvh;
+        padding: max(12px, env(safe-area-inset-top)) 12px calc(28px + env(safe-area-inset-bottom));
         box-sizing: border-box;
-        padding: 12px 12px calc(28px + env(safe-area-inset-bottom));
+        flex-direction: column;
+        align-items: stretch;
+        overflow-x: hidden;
+        overflow-y: auto;
+        box-shadow: 16px 0 50px rgba(0, 0, 0, 0.45);
+    }
+
+    .sidebar.expanded .rail-icons {
+        width: 100%;
+        flex: 0 0 auto;
+        flex-direction: column;
+        margin: 0 0 10px;
+        padding: 8px 0 10px;
+    }
+
+    .sidebar.expanded .menu-btn {
+        width: 100%;
+        flex: 0 0 auto;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 12px;
+        padding: 9px 10px;
+    }
+
+    .sidebar.expanded .menu-btn .menu-label {
+        font-size: 14px;
+        line-height: 1.2;
+    }
+
+    .sidebar-content {
+        width: 100%;
+        min-width: 0;
+        padding-bottom: 24px;
+        gap: 12px;
     }
 
     .main-wrapper {
         width: 100%;
         max-width: none;
-        box-sizing: border-box;
-    }
-}
-
-/* ===== Mobile app navigation and compact header =====
-   A desktop-style vertical rail leaves too little usable width on a phone,
-   and a partial-width drawer feels especially awkward in an installed PWA.
-   On touch-sized screens the rail becomes a bottom navigation bar; selecting
-   a tool opens its existing panel as a full-screen sheet. No JavaScript or
-   feature behaviour changes — only the mobile presentation changes. */
-@media (max-width: 850px) {
-    body,
-    body.panel-open {
-        padding-left: 0;
-        padding-bottom: calc(68px + env(safe-area-inset-bottom));
-    }
-
-    .sidebar {
-        top: auto;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        height: calc(64px + env(safe-area-inset-bottom));
-        padding: 4px 8px env(safe-area-inset-bottom);
-        flex-direction: row;
-        align-items: center;
-        overflow: visible;
-        border-top: 1px solid var(--border);
-        border-right: 0;
-        box-sizing: border-box;
-    }
-
-    .rail-icons {
-        flex: 1;
-        flex-direction: row;
-        justify-content: space-around;
-        gap: 4px;
-        padding: 0;
-    }
-
-    .menu-btn {
-        flex: 1 1 0;
         min-width: 0;
-        padding: 6px 0;
+        box-sizing: border-box;
+        padding: 12px;
+        margin: 0;
     }
 
-    .menu-btn .menu-icon { font-size: 19px; width: 24px; height: 24px; }
-    .menu-btn .menu-label { font-size: 8px; }
-
-    .sidebar.expanded {
-        inset: 0;
-        width: 100vw;
-        max-width: none;
-        height: 100dvh;
-        padding: max(12px, env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom));
-        flex-direction: column;
-        align-items: stretch;
-        overflow-x: hidden;
-        overflow-y: auto;
+    /* Never allow a mobile header child to establish a page-wide overflow. */
+    .header,
+    .quote-banner,
+    .card,
+    .grid-2 {
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
     }
 
-    .sidebar.expanded .rail-icons {
-        flex: 0 0 auto;
-        flex-direction: row;
+    .header {
         width: 100%;
-        margin: 0 0 12px;
-        padding: 8px 0 10px;
+        padding: 14px 12px;
+        margin-bottom: 14px;
+        gap: 12px;
     }
 
-    .sidebar.expanded .menu-btn {
-        flex: 1 1 0;
-        flex-direction: column;
-        gap: 2px;
-        padding: 6px 2px;
+    .app-title-wrap {
+        width: 100%;
+        min-width: 0;
+        margin-left: 0;
+        align-items: center;
     }
 
-    .sidebar.expanded .menu-btn .menu-label { font-size: 9px; }
-    .sidebar-content { padding-bottom: 0; }
+    .app-title-row {
+        max-width: 100%;
+    }
 
-    .main-wrapper { padding: 12px; }
-    .header { padding: 14px 12px; margin-bottom: 14px; }
+    .app-title-main {
+        font-size: clamp(23px, 7vw, 30px);
+    }
+
+    .app-title-icon {
+        width: clamp(28px, 8vw, 36px);
+        height: clamp(28px, 8vw, 36px);
+    }
+
+    .app-title-text {
+        max-width: 100%;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .app-title-sub {
+        font-size: 10px;
+        letter-spacing: 2.5px;
+    }
+
+    #exam-year-select {
+        max-width: 92px;
+        font-size: 11px !important;
+    }
 
     .header-chip-row {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         width: 100%;
-        gap: 8px;
+        max-width: 100%;
+        gap: 7px;
+        flex-shrink: 1;
     }
 
     .countdown-chip {
         min-width: 0;
-        padding: 10px 4px;
+        width: 100%;
+        padding: 9px 3px;
         border-radius: 12px;
+        box-sizing: border-box;
     }
 
-    .countdown-chip .chip-label { font-size: 9px; letter-spacing: 0.25px; }
-    .countdown-chip .chip-days { font-size: 28px; }
-    .countdown-chip .chip-days .chip-days-unit { font-size: 10px; letter-spacing: 0.6px; }
-    .countdown-chip .chip-sub { font-size: 9px; }
+    .countdown-chip .chip-label {
+        font-size: clamp(8px, 2.2vw, 10px);
+        letter-spacing: 0.15px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .countdown-chip .chip-days {
+        font-size: clamp(24px, 7vw, 31px);
+    }
+
+    .countdown-chip .chip-days .chip-days-unit {
+        font-size: 9px;
+        letter-spacing: 0.5px;
+    }
+
+    .countdown-chip .chip-sub {
+        font-size: clamp(8px, 2vw, 10px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .quote-banner {
+        padding: 16px 14px;
+        margin-bottom: 14px;
+    }
+
+    .quote-banner .quote-text {
+        font-size: clamp(16px, 4.5vw, 19px);
+    }
+
+    .quote-banner .quote-author {
+        font-size: 13px;
+        margin-top: 7px;
+    }
+
+    .grid-2 {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    #live-summary-card {
+        grid-column: 1;
+    }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 480px) {
+    .main-wrapper { padding: 10px; }
+    .header { padding: 12px 10px; }
     .header-chip-row { gap: 5px; }
-    .countdown-chip .chip-label { font-size: 8px; }
+    .countdown-chip { padding: 8px 2px; }
     .countdown-chip .chip-days { font-size: 25px; }
-    .countdown-chip .chip-sub { font-size: 8px; }
+    .card { padding: 16px; }
+}
+
+@media (max-width: 360px) {
+    body,
+    body.panel-open { padding-left: 50px; }
+    .sidebar { width: 50px; }
+    .menu-btn .menu-label { font-size: 7px; }
+    .header-chip-row { gap: 4px; }
+    .countdown-chip .chip-label { font-size: 7.5px; }
+    .countdown-chip .chip-days { font-size: 23px; }
 }
