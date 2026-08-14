@@ -59,7 +59,6 @@ export function gardenPlotSVG(hours, idx) {
         <ellipse cx="28" cy="${60 - trunkH - canopyR * 0.8}" rx="${canopyR * 0.5}" ry="${canopyR * 0.4}" fill="url(#grad${idx})" ${hitGoal ? `filter="url(#glow${idx})"` : ''}/>
         <!-- Sparkles when hit goal -->
         ${sparkles}
-        ${hours > 0 && hours < 6 ? `<text x="0" y="20" font-size="10" fill="#64748b" font-weight="700">🌱</text>` : ''}
     </svg>`;
 }
 

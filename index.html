@@ -451,7 +451,7 @@
 
     <div class="card" style="margin-top:20px;">
         <div class="goal-header">
-            <h3 style="margin:0;">🌱 This Week's Garden</h3>
+            <h3 style="margin:0;"><img class="garden-title-icon" src="assets/garden-icon.png" alt="Garden" width="24" height="24"> Week's Garden</h3>
             <span class="streak-pill" id="streak-pill">🔥 0 day streak</span>
         </div>
         <div class="goal-note"><strong class="goal-note-emphasis">Goal:</strong> 10 hrs/day counts toward your streak. A missed day gets one ❄️ freeze per week (Mon–Sun) to protect your streak; a 2nd missed day in the same week breaks the streak & resets to 0.</div>
@@ -478,7 +478,7 @@
         <div class="goal-header">
             <h3 style="margin:0;">🧮 Question Practice Tracker</h3>
             <div class="q-header-actions">
-                <button class="btn btn-start btn-small" onclick="openTodayQuestionsModal()">📝 Log Today's Questions</button>
+                <button class="btn btn-start btn-small q-log-btn" onclick="openTodayQuestionsModal()">📝 Log Today's Questions</button>
                 <span class="q-legend-group">
                     <span class="q-legend-item"><span class="q-dot" style="background:#38bdf8;"></span>1-59</span>
                     <span class="q-legend-item"><span class="q-dot" style="background:#10b981;"></span>60-100</span>
@@ -486,7 +486,7 @@
                 </span>
             </div>
         </div>
-        <div class="goal-note"><strong class="goal-note-emphasis">Tip:</strong> You'll be asked for the day's approximate question count right after you save a sleep log. Tap below to log or update today's count any time.</div>
+        <div class="goal-note"><strong class="goal-note-emphasis">Tip:</strong> Asked automatically after each sleep log — tap below anytime to add or update it.</div>
         <div class="garden-row" id="questions-row"></div>
     </div>
 
@@ -585,12 +585,14 @@
 
 <div class="modal" id="questions-modal" onclick="closeQuestionsModal()">
     <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
-        <h3 style="margin-top:0;">📝 Questions Solved</h3>
+        <h3 style="margin-top:0; display:flex; align-items:center; justify-content:center; gap:8px;">
+            📝 Questions Solved
+            <button type="button" class="q-modal-trash-btn" onclick="deleteQuestionsSolved()" title="Delete today's log" aria-label="Delete log">🗑</button>
+        </h3>
         <p style="color:var(--muted); font-size:13px; margin:0 0 14px;">How many questions did you solve on <strong id="questions-modal-date" style="color:var(--text);">--</strong>?</p>
         <input type="number" id="questions-count-input" min="0" step="1" placeholder="e.g. 56" style="text-align:center; font-size:18px;">
         <div style="margin-top:16px; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
             <button class="btn btn-start" onclick="saveQuestionsSolved()">Save</button>
-            <button class="btn btn-stop btn-small" onclick="deleteQuestionsSolved()">🗑 Delete</button>
             <button class="btn btn-pause btn-small" onclick="backQuestionsModal()">Back</button>
         </div>
     </div>

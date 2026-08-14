@@ -1,6 +1,13 @@
 /* ===== Weekly Garden + streak ===== */
-.goal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+/* align-items: flex-start (not center) — with the Questions card's header
+   right side now being a two-row block (button + legend stacked), center
+   alignment made the title's vertical position (and so the gap down to
+   the Tip/Goal note below it) shift depending on how tall that right side
+   was, reading as inconsistent spacing between cards. Top-aligning both
+   sides keeps the title pinned to the same spot regardless. */
+.goal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
 .streak-pill { background: rgba(245,158,11,0.15); color: var(--warning); font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 13px; }
+.garden-title-icon { width: 24px; height: 24px; vertical-align: -6px; object-fit: contain; margin-right: 2px; }
 .garden-row { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; }
 .garden-plot { text-align: center; min-width: 0; }
 .garden-plot .dow-label { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; color: #ffffff; font-weight: 800; margin-bottom: 4px; letter-spacing: 0.2px; }
@@ -36,6 +43,10 @@
    above uses, so this is scoped to #questions-row's parent card via the
    sibling class rather than changing .goal-header itself. */
 .q-header-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+/* Narrower than the default .btn-small padding so it matches the more
+   compact button width — scoped to this header only, other .btn-small
+   buttons elsewhere are untouched. */
+.q-header-actions .q-log-btn { padding: 6px 12px; font-size: 11.5px; }
 /* Day names move BELOW each ring (not above, like the Garden's hour
    plots) and are dimmed down from the Garden's bright white label —
    scoped to #questions-row only so the Garden's own dow-labels above are
