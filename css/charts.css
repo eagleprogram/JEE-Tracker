@@ -79,3 +79,19 @@
    and as <canvas> by reports.js (buildShareCanvas/buildReportCanvas) — their
    colors come from the SUBJECT_COLORS map in JS, not from CSS classes here,
    so there's nothing further to style for those two beyond what's above. */
+
+/* ===== Mobile-only: fixed-height SVGs that scale width but not height =====
+   Both renderTrendChart() and questionRingSVG() (js/charts.js, js/questions.js)
+   set width="100%" but a literal pixel height attribute, sized for their
+   desktop-width viewBox. On a phone-width column, the content scales down
+   (preserving aspect ratio) to fit the narrow width while the box itself
+   stays at the old, much taller desktop height — leaving a large blank gap
+   below the trend chart, and extra invisible padding above/below each
+   question-tracker ring. Letting height scale with width here fixes both
+   without touching desktop, where the rendered width is already close to
+   (trend chart) or at (question rings, via their own max-width cap) the
+   size these were tuned for. */
+@media (max-width: 850px) {
+    #trend-chart-container svg { height: auto; max-height: 160px; }
+    #questions-row svg { height: auto; }
+}

@@ -367,6 +367,23 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     .main-wrapper .card { margin-top: 14px !important; margin-bottom: 14px !important; }
     .quote-banner { margin-bottom: 14px; padding: 14px 18px; }
     .grid-2 { gap: 14px; }
+
+    /* Reports row: 6 equal-width buttons sharing a ~300px card forced every
+       label into 3 cramped wrapped lines. A 2-column grid roughly doubles
+       each button's width, so labels wrap at most twice — desktop's
+       single-row .btn-row-fit is untouched above 850px. */
+    .btn-row-fit { flex-wrap: wrap; }
+    .btn-row-fit .btn { flex: 1 1 calc(50% - 6px); min-width: 120px; }
+
+    /* Total Study / Total Break: display:flex alone (see history.js) gave
+       this row the full card width, but at the default font-size + 16px
+       gaps the two phrases still didn't fit together, so it kept wrapping
+       to 2 lines anyway. Smaller text and tighter gaps close that last gap. */
+    #history-subject-list > div:first-child {
+        gap: 6px !important;
+        padding: 8px 10px !important;
+        font-size: 12.5px;
+    }
 }
 
 /* Extra pass for genuinely small phones (~480px and under): the header's
