@@ -5,7 +5,8 @@ body {
     color: var(--text);
     margin: 0;
     display: flex;
-    min-height: 100vh;
+    min-height: 100vh; /* fallback for browsers without dvh support */
+    min-height: 100dvh;
     color-scheme: dark;
     padding-left: 84px;
     transition: padding-left 0.2s;
@@ -118,7 +119,8 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     position: fixed;
     top: 0;
     left: 0;
-    height: 100vh;
+    height: 100vh; /* fallback for browsers without dvh support */
+    height: 100dvh;
     overflow-y: auto;
     overflow-x: hidden;
     transition: width 0.2s;
@@ -343,7 +345,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
    to a stacked layout explicit and intentional: title block centered
    on its own row, chips centered in a wrapping row underneath. */
 @media (max-width: 850px) {
-    .header { flex-direction: column; flex-wrap: wrap; align-items: center; gap: 14px; }
+    .header { flex-direction: column; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 14px; }
     .app-title-wrap { margin-left: 0; }
     .app-title-main { font-size: 28px; }
     .app-title-icon { width: 34px; height: 34px; }
@@ -355,6 +357,17 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
        Placed here (after the base .main-wrapper rule above) so it actually
        wins the cascade at this width. */
     .main-wrapper { padding: 14px; }
+
+    /* ===== Compact mode: mobile is a genuinely dense layout, not a
+       shrunk-down desktop page (that's what "Request Desktop Site" was
+       doing, and it's a different — worse — problem, see chat). Every
+       card in the dashboard sets its own spacing to a large-screen value
+       via an inline style in index.html (margin-top:20px, etc.), so
+       !important is the only way to retune that spacing per breakpoint
+       without editing dozens of inline attributes by hand. */
+    .main-wrapper .card { margin-top: 14px !important; margin-bottom: 14px !important; }
+    .quote-banner { margin-bottom: 14px; padding: 14px 18px; }
+    .grid-2 { gap: 14px; }
 }
 
 /* Extra pass for genuinely small phones (~480px and under): the header's

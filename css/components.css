@@ -82,12 +82,23 @@ body.zen-mode .timer-box { min-height: 320px; }
     body.zen-mode .timer-card { width: 92vw; }
     body.zen-mode .timer-screen { font-size: clamp(38px, 15vw, 68px); }
 }
-/* Small-phone card padding — pairs with the .main-wrapper/.header tweaks
-   in base.css's own max-width:480px block; placed here (after the base
-   .card rule above) so it actually wins the cascade at this width, since
-   .card is defined in this file, not base.css. */
-@media (max-width: 480px) {
+/* Compact mode (mobile): tighter card padding than desktop, and a much
+   smaller timer card — at the desktop 280px min-height + 72px digits, the
+   timer alone ate most of a phone screen's first viewport with mostly
+   empty space, which was a big part of "can't see much without
+   scrolling." Two tiers: a general ≤850px pass, then an extra squeeze for
+   small phones ≤480px. Placed here (after the base .card/.timer-box rules
+   above) so these actually win the cascade at these widths, since .card
+   and .timer-box are defined in this file, not base.css. */
+@media (max-width: 850px) {
     .card { padding: 16px; }
+    .timer-box { min-height: 170px; margin: 10px 0; }
+    .timer-screen { font-size: clamp(34px, 11vw, 54px); }
+    .controls-row { margin-top: 12px; }
+}
+@media (max-width: 480px) {
+    .card { padding: 14px; }
+    .timer-box { min-height: 150px; }
 }
 
 /* ===== Buttons =====
