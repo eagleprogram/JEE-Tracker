@@ -368,22 +368,50 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     .quote-banner { margin-bottom: 14px; padding: 14px 18px; }
     .grid-2 { gap: 14px; }
 
-    /* Reports row: 6 equal-width buttons sharing a ~300px card forced every
-       label into 3 cramped wrapped lines. A 2-column grid roughly doubles
-       each button's width, so labels wrap at most twice — desktop's
-       single-row .btn-row-fit is untouched above 850px. */
-    .btn-row-fit { flex-wrap: wrap; }
-    .btn-row-fit .btn { flex: 1 1 calc(50% - 6px); min-width: 120px; }
+    /* Reports row: switched from flex-basis+min-width (which could still
+       overflow on narrower phones once min-width's floor exceeded the
+       actual available half-column) to a real 2-column grid. minmax(0,1fr)
+       guarantees each column is always exactly half the row minus gap —
+       button labels wrap within that fixed width instead of ever pushing
+       the row wider than its card. Desktop's single-row .btn-row-fit is
+       untouched above 850px. */
+    .btn-row-fit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .btn-row-fit .btn { flex: initial; width: 100%; box-sizing: border-box; padding: 10px 8px; font-size: 12px; line-height: 1.3; }
 
-    /* Total Study / Total Break: display:flex alone (see history.js) gave
-       this row the full card width, but at the default font-size + 16px
-       gaps the two phrases still didn't fit together, so it kept wrapping
-       to 2 lines anyway. Smaller text and tighter gaps close that last gap. */
+    /* Total Study / Total Break: confirmed fitting on one line now — bumped
+       up from 12.5px since there was still visible unused width in the row. */
     #history-subject-list > div:first-child {
         gap: 6px !important;
         padding: 8px 10px !important;
-        font-size: 12.5px;
+        font-size: 13.5px;
     }
+
+    /* Question Practice Tracker header: title + (button, legend) were
+       sharing one row, same as every other card's .goal-header — fine for
+       short titles, but "Question Practice Tracker" plus the button and a
+       3-item legend all fighting over one ~280px-wide row forced both the
+       title AND the legend to wrap. Stacking the header (title on its own
+       full-width row, button+legend below on theirs) gives each piece the
+       full card width instead of a shared fraction of it — scoped to just
+       this card's header via .q-goal-header, so every other card's
+       side-by-side .goal-header (Garden, Heatmap, etc., which already fit
+       fine) is untouched. */
+    .q-goal-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .q-goal-header h3 { font-size: 16px; }
+    .q-header-actions { align-items: flex-start; width: 100%; }
+
+    /* ===== "Zoomed out" default density =====
+       Requested repeatedly: the mobile dashboard should look like a
+       deliberately denser view by default, not require the person to
+       pinch-zoom out themselves to see more per screen. `zoom` (supported
+       in Chromium- and WebKit-based browsers, including Brave/Chrome on
+       Android, and in Firefox since 2024) uniformly shrinks everything
+       inside main-wrapper — text, spacing, every fixed px value — exactly
+       like an actual pinch-zoom-out would, without the blurriness or
+       tap-hit-testing issues transform:scale() has for this. Scoped to
+       .main-wrapper only, not body/.sidebar, so the drawer keeps the
+       sizing already tuned above. */
+    .main-wrapper { zoom: 0.85; }
 }
 
 /* Extra pass for genuinely small phones (~480px and under): the header's
@@ -475,6 +503,8 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
         box-sizing: border-box;
         padding: 12px 3px calc(18px + env(safe-area-inset-bottom));
         box-shadow: 8px 0 24px rgba(0, 0, 0, 0.16);
+        contain: layout style;
+        will-change: width;
         transition:
             width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
             box-shadow 0.28s ease;

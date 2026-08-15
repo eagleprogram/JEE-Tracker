@@ -93,5 +93,6 @@
    size these were tuned for. */
 @media (max-width: 850px) {
     #trend-chart-container svg { height: auto; max-height: 160px; }
+    #trend-chart-container svg text { font-size: 13.5px; }
     #questions-row svg { height: auto; }
 }
