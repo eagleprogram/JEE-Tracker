@@ -27,6 +27,35 @@ import { wipeLocalData } from './storage.js';
 // have finished evaluating — never at module-eval time.
 import { signOutOfGoogle, signInWithGoogle, getCurrentUser, pushToCloud } from './firebase-sync.js';
 
+// ----------------- MOBILE "ZOOMED OUT" DEFAULT DENSITY (reflow fix) -----------------
+// css/base.css sets `.main-wrapper { zoom: 0.85; }` under its mobile
+// max-width:850px query, which is supposed to make the whole dashboard look
+// like a deliberately denser view by default (see that rule's own comment).
+// That CSS is correct and does eventually apply — but on a genuinely cold
+// load (opening the installed PWA fresh, or a hard refresh) it was visibly
+// NOT applied for the very first paint: the header/chips/timer would render
+// at full (zoom:1) size, and only shrink to the intended 0.85 density after
+// some later reflow-triggering event (rotating, resizing, opening the
+// sidebar) happened to nudge the browser into recomputing it. This is a
+// known Chromium/WebView quirk with the `zoom` property specifically on the
+// very first layout pass of a standalone/installed web app — the zoomed
+// layout is computed correctly, it just isn't always painted until
+// something forces a second style recalculation.
+// The fix: explicitly toggle `.main-wrapper`'s inline zoom away from and
+// back to its stylesheet value once, on load. Setting it to 1 and then
+// clearing the inline override (which lets the 0.85 CSS rule take back
+// over) forces a genuine two-value style recalculation instead of a no-op,
+// which reliably makes the browser repaint at the correct density —
+// without a visible flash, since both frames happen before the user's eyes
+// have processed the first paint.
+export function forceMobileZoomReflow() {
+    let mw = document.querySelector(".main-wrapper");
+    if (!mw) return;
+    if (!window.matchMedia("(max-width: 850px)").matches) return; // desktop has no zoom rule to fix
+    mw.style.zoom = "1";
+    requestAnimationFrame(() => { mw.style.zoom = ""; });
+}
+
 // ----------------- FULL DEVICE RESET (Delete Cookies & Reload) -----------------
 // This used to only clear the PWA's Cache Storage layer (so a stale cached
 // build wouldn't keep being served) and leave everything else — study data,

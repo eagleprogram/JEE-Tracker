@@ -181,6 +181,26 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     border-radius: 8px;
     transition: 0.2s;
 }
+/* BUG FIX (drawer animation still laggy on mobile despite the .sidebar
+   will-change/contain/cubic-bezier work below): the blanket `transition:
+   0.2s` above animates EVERY animatable property on .menu-btn, and
+   .sidebar.expanded .menu-btn changes three of them at once (padding,
+   gap, and — implicitly, since flex-direction itself can't animate but
+   the box still has to re-flow around it — the button's whole internal
+   layout). With 9 rail buttons all trying to interpolate padding/gap on
+   every animation frame AT THE SAME TIME the parent .sidebar's own width
+   is interpolating, the browser was doing two full layout passes (one for
+   the sidebar box, one for each of its 9 children) per frame instead of
+   one — that compounding reflow, not the sidebar's own width transition
+   (already isolated via contain/will-change), is what read as "laggy."
+   Narrowing the buttons' own transition to just color/background — the
+   only properties that actually benefit from an animated hover/active
+   state — lets padding/gap snap instantly instead of re-computing layout
+   every frame, cutting the per-frame cost roughly in half. Scoped to
+   mobile only; desktop's existing 0.2s "all" transition is untouched. */
+@media (max-width: 850px) {
+    .menu-btn { transition: color 0.2s ease, background-color 0.2s ease; }
+}
 .sidebar.expanded .menu-btn {
     flex-direction: row;
     gap: 14px;
@@ -378,12 +398,19 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     .btn-row-fit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .btn-row-fit .btn { flex: initial; width: 100%; box-sizing: border-box; padding: 10px 8px; font-size: 12px; line-height: 1.3; }
 
-    /* Total Study / Total Break: confirmed fitting on one line now — bumped
-       up from 12.5px since there was still visible unused width in the row. */
+    /* Total Study / Total Break: bumped again from 13.5px — still visible
+       unused width to the right of "Total Break: 0h 0m 0s" at that size.
+       14.5px fills the row much closer to edge-to-edge for the common
+       short values (single-digit h/m/s) without wrapping. The row already
+       has flex-wrap: wrap as a safety net (see .stat-row/this rule's
+       flex-wrap below via the base rule), so on the rare day with a long
+       double-digit value ("12h 34m 56s" on both sides) it gracefully drops
+       to two lines instead of overflowing the card — it does not silently
+       break. */
     #history-subject-list > div:first-child {
         gap: 6px !important;
         padding: 8px 10px !important;
-        font-size: 13.5px;
+        font-size: 14.5px;
     }
 
     /* Question Practice Tracker header: title + (button, legend) were
@@ -398,7 +425,15 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
        fine) is untouched. */
     .q-goal-header { flex-direction: column; align-items: flex-start; gap: 10px; }
     .q-goal-header h3 { font-size: 16px; }
-    .q-header-actions { align-items: flex-start; width: 100%; }
+    /* NOTE: the actual mobile alignment/width fix for .q-header-actions
+       (the "Log Today's Questions" button + legend) lives in charts.css,
+       not here — see the comment there for why. A rule was previously
+       declared here too, but css/charts.css is <link>ed AFTER this file in
+       index.html, and charts.css's own unconditional (non-mobile-scoped)
+       .q-header-actions rule has equal selector specificity, so cascade
+       order let it silently win on every screen size, mobile included —
+       this line never actually took effect. Removed instead of left as
+       dead, misleading code. */
 
     /* ===== "Zoomed out" default density =====
        Requested repeatedly: the mobile dashboard should look like a
@@ -505,6 +540,12 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
         box-shadow: 8px 0 24px rgba(0, 0, 0, 0.16);
         contain: layout style;
         will-change: width;
+        /* Explicit layer promotion alongside will-change — belt-and-braces
+           so the sidebar reliably gets its own compositor layer on every
+           mobile browser (some are inconsistent about promoting purely off
+           will-change), so the width interpolation paints in isolation
+           instead of ever touching the rest of the page. */
+        transform: translateZ(0);
         transition:
             width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
             box-shadow 0.28s ease;

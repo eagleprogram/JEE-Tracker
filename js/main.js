@@ -19,7 +19,7 @@ import {
     renderQuoteOfDay, renderExamYearUI, setExamYear, tickCountdowns,
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
     hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
-    guestReminderSignInClicked, runBootSignInGate
+    guestReminderSignInClicked, runBootSignInGate, forceMobileZoomReflow
 } from './ui.js';
 
 import {
@@ -288,6 +288,22 @@ async function initApp() {
             console.error("Service worker registration failed:", err);
         });
     }
+
+    // Mobile "zoomed out" default density: nudge it into actually applying
+    // on this cold load — see forceMobileZoomReflow()'s own comment in
+    // ui.js for why this is needed at all. Called here so it runs once all
+    // of the above has finished injecting/resizing DOM content.
+    forceMobileZoomReflow();
 }
 
 initApp();
+
+// Extra safety net for the same cold-start zoom issue, independent of the
+// initApp() call above: the `load` event fires after every resource
+// (fonts, images) has finished, which can itself be a later reflow trigger
+// than anything inside initApp() — and `pageshow` additionally covers a PWA
+// being resumed from the OS/back-forward cache rather than freshly loaded,
+// which is another path the person described as "opens or refreshes the
+// app" that a plain `load` listener alone wouldn't catch.
+window.addEventListener("load", forceMobileZoomReflow);
+window.addEventListener("pageshow", forceMobileZoomReflow);

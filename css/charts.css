@@ -47,6 +47,20 @@
    compact button width — scoped to this header only, other .btn-small
    buttons elsewhere are untouched. */
 .q-header-actions .q-log-btn { padding: 6px 12px; font-size: 11.5px; }
+
+/* BUG FIX (empty gap beside "Log Today's Questions" on mobile): on mobile
+   the title moves to its own full-width row above this block (see
+   .q-goal-header in base.css), leaving .q-header-actions as a full-width
+   row of its own directly underneath — but align-items: flex-end above
+   right-aligns the button+legend as a narrow column INSIDE that full-width
+   row, leaving a large empty strip to their left. Stretching the button
+   to fill the row (and left-aligning the legend under it) removes that
+   dead space instead of just relocating it. Scoped to mobile only —
+   desktop keeps the compact right-aligned button next to the title. */
+@media (max-width: 850px) {
+    .q-header-actions { align-items: stretch; width: 100%; }
+    .q-header-actions .q-log-btn { width: 100%; text-align: center; }
+}
 /* Day names move BELOW each ring (not above, like the Garden's hour
    plots) and are dimmed down from the Garden's bright white label —
    scoped to #questions-row only so the Garden's own dow-labels above are
@@ -93,6 +107,10 @@
    size these were tuned for. */
 @media (max-width: 850px) {
     #trend-chart-container svg { height: auto; max-height: 160px; }
-    #trend-chart-container svg text { font-size: 13.5px; }
+    /* Axis labels (the "0.0h"/"2.5h"/... y-axis and "Sun"/"Mon"/... x-axis
+       text) bumped again from 13.5px — the chart's viewBox has generous
+       fixed padding (60 units) around the plotted line, so there was still
+       clear empty space between adjacent labels at that size. */
+    #trend-chart-container svg text { font-size: 15px; }
     #questions-row svg { height: auto; }
 }
