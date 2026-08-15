@@ -13,6 +13,12 @@ import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
 // time, so it doesn't matter that ui.js hasn't finished initializing yet
 // when this file is first parsed.
 import { enterZenMode, exitZenMode, lockBodyScroll, unlockBodyScroll } from './ui.js';
+// Forward reference, same circular-import pattern as ui.js above (safe —
+// only called inside function bodies below, never at module-eval time).
+// Starts the water-break reminder the moment a study session actually
+// begins; it keeps running until the night's sleep log is saved (see
+// stopWaterReminder() in sleep.js).
+import { startWaterReminder } from './notifications.js';
 
 // ----------------- TIMER ENGINE -----------------
 let timerState = "IDLE";
@@ -389,6 +395,7 @@ export function confirmStartStudy() {
     // break — both route through here) always drops straight into Zen Mode,
     // whether or not the user touched the dedicated zen toggle themselves.
     enterZenMode();
+    startWaterReminder();
 }
 
 export function pauseStudy() { commitActiveSegment(); cancelAnimationFrame(animFrame); timerState = "PAUSED"; clearActiveSession(); updateUIState(); }
@@ -398,6 +405,7 @@ export function resumeStudy() {
     // "Resume" from PAUSED also counts as (re)starting a study session — same
     // auto-zen behavior as confirmStartStudy() above.
     enterZenMode();
+    startWaterReminder();
 }
 
 export function takeBreak() {

@@ -7,7 +7,7 @@
    sides keeps the title pinned to the same spot regardless. */
 .goal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
 .streak-pill { background: rgba(245,158,11,0.15); color: var(--warning); font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 13px; }
-.garden-title-icon { width: 24px; height: 24px; vertical-align: -6px; object-fit: contain; margin-right: 2px; }
+.garden-title-icon { width: 30px; height: 30px; vertical-align: -8px; object-fit: contain; margin-right: 2px; }
 .garden-row { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; }
 .garden-plot { text-align: center; min-width: 0; }
 .garden-plot .dow-label { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; color: #ffffff; font-weight: 800; margin-bottom: 4px; letter-spacing: 0.2px; }

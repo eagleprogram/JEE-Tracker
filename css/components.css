@@ -1,9 +1,18 @@
 /* ===== Generic card + timer ===== */
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; min-width: 0; }
 
-.timer-box { text-align: center; margin: 15px 0; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 280px; }
-.timer-screen { font-size: 72px; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: -1px; max-width: 100%; overflow-wrap: anywhere; transition: font-size 0.25s ease; }
+/* flex:1 makes the box stretch to fill whatever height .timer-card ends up
+   with (see .timer-card below — it's a flex column now specifically so
+   this can happen). Without this the box only ever grew to min-height and
+   then just sat at the top of a taller card (e.g. whenever the grid row
+   stretched .timer-card to match the taller "Today's Live Summary" card
+   next to it), leaving a big dead gap underneath the Start/Break buttons
+   instead of the whole block sitting centered in the card. */
+.timer-box { text-align: center; margin: 15px 0; display: flex; flex: 1; flex-direction: column; justify-content: center; align-items: center; min-height: 280px; }
+.timer-screen { font-size: 80px; font-weight: 800; font-family: monospace; color: var(--primary); letter-spacing: -1px; max-width: 100%; overflow-wrap: anywhere; transition: font-size 0.25s ease; }
 .controls-row { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+.timer-box .controls-row .btn { font-size: 15px; padding: 13px 22px; }
+#session-label { font-size: 14px !important; }
 
 /* ===== Zen / Focus Mode =====
    Design: one full-viewport backdrop (positioned, its own z-index) that
@@ -15,7 +24,13 @@
    JS does (see toggleZenMode() in ui.js); every visual change here is a
    CSS transition, so entering/exiting is fully symmetric and never
    restructures the underlying layout. */
-.timer-card { position: relative; }
+/* display:flex + flex-direction:column turns .timer-card into the flex
+   parent that .timer-box's flex:1 (above) needs in order to stretch and
+   self-center inside whatever height the grid gives this card — see the
+   .timer-box comment for the full story. Zen Mode's own layout below
+   (position:fixed etc.) is untouched by this; it just overrides position/
+   sizing on top, same as before. */
+.timer-card { position: relative; display: flex; flex-direction: column; }
 
 .zen-toggle-btn {
     position: absolute;
@@ -399,6 +414,11 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    lines up with Save/Back; only horizontal padding is zeroed so it stays
    a tight square instead of stretching. font-size:0 stops any stray text
    node from affecting sizing now that the icon is an SVG, not a glyph. */
+/* The "e.g. 55" hint text was rendering at the browser's default
+   placeholder color/opacity, which read as bright/prominent as if it were
+   an actual value rather than a low-key example — toned down to a faint
+   hint like every other muted/secondary label in the app. */
+#questions-count-input::placeholder { color: var(--muted); opacity: 0.55; }
 .q-modal-trash-btn {
     width: 54px;
     flex: 0 0 auto;
@@ -479,6 +499,12 @@ button.del:hover { color: #fca5a5; }
 .yt-player-wrap { margin-top: 8px; }
 .yt-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 .yt-controls button { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+/* Small red "close player" button — sits after Loop in the same row.
+   Rose-tinted (matches Stop/Delete elsewhere) so it visually reads as the
+   "shut this down" action, distinct from the neutral Play/Loop buttons. */
+.yt-close-btn { background: rgba(var(--tint-rose), 0.12) !important; border: 1px solid rgba(var(--tint-rose), 0.4) !important; color: rgb(var(--tint-rose)) !important; flex: 0 0 auto; width: 34px; padding: 6px 0 !important; display: flex; align-items: center; justify-content: center; }
+.yt-close-btn:hover { background: rgba(var(--tint-rose), 0.22) !important; }
+.yt-close-btn svg { width: 15px; height: 15px; }
 .yt-controls input[type="range"] { flex: 1; }
 /* scrollbar-width/color + the ::-webkit-scrollbar rules below match the
    thin track used by #todo-list and .sidebar — without them this panel

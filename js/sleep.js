@@ -7,11 +7,20 @@ import { showToast } from './ui.js';
 // saved, so History's "Add Missed Break" reflects it immediately without
 // requiring the user to touch the history date picker first.
 import { refreshMissedBreakConstraints } from './history.js';
-// Forward reference — questions.js only needs to be safe to call once the
-// full module graph is wired in main.js (same pattern as the ui.js import
-// above). Triggers the "how many questions did you solve" popup for the
-// day a sleep log entry just closed out.
+// BUG FIX: the "how many questions did you solve" popup used to also fire
+// when a WAKE time was saved (maybeAskQuestionsSolved(pending.date) below,
+// old CASE 2a) — asking someone how many questions they'd solved seconds
+// after they woke up made no sense (they haven't studied yet). It's still
+// asked when a bedtime/full entry is saved (that's the moment the day's
+// study is actually "closed out") — just no longer on a wake-only save.
 import { maybeAskQuestionsSolved } from './questions.js';
+// Wake-only saves now open the attendance reminder instead (see
+// openAttendanceReminderModal() below) — forward reference, same pattern as
+// the ui.js import above.
+import { openPlannerModal } from './planner.js';
+// Studying's water-break reminder (see startWaterReminder() in timer.js)
+// runs until the night's sleep log is actually saved.
+import { stopWaterReminder } from './notifications.js';
 
 // A "pending" entry is always type 'sleep' now (bedtime logged, wake still
 // to come). Older saved data may still have a leftover type:'wake' pending
@@ -85,6 +94,10 @@ export function saveSleepLog() {
         // this is the natural moment to ask how many questions were solved
         // today. No-ops if today was already asked (see the function).
         maybeAskQuestionsSolved(sleepDate);
+        // Going to sleep is the "sleep log saved" moment the water-break
+        // reminder is scoped to stop at — no point nudging someone to drink
+        // water while they're asleep.
+        stopWaterReminder();
         return;
     }
 
@@ -115,9 +128,6 @@ export function saveSleepLog() {
             setSleepPending(null);
             refreshMissedBreakConstraints();
             showToast("Sleep log completed!");
-            // pending.date is the day that bedtime was logged for — i.e.
-            // the study day this sleep cycle closes out.
-            maybeAskQuestionsSolved(pending.date);
         } else {
             // 2b: Nothing pending — the realistic first-time-opening-the-app
             // case (no prior bedtime on record to attach to). Save this as
@@ -134,6 +144,10 @@ export function saveSleepLog() {
         document.getElementById("sleep-time-input").value = "";
         renderSleepLog();
         renderSleepPendingBanner();
+        // A wake-up log (either sub-case above) is the new trigger for the
+        // attendance reminder — see openAttendanceReminderModal() below.
+        // Acknowledging it opens today's to-do list in the Planner.
+        openAttendanceReminderModal();
         return;
     }
 
@@ -174,7 +188,23 @@ export function saveSleepLog() {
         renderSleepPendingBanner();
         showToast("Sleep log saved.");
         maybeAskQuestionsSolved(sleepDate);
+        // Both times entered together still represents a completed sleep
+        // log for the night (same as CASE 1's bedtime-only save) — stop the
+        // water reminder here too.
+        stopWaterReminder();
     }
+}
+
+// Fires after a wake time is saved (see CASE 2 above) instead of the old
+// "questions solved" popup. A single acknowledgment button; closing it
+// redirects straight into today's to-do list in the Planner so the user can
+// fill it in right after marking attendance, per the requested flow.
+export function openAttendanceReminderModal() {
+    document.getElementById("attendance-reminder-modal").style.display = "flex";
+}
+export function closeAttendanceReminderModal() {
+    document.getElementById("attendance-reminder-modal").style.display = "none";
+    openPlannerModal(getTodayKey());
 }
 
 // Shows a small banner with a ✕ button whenever a bedtime has been logged

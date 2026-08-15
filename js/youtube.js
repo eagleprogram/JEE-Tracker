@@ -164,3 +164,27 @@ export function ytToggleLoop() {
     ytLoopEnabled = !ytLoopEnabled;
     document.getElementById("yt-loop-btn").innerText = `🔁 Loop: ${ytLoopEnabled ? "On" : "Off"}`;
 }
+
+// Fully shuts the player down: stops playback, tears down the YT.Player
+// instance (so the next Load starts completely fresh instead of trying to
+// reuse a destroyed player), hides the whole player block, and clears the
+// link input back to its placeholder — matches "closed = gone, like it was
+// never loaded" rather than just pausing/hiding.
+export function ytClosePlayer() {
+    if (ytPlayer) {
+        try {
+            if (ytPlayer.stopVideo) ytPlayer.stopVideo();
+            if (ytPlayer.destroy) ytPlayer.destroy();
+        } catch (e) { /* non-fatal — we're tearing it down anyway */ }
+        ytPlayer = null;
+    }
+    ytIsPlaying = false;
+    ytPendingVideoId = null;
+    ytLoopEnabled = false;
+    document.getElementById("yt-player-wrap").style.display = "none";
+    document.getElementById("yt-link-input").value = "";
+    let playBtn = document.getElementById("yt-playpause-btn");
+    if (playBtn) playBtn.innerText = "▶ Play";
+    let loopBtn = document.getElementById("yt-loop-btn");
+    if (loopBtn) loopBtn.innerText = "🔁 Loop: Off";
+}

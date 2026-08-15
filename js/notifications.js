@@ -35,6 +35,8 @@ export function renderNotifSettingsUI() {
     document.getElementById("notif-parentLogReminder").checked = s.parentLogReminder;
     document.getElementById("notif-parentLogReminderTime").value = s.parentLogReminderTime;
     document.getElementById("notif-backupReminder").checked = s.backupReminder;
+    document.getElementById("notif-waterBreakReminder").checked = s.waterBreakReminder;
+    document.getElementById("notif-waterBreakFrequency").value = s.waterBreakFrequencyMin;
     updateNotifPermissionStatus();
 }
 
@@ -54,9 +56,16 @@ export function saveNotifSettingsFromUI() {
         sleepReminderStartTime: document.getElementById("notif-sleepReminderStartTime").value || "22:30",
         parentLogReminder: document.getElementById("notif-parentLogReminder").checked,
         parentLogReminderTime: document.getElementById("notif-parentLogReminderTime").value || "22:30",
-        backupReminder: document.getElementById("notif-backupReminder").checked
+        backupReminder: document.getElementById("notif-backupReminder").checked,
+        waterBreakReminder: document.getElementById("notif-waterBreakReminder").checked,
+        waterBreakFrequencyMin: Math.max(5, parseInt(document.getElementById("notif-waterBreakFrequency").value) || 30)
     };
     saveNotifSettings(s); showToast("Notification settings saved.");
+    // A frequency/on-off change should take effect immediately for a water
+    // reminder that's already running (mid-study-session), not just the
+    // next time study is started — restart it against the freshly-saved
+    // settings. No-op (and harmless) if a study session isn't active.
+    if (waterReminderTimer) startWaterReminder();
 }
 
 export function updateNotifPermissionStatus() {
@@ -187,6 +196,21 @@ function enqueueAlarm(title, body, priority) {
     alarmQueue.sort((a, b) => a.priority - b.priority);
 }
 
+// BUG FIX: a persistent alarm used to ring indefinitely until the user
+// actively hit "Stop Alarm" — if they never did (phone in another room,
+// asleep, etc.) it would just ring forever. Two changes:
+// 1) Auto-silence after 2 minutes of continuous, unacknowledged ringing —
+//    the sound+modal stop on their own instead of going forever.
+// 2) Since auto-silencing (unlike a manual Stop) means the user still
+//    hasn't actually acknowledged the reason, the same reason comes back
+//    and rings again 5 minutes later — repeating this cycle until the user
+//    does hit Stop, at which point stopAlarmLoop() below cancels the
+//    pending re-ring (see alarmRelaunchTimer there).
+const ALARM_AUTO_SILENCE_MS = 2 * 60 * 1000;
+const ALARM_RERING_DELAY_MS = 5 * 60 * 1000;
+let alarmAutoSilenceTimer = null;
+let alarmRelaunchTimer = null;
+
 export function ringPersistentAlarm(title, body, priority = 5) {
     if (isAlarmActive) { enqueueAlarm(title, body, priority); return; }
     isAlarmActive = true;
@@ -196,6 +220,38 @@ export function ringPersistentAlarm(title, body, priority = 5) {
     playAlarmSound();
     alarmInterval = setInterval(() => { playAlarmSound(); }, 1000);
     startTitleFlash(title);
+    alarmAutoSilenceTimer = setTimeout(() => autoSilenceAlarm(title, body, priority), ALARM_AUTO_SILENCE_MS);
+}
+
+// Called when 2 minutes pass with nobody tapping "Stop Alarm" — silences
+// this ring (same cleanup as stopAlarmLoop(), minus the "Alarm stopped"
+// toast, since the user didn't actually do anything) and schedules the
+// same reason to ring again in 5 minutes. Any other reason already queued
+// behind it still gets its turn first, exactly like a manual stop would.
+function autoSilenceAlarm(title, body, priority) {
+    if (alarmInterval) { clearInterval(alarmInterval); alarmInterval = null; }
+    isAlarmActive = false;
+    document.getElementById("alarm-modal").style.display = "none";
+    unlockBodyScroll();
+    stopTitleFlash();
+    showToast(`"${title}" wasn't acknowledged — you'll be reminded again in 5 min.`);
+    alarmRelaunchTimer = setTimeout(() => {
+        alarmRelaunchTimer = null;
+        ringPersistentAlarm(title, body, priority);
+    }, ALARM_RERING_DELAY_MS);
+    advanceAlarmQueue();
+}
+
+// Shared by autoSilenceAlarm() and stopAlarmLoop() — rings the next
+// most-important queued reason (if any) after the standard breather gap.
+function advanceAlarmQueue() {
+    if (alarmQueue.length === 0) return;
+    let next = alarmQueue.shift();
+    showToast(`Next alarm ("${next.title}") in 15s…`);
+    nextAlarmTimer = setTimeout(() => {
+        nextAlarmTimer = null;
+        ringPersistentAlarm(next.title, next.body, next.priority);
+    }, ALARM_QUEUE_GAP_MS);
 }
 
 // Exposed so other modules (ui.js's guest sign-in reminder) can avoid
@@ -214,28 +270,27 @@ let nextAlarmTimer = null;
 const ALARM_QUEUE_GAP_MS = 15000;
 
 export function stopAlarmLoop() {
+    // A manual Stop IS acknowledgment — cancel the 2-min auto-silence timer
+    // (nothing to silence anymore) and, importantly, the 5-min re-ring timer
+    // if this ring was already an auto-silenced one coming back around, so
+    // it doesn't ring a 3rd time after the user has just dismissed it.
+    if (alarmAutoSilenceTimer) { clearTimeout(alarmAutoSilenceTimer); alarmAutoSilenceTimer = null; }
+    if (alarmRelaunchTimer) { clearTimeout(alarmRelaunchTimer); alarmRelaunchTimer = null; }
     if (alarmInterval) { clearInterval(alarmInterval); alarmInterval = null; }
     isAlarmActive = false;
     document.getElementById("alarm-modal").style.display = "none";
     unlockBodyScroll();
     stopTitleFlash();
     showToast("Alarm stopped.");
-    if (alarmQueue.length > 0) {
-        // Ring the next most-important queued reason after a short gap —
-        // this is the "two (or more) reminders due at the same time" case:
-        // the more important one rings, gets dismissed, then — after a
-        // 15-second breather, not instantly — the next one rings in its own
-        // modal, and so on down the queue. The OS notification for every
-        // queued reason already went out the instant it became due (see
-        // notify()/fireOsNotification below), so nothing about the alert
-        // itself is delayed — only the in-page modal+sound is sequenced.
-        let next = alarmQueue.shift();
-        showToast(`Next alarm ("${next.title}") in 15s…`);
-        nextAlarmTimer = setTimeout(() => {
-            nextAlarmTimer = null;
-            ringPersistentAlarm(next.title, next.body, next.priority);
-        }, ALARM_QUEUE_GAP_MS);
-    }
+    // Ring the next most-important queued reason after a short gap — this is
+    // the "two (or more) reminders due at the same time" case: the more
+    // important one rings, gets dismissed, then — after a 15-second
+    // breather, not instantly — the next one rings in its own modal, and so
+    // on down the queue. The OS notification for every queued reason
+    // already went out the instant it became due (see notify()/
+    // fireOsNotification below), so nothing about the alert itself is
+    // delayed — only the in-page modal+sound is sequenced.
+    advanceAlarmQueue();
 }
 
 // ----------------- TAB-TITLE FLASH -----------------
@@ -443,6 +498,28 @@ function checkBackupReminder(s) {
     if (Date.now() - lastReminded < BACKUP_REMINDER_INTERVAL_MS) return; // already pinged within the last 48h
     notify("Backup reminder", "It's been 2+ days since your last backup — export one now from Settings.", true, 8);
     setRawFlag(BACKUP_REMINDER_LAST_KEY, String(Date.now()));
+}
+
+// ----------------- WATER BREAK REMINDER -----------------
+// Unlike the other reminders above (which are all polled every second from
+// runNotificationChecks()), this one runs its own dedicated interval that's
+// only alive between "study started" and "sleep log saved" — see
+// startWaterReminder()/stopWaterReminder()'s call sites in timer.js
+// (confirmStartStudy()/resumeStudy()) and sleep.js (saveSleepLog()).
+// Priority 6 — same tier as the break-overrun check-in, since both are
+// "you're mid-study, here's a quick nudge" reminders.
+let waterReminderTimer = null;
+export function startWaterReminder() {
+    if (waterReminderTimer) { clearInterval(waterReminderTimer); waterReminderTimer = null; }
+    let s = getNotifSettings();
+    if (!s.waterBreakReminder) return;
+    let ms = Math.max(5, s.waterBreakFrequencyMin || 30) * 60 * 1000;
+    waterReminderTimer = setInterval(() => {
+        notify("Water break", "Time to drink some water!", true, 6);
+    }, ms);
+}
+export function stopWaterReminder() {
+    if (waterReminderTimer) { clearInterval(waterReminderTimer); waterReminderTimer = null; }
 }
 
 // ----------------- MASTER CHECK LOOP -----------------

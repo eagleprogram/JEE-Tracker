@@ -110,6 +110,11 @@
                 <div class="yt-controls">
                     <button onclick="ytTogglePlay()" id="yt-playpause-btn">▶ Play</button>
                     <button onclick="ytToggleLoop()" id="yt-loop-btn">🔁 Loop: Off</button>
+                    <button class="yt-close-btn" onclick="ytClosePlayer()" title="Close player" aria-label="Close player">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
                 <div class="yt-controls">
                     <span style="font-size:11px; color:var(--muted);">🔊</span>
@@ -197,6 +202,15 @@
                     <input type="checkbox" id="notif-examMilestones" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
+                    <label>Water break reminder (while studying)</label>
+                    <input type="checkbox" id="notif-waterBreakReminder" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-sub">
+                    <span style="font-size:12px; color:var(--muted);">Every</span>
+                    <input type="number" id="notif-waterBreakFrequency" min="5" max="180" onchange="saveNotifSettingsFromUI()">
+                    <span style="font-size:12px; color:var(--muted);">min</span>
+                </div>
+                <div class="settings-row">
                     <label>Idle nudge ("still there?")</label>
                     <input type="checkbox" id="notif-idleNudge" onchange="saveNotifSettingsFromUI()">
                 </div>
@@ -205,7 +219,7 @@
                     <input type="number" id="notif-idleThreshold" min="10" max="240" onchange="saveNotifSettingsFromUI()">
                     <span style="font-size:12px; color:var(--muted);">min idle</span>
                 </div>
-                <div class="small-note">Info-only, never pauses the timer. Break-overrun &amp; idle-nudge need a live tab open — everything below still reaches you when it's closed.</div>
+                <div class="small-note">Info-only, never pauses the timer. Break-overrun, idle-nudge &amp; the water break reminder need a live tab open — everything below still reaches you when it's closed.</div>
             </div>
 
             <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
@@ -451,7 +465,7 @@
 
     <div class="card" style="margin-top:20px;">
         <div class="goal-header">
-            <h3 style="margin:0;"><img class="garden-title-icon" src="assets/garden-icon.png" alt="Garden" width="24" height="24"> Week's Garden</h3>
+            <h3 style="margin:0;"><img class="garden-title-icon" src="assets/garden-icon.png" alt="Garden" width="30" height="30"> Week's Garden</h3>
             <span class="streak-pill" id="streak-pill">🔥 0 day streak</span>
         </div>
         <div class="goal-note"><strong class="goal-note-emphasis">Goal:</strong> 10 hrs/day counts toward your streak. A missed day gets one ❄️ freeze per week (Mon–Sun) to protect your streak; a 2nd missed day in the same week breaks the streak & resets to 0.</div>
@@ -580,6 +594,19 @@
             <button class="btn btn-start" onclick="confirmStartStudy()">Begin Session</button>
             <button class="btn btn-stop btn-small" onclick="cancelSubjectModal()">Back</button>
         </div>
+    </div>
+</div>
+
+<!-- Wake-up reminder: fires after a wake time is logged (see saveSleepLog()
+     in sleep.js) instead of the old "questions solved" popup, which never
+     made sense to ask about right after waking up. Acknowledging it opens
+     today's to-do list in the Planner (see closeAttendanceReminderModal()
+     in sleep.js). -->
+<div class="modal" id="attendance-reminder-modal">
+    <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
+        <h3 style="margin-top:0;">📻 Reminder</h3>
+        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark your attendance in the SM Radio YouTube channel!</p>
+        <button class="btn btn-start" style="width:100%;" onclick="closeAttendanceReminderModal()">Got it</button>
     </div>
 </div>
 

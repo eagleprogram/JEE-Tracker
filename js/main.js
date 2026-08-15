@@ -36,7 +36,7 @@ import {
 
 import {
     saveSleepLog, toggleSleepHistory, deleteSleepLogEntry,
-    renderSleepPendingBanner, cancelPendingSleepLog
+    renderSleepPendingBanner, cancelPendingSleepLog, closeAttendanceReminderModal
 } from './sleep.js';
 
 import {
@@ -58,7 +58,8 @@ import {
 
 import {
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
-    ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar
+    ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
+    ytClosePlayer
 } from './youtube.js';
 
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
@@ -121,6 +122,7 @@ Object.assign(window, {
     deleteBreakEntry, deleteStudyLog, deleteBreakLog, addMissedBreak,
     // sleep.js
     saveSleepLog, toggleSleepHistory, deleteSleepLogEntry, cancelPendingSleepLog,
+    closeAttendanceReminderModal,
     // syllabus.js
     toggleSyllabusChapterExpand, toggleSyllabusTag, setSyllabusSubject,
     // mistakes.js
@@ -133,6 +135,7 @@ Object.assign(window, {
     // youtube.js
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
+    ytClosePlayer,
     // reports.js
     downloadDayLog, shareDayLog, sendReportViaEmail, downloadReport, shareReport,
     // backup.js
