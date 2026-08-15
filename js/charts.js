@@ -118,7 +118,7 @@ export function renderHeatmap() {
     // GitHub-proportioned tiles from the previous fix were the wrong
     // target; only the COLOR treatment (below) should follow GitHub's
     // dark, low-contrast style, not the size.
-    let cell = 13; let gap = 4; let width = weeks.length * (cell + gap) + 16; let height = 7 * (cell + gap) + 10; let svg = `<svg width="${width}" height="${height}">`;
+    let cell = 13; let gap = 4; let width = weeks.length * (cell + gap) + 16; let height = 7 * (cell + gap) + 10; let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; max-width:${width}px; display:block;">`;
     // BUG FIX: the previous version used a genuine multi-hue scale (blue ->
     // green -> amber -> rose per bucket) specifically because a single-hue
     // ramp was hard to split into confident buckets. Feedback was the exact

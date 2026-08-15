@@ -51,7 +51,7 @@ export function loadHistoryData() {
         return;
     }
     ensureDayShape(day);
-    let sHtml = `<div style="margin-bottom:12px; padding:10px 14px; border:1px solid var(--border); border-radius:8px; display:inline-flex; gap:16px; flex-wrap:wrap;"><span><strong>Total Study:</strong> <span style="color:#a78bfa;">${formatReadable(day.totalStudy)}</span></span><span style="color:var(--muted);">&amp;</span><span><strong>Total Break:</strong> <span style="color:#a78bfa;">${formatReadable(day.totalBreak)}</span></span></div>`;
+    let sHtml = `<div style="margin-bottom:12px; padding:10px 14px; border:1px solid var(--border); border-radius:8px; display:flex; gap:16px; flex-wrap:wrap;"><span><strong>Total Study:</strong> <span style="color:#a78bfa;">${formatReadable(day.totalStudy)}</span></span><span style="color:var(--muted);">&amp;</span><span><strong>Total Break:</strong> <span style="color:#a78bfa;">${formatReadable(day.totalBreak)}</span></span></div>`;
     for (let [cat, sec] of Object.entries(day.subjects)) {
         sHtml += `<div class="stat-row"><span>${cat}:</span><span style="display:flex; align-items:center; gap:8px;"><strong>${formatReadable(sec)}</strong><button class="del" onclick="deleteSubjectEntry('${dt}','${cat}')">✕</button></span></div>`;
     }

@@ -119,8 +119,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     position: fixed;
     top: 0;
     left: 0;
-    height: 100vh; /* fallback for browsers without dvh support */
-    height: 100dvh;
+    bottom: 0;
     overflow-y: auto;
     overflow-x: hidden;
     transition: width 0.2s;
