@@ -673,5 +673,40 @@
         <button class="btn btn-stop" onclick="stopAlarmLoop()" style="font-size: 18px; padding: 14px 20px; width: 100%; border-radius: 10px;">STOP ALARM</button>
     </div>
 </div>
+<script>
+(function () {
+  var box = document.createElement("div");
+  box.id = "__diag_box";
+  box.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#000;color:#0f0;font:11px monospace;padding:10px;max-height:45vh;overflow:auto;border-top:3px solid #f00;white-space:pre-wrap;";
+  document.body.appendChild(box);
+
+  function report() {
+    var sb = document.getElementById("sidebar");
+    var main = document.querySelector(".main-wrapper");
+    var sbCS = sb ? getComputedStyle(sb) : null;
+    var bodyCS = getComputedStyle(document.body);
+    var mainCS = main ? getComputedStyle(main) : null;
+    var lines = [];
+    lines.push("innerWidth: " + window.innerWidth);
+    lines.push("sidebar class: " + (sb ? sb.className : "NOT FOUND"));
+    lines.push("sidebar computed width: " + (sbCS ? sbCS.width : "?"));
+    lines.push("sidebar position: " + (sbCS ? sbCS.position : "?"));
+    lines.push("sidebar left/top: " + (sbCS ? sbCS.left + " / " + sbCS.top : "?"));
+    lines.push("sidebar z-index: " + (sbCS ? sbCS.zIndex : "?"));
+    lines.push("body class: " + document.body.className);
+    lines.push("body padding-left: " + bodyCS.paddingLeft);
+    lines.push("main-wrapper computed width: " + (mainCS ? mainCS.width : "NOT FOUND"));
+    lines.push("main-wrapper margin-left: " + (mainCS ? mainCS.marginLeft : "?"));
+    box.textContent = lines.join("\n");
+  }
+
+  report();
+  var mo = new MutationObserver(report);
+  mo.observe(document.body, { attributes: true, attributeFilter: ["class"], subtree: true });
+  document.getElementById("sidebar") && mo.observe(document.getElementById("sidebar"), { attributes: true, attributeFilter: ["class"] });
+  setInterval(report, 1000);
+})();
+</script>
+</body>
 </body>
 </html>
