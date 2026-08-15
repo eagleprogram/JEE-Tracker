@@ -381,40 +381,24 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     /* Total Study / Total Break: confirmed fitting on one line now — bumped
        up from 12.5px since there was still visible unused width in the row. */
     #history-subject-list > div:first-child {
-        gap: 5px !important;
-        padding: 8px 8px !important;
-        font-size: 14px;
-        flex-wrap: nowrap !important;
-        white-space: nowrap;
-    }
-    #history-subject-list > div:first-child > span {
-        flex-shrink: 0;
+        gap: 6px !important;
+        padding: 8px 10px !important;
+        font-size: 13.5px;
     }
 
-    /* Question Practice Tracker: keep the title and "Log Today's Questions"
-       action on the SAME row on mobile. The legend remains stacked under the
-       button, so the header stays compact without making the title compete
-       with three legend items. This is scoped to this card only. */
-    .q-goal-header {
-        flex-direction: row;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    .q-goal-header h3 {
-        flex: 1 1 auto;
-        min-width: 0;
-        font-size: 16px;
-        line-height: 1.25;
-    }
-    .q-header-actions {
-        flex: 0 0 auto;
-        width: auto;
-        align-items: flex-end;
-        gap: 7px;
-    }
-    .q-header-actions .q-log-btn {
-        white-space: nowrap;
-    }
+    /* Question Practice Tracker header: title + (button, legend) were
+       sharing one row, same as every other card's .goal-header — fine for
+       short titles, but "Question Practice Tracker" plus the button and a
+       3-item legend all fighting over one ~280px-wide row forced both the
+       title AND the legend to wrap. Stacking the header (title on its own
+       full-width row, button+legend below on theirs) gives each piece the
+       full card width instead of a shared fraction of it — scoped to just
+       this card's header via .q-goal-header, so every other card's
+       side-by-side .goal-header (Garden, Heatmap, etc., which already fit
+       fine) is untouched. */
+    .q-goal-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .q-goal-header h3 { font-size: 16px; }
+    .q-header-actions { align-items: flex-start; width: 100%; }
 
     /* ===== "Zoomed out" default density =====
        Requested repeatedly: the mobile dashboard should look like a
@@ -427,7 +411,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
        tap-hit-testing issues transform:scale() has for this. Scoped to
        .main-wrapper only, not body/.sidebar, so the drawer keeps the
        sizing already tuned above. */
-    .main-wrapper { zoom: 0.78; }
+    .main-wrapper { zoom: 0.85; }
 }
 
 /* Extra pass for genuinely small phones (~480px and under): the header's
@@ -514,43 +498,27 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
         padding-left: 52px;
     }
 
-    /* Mobile drawer: keep the sidebar at its FULL panel width even while it
-       is closed, then reveal/hide it with clip-path instead of animating its
-       width. Width animation forces the entire drawer (and its large lists)
-       to reflow on every animation frame, which is the source of the
-       stuttery opening seen on phones. clip-path is compositor-friendly, so
-       the rail stays visually 52px wide while the panel itself is already
-       laid out at its final width. The dashboard still reserves only the
-       52px rail because the sidebar is fixed-position. */
     .sidebar {
-        width: min(360px, calc(100vw - 16px));
-        max-width: calc(100vw - 16px);
+        width: 52px;
         box-sizing: border-box;
         padding: 12px 3px calc(18px + env(safe-area-inset-bottom));
         box-shadow: 8px 0 24px rgba(0, 0, 0, 0.16);
-        contain: layout style paint;
-        will-change: clip-path;
-        clip-path: inset(0 calc(100% - 52px) 0 0);
-        transition: clip-path 0.22s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    /* While closed, keep only the rail's own 52px layout width. The sidebar
-       itself is wider so the expanded panel never has to reflow during the
-       animation; clipping hides that extra width. */
-    .sidebar:not(.expanded) .rail-icons {
-        width: 52px;
+        contain: layout style;
+        will-change: width;
+        transition:
+            width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 0.28s ease;
     }
 
     /* The open drawer overlays the dashboard instead of creating a second
-       page layout. Its width no longer changes during the animation, so the
-       contents remain stable and the reveal itself stays smooth. */
+       page layout. Keeping the rail's normal vertical structure here makes
+       the mobile experience visually consistent with the laptop browser. */
     .sidebar.expanded {
         width: min(360px, calc(100vw - 16px));
         max-width: calc(100vw - 16px);
         align-items: stretch;
         padding: max(12px, env(safe-area-inset-top)) 12px
                  calc(28px + env(safe-area-inset-bottom));
-        clip-path: inset(0);
         box-shadow: 18px 0 48px rgba(0, 0, 0, 0.42);
     }
 
@@ -562,6 +530,8 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
         position: fixed;
         inset: 0;
         background: rgba(3, 7, 15, 0.34);
+        backdrop-filter: blur(1.5px);
+        -webkit-backdrop-filter: blur(1.5px);
         pointer-events: none;
         z-index: 150;
         animation: mobile-drawer-dim 0.24s ease both;
@@ -776,19 +746,12 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     }
 
     .sidebar {
-        width: min(340px, calc(100vw - 8px));
-        max-width: calc(100vw - 8px);
-        clip-path: inset(0 calc(100% - 48px) 0 0);
-    }
-
-    .sidebar:not(.expanded) .rail-icons {
         width: 48px;
     }
 
     .sidebar.expanded {
         width: min(340px, calc(100vw - 8px));
         max-width: calc(100vw - 8px);
-        clip-path: inset(0);
     }
 
     .main-wrapper {
