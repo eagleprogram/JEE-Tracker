@@ -31,6 +31,13 @@
    (position:fixed etc.) is untouched by this; it just overrides position/
    sizing on top, same as before. */
 .timer-card { position: relative; display: flex; flex-direction: column; }
+/* BUG FIX: turning .timer-card into a flex column (above) made every direct
+   child a flex item, and flex items default to align-items:stretch — so
+   #status-badge (a small pill, meant to size to its own text) was silently
+   stretching to the full width of the card instead of staying compact.
+   Pinning it back to its natural width on the cross axis (align-self) fixes
+   that without touching the flex centering .timer-box still needs. */
+#status-badge { align-self: flex-start; }
 
 .zen-toggle-btn {
     position: absolute;
@@ -501,10 +508,11 @@ button.del:hover { color: #fca5a5; }
 .yt-controls button { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
 /* Small red "close player" button — sits after Loop in the same row.
    Rose-tinted (matches Stop/Delete elsewhere) so it visually reads as the
-   "shut this down" action, distinct from the neutral Play/Loop buttons. */
-.yt-close-btn { background: rgba(var(--tint-rose), 0.12) !important; border: 1px solid rgba(var(--tint-rose), 0.4) !important; color: rgb(var(--tint-rose)) !important; flex: 0 0 auto; width: 34px; padding: 6px 0 !important; display: flex; align-items: center; justify-content: center; }
+   "shut this down" action, distinct from the neutral Play/Loop buttons.
+   Plain text label ("Close"), not an icon — sized like its Play/Loop
+   siblings instead of the old fixed-width icon-only square. */
+.yt-close-btn { background: rgba(var(--tint-rose), 0.12) !important; border: 1px solid rgba(var(--tint-rose), 0.4) !important; color: rgb(var(--tint-rose)) !important; font-weight: 700; }
 .yt-close-btn:hover { background: rgba(var(--tint-rose), 0.22) !important; }
-.yt-close-btn svg { width: 15px; height: 15px; }
 .yt-controls input[type="range"] { flex: 1; }
 /* scrollbar-width/color + the ::-webkit-scrollbar rules below match the
    thin track used by #todo-list and .sidebar — without them this panel

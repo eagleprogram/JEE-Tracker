@@ -401,20 +401,41 @@ function buildReportCanvas(days, title) {
     const statsLabelY = 278;
     const sectionTitleY = 360;
     const heatmapDowY = sectionTitleY + 34;
-    const heatmapGridStartY = heatmapDowY + 16;
-    const cellSize = 27, cellGap = 7;
-    const heatmapWidth = 7 * cellSize + 6 * cellGap;          // 190px
+    // Slightly larger cells than before (27→30, gap 7→8) — still well within
+    // the left half's width (max grid width 258px vs. the 600px half), so no
+    // risk of overlapping into the pie's half on the right.
+    const cellSize = 30, cellGap = 8;
+    const heatmapWidth = 7 * cellSize + 6 * cellGap;
     const heatmapX = leftHalfCenter - heatmapWidth / 2;        // centered in left half
     const heatmapRows = Math.ceil(Math.min(dayData.length, 35) / 7);
+
+    const pieCx = rightHalfCenter, pieRadius = 100;            // centered in right half
+    const pieCy = sectionTitleY + 40 + pieRadius;
+    const pieBottomY = pieCy + pieRadius;
+
+    // BUG FIX: the grid used to start immediately under the day-of-week
+    // labels regardless of how many rows it had — fine for a monthly report
+    // (5 rows, fills most of the pie's height), but a weekly report is only
+    // 1 row, so it rendered as a short strip pinned to the top of the
+    // section while the much taller pie chart sat centered below/beside it —
+    // reading as "not aligned." Centering the grid within the same vertical
+    // band the pie occupies (dow-label row down to the pie's own bottom
+    // edge) instead fixes that for any row count: a short (weekly) grid
+    // now sits mid-band alongside the pie's center, and a tall (near-
+    // monthly, 5-row) grid — which already fills almost the whole band —
+    // barely shifts at all. The max possible grid (5 rows, the slice(0,35)
+    // cap below) is always shorter than this band, so the offset is never
+    // negative — no clamping needed to avoid the grid climbing above the
+    // day-of-week labels.
+    const heatmapBandTop = heatmapDowY + 16;
+    const heatmapGridHeight = heatmapRows * (cellSize + cellGap) - cellGap;
+    const heatmapGridStartY = heatmapBandTop + Math.max(0, (pieBottomY - heatmapBandTop - heatmapGridHeight) / 2);
     const heatmapBottomY = heatmapGridStartY + heatmapRows * (cellSize + cellGap);
     // Color-key row (study-hours buckets) drawn just under the heatmap grid,
     // so a shared/downloaded report is self-explanatory without the live app.
     const heatmapLegendY = heatmapBottomY + 44;
     const heatmapLegendBottomY = heatmapLegendY + 16;
 
-    const pieCx = rightHalfCenter, pieRadius = 100;            // centered in right half
-    const pieCy = sectionTitleY + 40 + pieRadius;
-    const pieBottomY = pieCy + pieRadius;
 
     const tableTitleY = Math.max(heatmapLegendBottomY, pieBottomY) + 55;
     const tableHeaderY = tableTitleY + 45;

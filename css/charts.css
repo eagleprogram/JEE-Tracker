@@ -113,4 +113,17 @@
        clear empty space between adjacent labels at that size. */
     #trend-chart-container svg text { font-size: 15px; }
     #questions-row svg { height: auto; }
+    /* BUG FIX: the subject-name legend below the trend chart (injected by
+       renderTrendChart() in charts.js) carries its own inline
+       margin-top:10px, sized for the chart's fixed 400px desktop height.
+       On mobile the svg above already shrinks a lot (height:auto, capped
+       at 160px per the rule above), but that inline margin-top doesn't
+       shrink with it — so relative to the now-much-shorter chart, the gap
+       down to the legend reads as noticeably larger than it used to.
+       Overriding it (needs !important — it's a plain inline style) to a
+       size proportional to the smaller mobile chart closes that back up.
+       `#trend-chart-container > div` is specific to the legend — the only
+       direct-child <div> renderTrendChart() ever injects there (the <svg>
+       is the other, unaffected, sibling). */
+    #trend-chart-container > div { margin-top: 4px !important; }
 }
