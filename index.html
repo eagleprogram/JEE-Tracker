@@ -158,7 +158,7 @@
                     <span style="font-size:12px; color:var(--muted);">min on break</span>
                 </div>
                 <div class="settings-row">
-                    <label title="2-hour window, reminds every 30 min">Planner task reminder</label>
+                    <label>Planner task reminder (2hr window, remind every 30min)</label>
                     <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -166,7 +166,7 @@
                     <input type="time" id="notif-plannerReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label title="Once per day">Revision reminder</label>
+                    <label>Revision reminder (once/day)</label>
                     <input type="checkbox" id="notif-revisionReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -174,7 +174,7 @@
                     <input type="time" id="notif-revisionReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label title="30-minute window, reminds every 5 min">Sleep reminder</label>
+                    <label>Sleep reminder (30-min window, remind every 5min)</label>
                     <input type="checkbox" id="notif-sleepReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -182,7 +182,7 @@
                     <input type="time" id="notif-sleepReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label title="Sends once per day">Daily log to parent</label>
+                    <label>Send daily log to parent (once/day)</label>
                     <input type="checkbox" id="notif-parentLogReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -190,7 +190,7 @@
                     <input type="time" id="notif-parentLogReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label title="Every 2 days">Backup reminder</label>
+                    <label>Export local backup reminder (every 2 days)</label>
                     <input type="checkbox" id="notif-backupReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
@@ -198,7 +198,7 @@
                     <input type="checkbox" id="notif-examMilestones" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label title="Reminds while studying">Water break reminder</label>
+                    <label>Water break reminder (while studying)</label>
                     <input type="checkbox" id="notif-waterBreakReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -207,7 +207,7 @@
                     <span style="font-size:12px; color:var(--muted);">min</span>
                 </div>
                 <div class="settings-row">
-                    <label title='Checks in when idle'>Idle nudge</label>
+                    <label>Idle nudge ("still there?")</label>
                     <input type="checkbox" id="notif-idleNudge" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -219,7 +219,7 @@
             </div>
 
             <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
-                <div style="font-size:13px; font-weight:700; margin-bottom:4px;" title="Reaches you even when the app is fully closed">📴 Background Alerts</div>
+                <div style="font-size:13px; font-weight:700; margin-bottom:4px;">📴 Background Alerts (even when the app is fully closed)</div>
                 <div id="push-permission-status" class="small-note" style="margin-bottom:8px;"></div>
                 <div style="display:flex; gap:6px;">
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="enableBackgroundPush()">Enable</button>
@@ -247,9 +247,9 @@
                 <div style="border-top:1px solid var(--border); margin:14px 0 10px 0;"></div>
 
                 <!-- BOTTOM: Guest Delete Button -->
-                <div class="small-note" style="color:var(--danger); margin-bottom:4px;" title="Logs, planner, sleep, settings">⚠️ Deletes all local data</div>
+                <div class="small-note" style="color:var(--danger); margin-bottom:4px;">⚠️ Guest mode: deletes ALL local data (logs, planner, sleep, settings).</div>
                 <button class="btn btn-stop btn-small" style="width:100%;" onclick="resetAllData()">Delete All Local Data</button>
-                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: saves to cloud if signed in, then clears all data and reloads">Delete Cookies & Reload Website</button>
+                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: auto-saves to cloud (if signed in), signs out, clears cookies/site data and local study data, and reloads the latest version">Delete Cookies & Reload Website</button>
             </div>
             <div id="signed-in-block" style="display:none;">
                 <div id="sync-last" class="small-note"></div>
@@ -269,7 +269,7 @@
 
     <div class="sidebar-content" id="panel-mocktest">
         <h3 style="margin:0; color:var(--primary);">📝 Mock Test Score & Analysis</h3>
-        <button class="btn btn-pause btn-small" style="width:100%;" onclick="exportAllMockTests()" title="Downloads a .zip of every mock test entry">⬇ Export All Mock Tests</button>
+        <button class="btn btn-pause btn-small" style="width:100%;" onclick="exportAllMockTests()" title="Downloads a .zip of every mock test entry">⬇ Export All Mock Tests (.zip)</button>
         <div class="card" style="padding:12px;">
             <label style="font-size:12px; color:var(--muted);">Date</label>
             <div class="date-field-wrap">
@@ -333,7 +333,7 @@
     <div class="sidebar-content" id="panel-mistakes">
         <h3 style="margin:0; color:var(--primary);">❗ Chapter Mistakes Tracker</h3>
         <div class="small-note">Log mistakes per chapter, with optional notes &amp; attachments.</div>
-        <button class="btn btn-pause btn-small" style="width:100%;" onclick="exportAllMistakes()" title="Downloads a .zip of every mistake entry">⬇ Export All Mistakes</button>
+        <button class="btn btn-pause btn-small" style="width:100%;" onclick="exportAllMistakes()" title="Downloads a .zip of every mistake entry">⬇ Export All Mistakes (.zip)</button>
 
         <div class="mistake-view-toggle">
             <button id="mistake-tab-add" class="active" onclick="setMistakesView('add')">➕ Add Mistake</button>
@@ -497,7 +497,7 @@
             </div>
         </div>
         <div class="garden-row" id="questions-row"></div>
-        <div class="goal-note q-goal-note"><strong class="goal-note-emphasis">Tip:</strong> Auto-prompted after each sleep log, or log it anytime above.</div>
+        <div class="goal-note q-goal-note"><strong class="goal-note-emphasis">Tip:</strong> Auto-prompted after each sleep log, log or update it anytime above.</div>
     </div>
 
     <div class="card" style="margin-top:20px;">
@@ -527,7 +527,7 @@
                 <button class="btn btn-report-share btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
                 <button class="btn btn-report-share btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
             </div>
-            <div class="small-note" style="margin-top:4px; color:var(--warning);" title="Or send manually with the buttons above">Auto-sent Sundays &amp; month-end if signed in.</div>
+            <div class="small-note" style="margin-top:4px; color:var(--warning);">Auto-sent Sundays &amp; month-end if signed in — or send manually above.</div>
         </div>
     </div>
 
@@ -541,9 +541,9 @@
         <div class="btn-row-nowrap" style="margin-top:10px;">
             <button class="btn btn-stop btn-compact history-delete-btn" onclick="deleteStudyLog()"><svg class="trash-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2"></path><path d="M6.5 7l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7"></path><path d="M10 10.5v6"></path><path d="M14 10.5v6"></path></svg><span>Delete Study Log</span></button>
             <button class="btn btn-stop btn-compact history-delete-btn" onclick="deleteBreakLog()"><svg class="trash-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2"></path><path d="M6.5 7l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7"></path><path d="M10 10.5v6"></path><path d="M14 10.5v6"></path></svg><span>Delete Break Log</span></button>
-            <button class="btn btn-report-download btn-compact" onclick="downloadDayLog()">Download Log</button>
-            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('daily', false)">Email Log</button>
-            <button class="btn btn-report-share btn-compact" onclick="shareDayLog()">📤 Share Log</button>
+            <button class="btn btn-report-download btn-compact" onclick="downloadDayLog()">Download Daily Log</button>
+            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('daily', false)">Email Daily Log</button>
+            <button class="btn btn-report-share btn-compact" onclick="shareDayLog()">📤 Share Daily Log</button>
         </div>
             <div class="grid-2 grid-2-top" style="margin-top:15px;">
         <div>
