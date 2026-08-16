@@ -31,6 +31,18 @@ body.panel-open { padding-left: 440px; }
    dead zone: the sidebar and the main content now switch to mobile layout
    at the exact same width, together. */
 @media (max-width: 850px) {
+    /* BUG FIX (default mobile zoom): the requested "start already
+       pinched-out" look can't be done via the viewport meta's
+       initial-scale — mobile browsers commonly ignore/clamp
+       initial-scale below 1.0 when width=device-width is also set (an
+       anti-spoofing zoom restriction), so that approach was silently
+       discarded regardless of deployment. `zoom` (non-standard but
+       reliably supported across mobile Chrome/Safari/WebKit — the
+       browsers this app's users are on) actually forces the render
+       smaller, the same way a real pinch-out does, and — unlike
+       initial-scale — the browser has no "ignore this" behavior for it.
+       Scoped to this existing mobile breakpoint so desktop is untouched. */
+    body { zoom: 0.85; }
     body { padding-left: 64px; }
     body.panel-open { padding-left: 64px; }
     .sidebar { width: 48px; }
