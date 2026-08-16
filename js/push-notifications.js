@@ -65,12 +65,12 @@ function initMessagingIfNeeded() {
 export function updatePushPermissionStatusUI() {
     let el = document.getElementById("push-permission-status");
     if (!el) return;
-    if (!vapidConfigured()) { el.innerText = "Not set up yet on this deployment — see PUSH_SETUP.md."; return; }
+    if (!vapidConfigured()) { el.innerText = "Not set up yet — see PUSH_SETUP.md."; return; }
     if (!("Notification" in window) || !("serviceWorker" in navigator)) { el.innerText = "Not supported on this browser."; return; }
-    if (!getCurrentUser()) { el.innerText = "Sign in first — background alerts are tied to your account."; return; }
-    if (Notification.permission === "denied") { el.innerText = "⛔ Blocked — enable notifications for this site in your browser settings."; return; }
-    if (Notification.permission === "granted" && getRawFlag(PUSH_ENABLED_FLAG) === "1") { el.innerText = "✅ Background alerts enabled on this device."; return; }
-    el.innerText = "Off. Tap Enable — alerts will then reach you even with the app fully closed.";
+    if (!getCurrentUser()) { el.innerText = "Sign in first to enable this."; return; }
+    if (Notification.permission === "denied") { el.innerText = "⛔ Blocked — enable notifications in browser settings."; return; }
+    if (Notification.permission === "granted" && getRawFlag(PUSH_ENABLED_FLAG) === "1") { el.innerText = "✅ Enabled on this device."; return; }
+    el.innerText = "Off — tap Enable to turn on.";
 }
 
 export async function enableBackgroundPush() {

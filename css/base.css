@@ -128,7 +128,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 .sidebar.expanded {
     width: 420px;
     align-items: stretch;
-    padding: 15px 14px 60px 14px;
+    padding: 15px 14px 20px 14px;
 }
 
 .sidebar-header-expanded {
@@ -217,7 +217,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     display: none;
     flex-direction: column;
     gap: 15px;
-    padding-bottom: 24px;
+    padding-bottom: 4px;
 }
 
 /* ===== Main content ===== */
@@ -571,7 +571,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
         max-width: calc(100vw - 16px);
         align-items: stretch;
         padding: max(12px, env(safe-area-inset-top)) 12px
-                 calc(28px + env(safe-area-inset-bottom));
+                 calc(14px + env(safe-area-inset-bottom));
         box-shadow: 18px 0 48px rgba(0, 0, 0, 0.42);
     }
 
@@ -646,7 +646,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     .sidebar-content {
         width: 100%;
         min-width: 0;
-        padding-bottom: 28px;
+        padding-bottom: 4px;
     }
 
     .main-wrapper {

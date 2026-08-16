@@ -98,27 +98,40 @@ export function renderGarden() {
 }
 
 // ---------------- HEATMAP ----------------
+// BUG FIX (round 5): replaced the GitHub-style calendar-aligned grid
+// (weeks starting on a fixed Sunday, rows = real day-of-week) with a
+// plain sequential fill. The old approach always allocated a full 7-day
+// column for the current week even though most of those days hadn't
+// happened yet, so "today" ended up stranded mid-grid with a dead,
+// mostly-empty column trailing to its right. Here the day list is built
+// with NO days past today (so nothing to skip/leave blank), then simply
+// chunked into columns of 7 from oldest to newest — the last column is
+// naturally partial and its last cell is always today, flush against the
+// right edge, with the rest of that week's data trailing left one day at
+// a time. No calendar/weekday alignment is implied by row position
+// anymore. Color scale, tooltip, legend and geometry are unchanged.
 export function renderHeatmap() {
     let db = getDB(); let today = new Date(); today.setHours(0,0,0,0);
-    let start = new Date(today); start.setDate(today.getDate() - 371); start.setDate(start.getDate() - start.getDay());
-    let weeks = []; let cursor = new Date(start);
+    const totalDays = 372; // ~12 months, same range as before
+    let start = new Date(today); start.setDate(today.getDate() - (totalDays - 1));
+    let days = []; let cursor = new Date(start);
     while (cursor <= today) {
-        let week = [];
-        for (let i = 0; i < 7; i++) {
-            let key = dateKeyFromWall(cursor.getTime());
-            let sec = db[key]?.totalStudy || 0;
-            let q = db[key]?.questionsSolved || 0;
-            week.push({ key, hrs: sec / 3600, q, date: new Date(cursor) });
-            cursor.setDate(cursor.getDate() + 1);
-        }
-        weeks.push(week);
+        let key = dateKeyFromWall(cursor.getTime());
+        let sec = db[key]?.totalStudy || 0;
+        let q = db[key]?.questionsSolved || 0;
+        days.push({ key, hrs: sec / 3600, q });
+        cursor.setDate(cursor.getDate() + 1);
     }
+    const rows = 7;
+    let weeks = [];
+    for (let i = 0; i < days.length; i += rows) weeks.push(days.slice(i, i + rows));
+
     // BUG FIX (round 2): reverted to the original larger tile geometry
     // (13px cell, 4px gap, rx3) the user wants back — the small/tight
     // GitHub-proportioned tiles from the previous fix were the wrong
     // target; only the COLOR treatment (below) should follow GitHub's
     // dark, low-contrast style, not the size.
-    let cell = 13; let gap = 4; let width = weeks.length * (cell + gap) + 16; let height = 7 * (cell + gap) + 10; let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; max-width:${width}px; display:block;">`;
+    let cell = 13; let gap = 4; let width = weeks.length * (cell + gap) + 16; let height = rows * (cell + gap) + 10; let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; max-width:${width}px; display:block;">`;
     // BUG FIX: the previous version used a genuine multi-hue scale (blue ->
     // green -> amber -> rose per bucket) specifically because a single-hue
     // ramp was hard to split into confident buckets. Feedback was the exact
@@ -153,7 +166,6 @@ export function renderHeatmap() {
     // Dropped stroke/stroke-width entirely.
     weeks.forEach((week, wi) => {
         week.forEach((day, di) => {
-            if (day.date > today) return;
             let x = wi * (cell + gap) + 8, y = di * (cell + gap) + 5;
             // Buckets now span the full 0-10h daily goal so the brightest
             // color is only reached at the actual goal (10h+), not 9h —
