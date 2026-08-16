@@ -98,21 +98,22 @@ export function renderGarden() {
 }
 
 // ---------------- HEATMAP ----------------
-// BUG FIX (round 5): replaced the GitHub-style calendar-aligned grid
-// (weeks starting on a fixed Sunday, rows = real day-of-week) with a
-// plain sequential fill. The old approach always allocated a full 7-day
-// column for the current week even though most of those days hadn't
-// happened yet, so "today" ended up stranded mid-grid with a dead,
-// mostly-empty column trailing to its right. Here the day list is built
-// with NO days past today (so nothing to skip/leave blank), then simply
-// chunked into columns of 7 from oldest to newest — the last column is
-// naturally partial and its last cell is always today, flush against the
-// right edge, with the rest of that week's data trailing left one day at
-// a time. No calendar/weekday alignment is implied by row position
-// anymore. Color scale, tooltip, legend and geometry are unchanged.
+// BUG FIX (round 6): the round-5 rewrite used a fixed 372-day window
+// chunked into columns of 7 from the OLDEST day forward. 372 is not a
+// multiple of 7 (372 = 53*7 + 1) and — because the window is a fixed
+// SIZE that slides with "today" rather than growing — that remainder is
+// not a one-off, it's permanent: the rightmost column would contain
+// exactly 1 cell (today, alone) on every single day forever, stuck near
+// the TOP of the grid rather than at the bottom-right corner the user
+// wants. Switched the window to 371 days = exactly 53*7, so the columns
+// divide evenly with no remainder: the grid is always 53 full columns of
+// 7 rows, and the very last cell — bottom row, rightmost column — is
+// always today. Everything else (sequential/non-calendar fill, color
+// scale, tooltip, legend, cell geometry) is unchanged from round 5.
 export function renderHeatmap() {
     let db = getDB(); let today = new Date(); today.setHours(0,0,0,0);
-    const totalDays = 372; // ~12 months, same range as before
+    const rows = 7;
+    const totalDays = 53 * rows; // 371 days = exactly 53 full weeks, no remainder
     let start = new Date(today); start.setDate(today.getDate() - (totalDays - 1));
     let days = []; let cursor = new Date(start);
     while (cursor <= today) {
@@ -122,7 +123,6 @@ export function renderHeatmap() {
         days.push({ key, hrs: sec / 3600, q });
         cursor.setDate(cursor.getDate() + 1);
     }
-    const rows = 7;
     let weeks = [];
     for (let i = 0; i < days.length; i += rows) weeks.push(days.slice(i, i + rows));
 
