@@ -94,36 +94,35 @@
    colors come from the SUBJECT_COLORS map in JS, not from CSS classes here,
    so there's nothing further to style for those two beyond what's above. */
 
-/* ===== Mobile-only: fixed-height SVGs that scale width but not height =====
+/* ===== Fixed-height SVGs that scale width but not height =====
    Both renderTrendChart() and questionRingSVG() (js/charts.js, js/questions.js)
-   set width="100%" but a literal pixel height attribute, sized for their
-   desktop-width viewBox. On a phone-width column, the content scales down
-   (preserving aspect ratio) to fit the narrow width while the box itself
-   stays at the old, much taller desktop height — leaving a large blank gap
-   below the trend chart, and extra invisible padding above/below each
-   question-tracker ring. Letting height scale with width here fixes both
-   without touching desktop, where the rendered width is already close to
-   (trend chart) or at (question rings, via their own max-width cap) the
-   size these were tuned for. */
+   set width="100%" but a literal pixel height attribute (400 for the trend
+   chart), sized for its 1200x400 viewBox. The card this lives in never
+   actually gets 1200px wide — even at the absolute widest desktop layout
+   this app allows (~1052px of content width) it's still narrower than the
+   viewBox, so preserveAspectRatio="xMinYMin meet" is ALWAYS width-limited
+   here: it scales the drawn chart down to fit the width, but the SVG's own
+   box stays pinned at the literal 400px height attribute regardless —
+   leaving real dead space below the drawn chart (between the x-axis labels
+   and the legend underneath) at every screen size, not just on mobile,
+   and worse the narrower it gets.
+   BUG FIX: an earlier pass only fixed this inside a `max-width:850px`
+   media query, plus patched the legend's own margin-top for that narrow
+   case specifically — leaving the dead space fully intact on wider
+   screens, and adding a mobile-only override that no longer means
+   anything once the box itself is fixed. Letting height auto-follow the
+   real aspect ratio (capped at 400 — its own intrinsic ceiling, so this
+   never grows past the original design height) removes the dead space at
+   every width in one rule; the legend needs no separate override anymore
+   since there's no leftover box height beneath the chart for it to look
+   large relative to. */
+#trend-chart-container svg { height: auto; max-height: 400px; }
+#questions-row svg { height: auto; }
+
 @media (max-width: 850px) {
-    #trend-chart-container svg { height: auto; max-height: 160px; }
     /* Axis labels (the "0.0h"/"2.5h"/... y-axis and "Sun"/"Mon"/... x-axis
-       text) bumped again from 13.5px — the chart's viewBox has generous
-       fixed padding (60 units) around the plotted line, so there was still
-       clear empty space between adjacent labels at that size. */
+       text) bumped up — the chart's viewBox has generous fixed padding (60
+       units) around the plotted line, so at the base 12px (set in
+       charts.js) they read small on a narrow phone screen. */
     #trend-chart-container svg text { font-size: 15px; }
-    #questions-row svg { height: auto; }
-    /* BUG FIX: the subject-name legend below the trend chart (injected by
-       renderTrendChart() in charts.js) carries its own inline
-       margin-top:10px, sized for the chart's fixed 400px desktop height.
-       On mobile the svg above already shrinks a lot (height:auto, capped
-       at 160px per the rule above), but that inline margin-top doesn't
-       shrink with it — so relative to the now-much-shorter chart, the gap
-       down to the legend reads as noticeably larger than it used to.
-       Overriding it (needs !important — it's a plain inline style) to a
-       size proportional to the smaller mobile chart closes that back up.
-       `#trend-chart-container > div` is specific to the legend — the only
-       direct-child <div> renderTrendChart() ever injects there (the <svg>
-       is the other, unaffected, sibling). */
-    #trend-chart-container > div { margin-top: 4px !important; }
 }

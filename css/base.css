@@ -481,6 +481,18 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 /* ===== Two-column page grid ===== */
 .grid-2 { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; }
 @media (max-width: 850px) { .grid-2 { grid-template-columns: 1fr; } }
+/* BUG FIX: CSS Grid's default align-items:stretch makes every column
+   stretch to match the tallest one in its row — invisible on the timer/
+   live-summary .grid-2 above (both columns are opaque cards, so equal
+   height there is actually the desired look), but on the History section's
+   .grid-2 the "Logged Breaks" column can run much taller than "Subject
+   Breakdown" (many missed-break entries vs. a short subject list), and
+   that column's own <div> has no background — so it silently stretched to
+   match, leaving a big block of dead, invisible empty space below "No
+   individual sessions recorded" before the footer. Scoped via this second
+   class (rather than changing .grid-2 itself) so the Timer/Live-Summary
+   pair keeps its equal-height stretch behavior untouched. */
+.grid-2-top { align-items: start; }
 
 /* BUG FIX: body.zen-mode .timer-card (components.css) switches the timer
    card to `position: fixed` the instant zen mode turns on. That takes it

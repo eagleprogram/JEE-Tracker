@@ -41,6 +41,15 @@ export function renderNotifSettingsUI() {
 }
 
 export function saveNotifSettingsFromUI() {
+    // BUG FIX: this used to just clamp to a min of 5 with no rounding, so a
+    // typed value like 25 was saved and used as-is — the "every 15 min"
+    // step on the input's spinner only affects the up/down arrows, it
+    // never restricts what can be typed directly. Snapping any typed value
+    // to the nearest multiple of 15 (min 15) here, and writing the snapped
+    // number back into the field, is what actually enforces it.
+    let waterFreqRaw = parseInt(document.getElementById("notif-waterBreakFrequency").value) || 30;
+    let waterFreqSnapped = Math.min(180, Math.max(15, Math.round(waterFreqRaw / 15) * 15));
+    document.getElementById("notif-waterBreakFrequency").value = waterFreqSnapped;
     let s = {
         enabled: getNotifSettings().enabled,
         breakOverrun: document.getElementById("notif-breakOverrun").checked,
@@ -58,7 +67,7 @@ export function saveNotifSettingsFromUI() {
         parentLogReminderTime: document.getElementById("notif-parentLogReminderTime").value || "22:30",
         backupReminder: document.getElementById("notif-backupReminder").checked,
         waterBreakReminder: document.getElementById("notif-waterBreakReminder").checked,
-        waterBreakFrequencyMin: Math.max(5, parseInt(document.getElementById("notif-waterBreakFrequency").value) || 30)
+        waterBreakFrequencyMin: waterFreqSnapped
     };
     saveNotifSettings(s); showToast("Notification settings saved.");
     // A frequency/on-off change should take effect immediately for a water
@@ -513,7 +522,11 @@ export function startWaterReminder() {
     if (waterReminderTimer) { clearInterval(waterReminderTimer); waterReminderTimer = null; }
     let s = getNotifSettings();
     if (!s.waterBreakReminder) return;
-    let ms = Math.max(5, s.waterBreakFrequencyMin || 30) * 60 * 1000;
+    // Defensive re-snap: a value saved before this fix (or edited directly
+    // in storage) might not be a clean multiple of 15 — same snapping as
+    // saveNotifSettingsFromUI() above, so this is never less than 15
+    // regardless of what's actually sitting in storage.
+    let ms = Math.min(180, Math.max(15, Math.round((s.waterBreakFrequencyMin || 30) / 15) * 15)) * 60 * 1000;
     waterReminderTimer = setInterval(() => {
         notify("Water break", "Time to drink some water!", true, 6);
     }, ms);
