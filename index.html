@@ -3,7 +3,7 @@
 <head>
     <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=0.85, viewport-fit=cover">
     <title>JEE 2027 Study Tracker & Planner</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#070b14">
@@ -464,7 +464,7 @@
             <h3 style="margin:0;"><img class="garden-title-icon" src="assets/garden-icon.png" alt="Garden" width="30" height="30"> Week's Garden</h3>
             <span class="streak-pill" id="streak-pill">🔥 0 day streak</span>
         </div>
-        <div class="goal-note" title="Weeks run Monday–Sunday"><strong class="goal-note-emphasis">Goal:</strong> 10 hrs/day keeps your streak alive. One ❄️ freeze covers a missed day each week; a 2nd miss resets it to 0.</div>
+        <div class="goal-note" title="Weeks run Monday–Sunday"><strong class="goal-note-emphasis">Goal:</strong> 10 hrs/day keeps your streak alive. One ❄️ freeze covers a missed day each week; a 2nd miss resets the streak to 0.</div>
         <div class="garden-row" id="garden-row"></div>
     </div>
 
@@ -520,12 +520,12 @@
         <div style="border-top:1px solid var(--border); padding-top:10px;">
             <h4 style="margin:0 0 4px 0;">📊 Weekly / Monthly Reports</h4>
             <div class="btn-row-fit">
-                <button class="btn btn-report-download btn-compact" onclick="downloadReport('weekly')">Weekly Report</button>
-                <button class="btn btn-report-download btn-compact" onclick="downloadReport('monthly')">Monthly Report</button>
-                <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('weekly', false)">Email Weekly</button>
-                <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('monthly', false)">Email Monthly</button>
-                <button class="btn btn-report-share btn-compact" onclick="shareReport('weekly')">📤 Share Weekly</button>
-                <button class="btn btn-report-share btn-compact" onclick="shareReport('monthly')">📤 Share Monthly</button>
+                <button class="btn btn-report-download btn-compact" onclick="downloadReport('weekly')">Download Weekly Report</button>
+                <button class="btn btn-report-download btn-compact" onclick="downloadReport('monthly')">Download Monthly Report</button>
+                <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('weekly', false)">Email Weekly Report</button>
+                <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('monthly', false)">Email Monthly Report</button>
+                <button class="btn btn-report-share btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
+                <button class="btn btn-report-share btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
             </div>
             <div class="small-note" style="margin-top:4px; color:var(--warning);" title="Or send manually with the buttons above">Auto-sent Sundays &amp; month-end if signed in.</div>
         </div>
