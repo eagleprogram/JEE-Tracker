@@ -19,7 +19,8 @@ import {
     renderQuoteOfDay, renderExamYearUI, setExamYear, tickCountdowns,
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
     hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
-    guestReminderSignInClicked, runBootSignInGate, forceMobileZoomReflow
+    guestReminderSignInClicked, runBootSignInGate, forceMobileZoomReflow,
+    initHolidayReference
 } from './ui.js';
 
 import {
@@ -69,6 +70,8 @@ import {
     backQuestionsModal, deleteQuestionsSolved, openTodayQuestionsModal, renderQuestionsWidget
 } from './questions.js';
 
+import { getViewWeekOffset, setViewWeekOffset, renderWeekNavUI } from './week-nav.js';
+
 import {
     downloadDayLog, shareDayLog, sendReportViaEmail, downloadReport, shareReport
 } from './reports.js';
@@ -89,6 +92,19 @@ import {
     enableBackgroundPush, disableBackgroundPush, updatePushPermissionStatusUI,
     reregisterPushIfEnabled
 } from './push-notifications.js';
+
+// Week-nav: the ‹ This Week › control repeated under the Garden/Questions/
+// Trend titles all call this same function (see week-nav.js for the
+// shared offset state). main.js is the one place that already imports all
+// three widgets' render functions, so it's what re-renders them together
+// after the offset changes, then repaints the nav control itself to match.
+function shiftViewWeek(delta) {
+    setViewWeekOffset(getViewWeekOffset() + delta);
+    renderGarden();
+    renderQuestionsWidget();
+    renderTrendChart();
+    renderWeekNavUI();
+}
 
 // -----------------------------------------------------------------------
 // EXPOSE EVERY FUNCTION THE HTML's INLINE onclick/onchange HANDLERS CALL.
@@ -117,6 +133,8 @@ Object.assign(window, {
     // questions.js
     openQuestionsModal, closeQuestionsModal, saveQuestionsSolved,
     backQuestionsModal, deleteQuestionsSolved, openTodayQuestionsModal,
+    // week-nav.js (shared Garden/Questions/Trend week control)
+    shiftViewWeek,
     // history.js
     loadHistoryData, deleteSubjectEntry, deleteStudySessionEntry,
     deleteBreakEntry, deleteStudyLog, deleteBreakLog, addMissedBreak,
@@ -266,6 +284,7 @@ async function initApp() {
     renderHeatmap();
     renderTrendChart();
     renderQuestionsWidget();
+    renderWeekNavUI();
 
     // Seed the backup-reminder timestamp on first run so it has a baseline.
     if (!getLastBackupAt()) markBackupDone();
@@ -310,3 +329,9 @@ initApp();
 // app" that a plain `load` listener alone wouldn't catch.
 window.addEventListener("load", forceMobileZoomReflow);
 window.addEventListener("pageshow", forceMobileZoomReflow);
+
+// Holiday Reference (Google Calendar embed): deferred until every other
+// page resource has finished loading — see initHolidayReference()'s own
+// comment in ui.js for why this fixes the "broken until refresh on
+// mobile" bug.
+window.addEventListener("load", initHolidayReference);

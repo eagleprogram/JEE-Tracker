@@ -5,7 +5,7 @@
 // thing that makes the activate handler below delete the old cache and let
 // the new files be fetched fresh. Forgetting this step means fixes silently
 // never reach anyone who doesn't manually hard-refresh.
-const CACHE_NAME = "jee-tracker-v2.5.7";
+const CACHE_NAME = "jee-tracker-v2.5.8";
 
 // ----------------- BACKGROUND PUSH (Firebase Cloud Messaging) -----------------
 // Handles push messages that arrive while no tab of this app is open or
@@ -78,6 +78,7 @@ const APP_SHELL = [
   "./js/history.js",
   "./js/sleep.js",
   "./js/questions.js",
+  "./js/week-nav.js",
   "./js/syllabus.js",
   "./js/mocktest.js",
   "./js/youtube.js",

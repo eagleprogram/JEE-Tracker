@@ -135,7 +135,8 @@
         <div class="card" style="padding: 12px;">
             <h4 style="margin:0 0 6px 0;">Holiday Reference</h4>
             <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">Read-only Indian holiday calendar.</div>
-            <iframe src="https://calendar.google.com/calendar/embed?src=en.indian%23holiday%40group.v.calendar.google.com&ctz=Asia%2FKolkata"
+            <iframe id="holiday-iframe"
+                    data-src="https://calendar.google.com/calendar/embed?src=en.indian%23holiday%40group.v.calendar.google.com&ctz=Asia%2FKolkata"
                     style="border: 0; width:100%; height:260px; border-radius:6px;" frameborder="0" scrolling="no"></iframe>
         </div>
 
@@ -464,6 +465,11 @@
             <h3 style="margin:0;"><img class="garden-title-icon" src="assets/garden-icon.png" alt="Garden" width="30" height="30"> Week's Garden</h3>
             <span class="streak-pill" id="streak-pill">🔥 0 day streak</span>
         </div>
+        <div class="week-nav" id="garden-week-nav">
+            <button class="week-nav-btn" id="garden-week-prev" onclick="shiftViewWeek(-1)" aria-label="Previous week">‹</button>
+            <span class="week-nav-label" id="garden-week-label">This Week</span>
+            <button class="week-nav-btn" id="garden-week-next" onclick="shiftViewWeek(1)" aria-label="Next week" disabled>›</button>
+        </div>
         <div class="goal-note" title="Weeks run Monday–Sunday"><strong class="goal-note-emphasis">Goal:</strong> 10 hrs/day keeps your streak alive. One ❄️ freeze covers a missed day each week; a 2nd miss resets the streak to 0.</div>
         <div class="garden-row" id="garden-row"></div>
     </div>
@@ -496,12 +502,22 @@
                 </span>
             </div>
         </div>
+        <div class="week-nav" id="questions-week-nav">
+            <button class="week-nav-btn" id="questions-week-prev" onclick="shiftViewWeek(-1)" aria-label="Previous week">‹</button>
+            <span class="week-nav-label" id="questions-week-label">This Week</span>
+            <button class="week-nav-btn" id="questions-week-next" onclick="shiftViewWeek(1)" aria-label="Next week" disabled>›</button>
+        </div>
         <div class="garden-row" id="questions-row"></div>
         <div class="goal-note q-goal-note"><strong class="goal-note-emphasis">Tip:</strong> Auto-prompted after each sleep log, log or update it anytime above.</div>
     </div>
 
     <div class="card" style="margin-top:20px;">
         <h3 style="margin-top:0;">📈 Weekly Subject Trend (last 7 days)</h3>
+        <div class="week-nav" id="trend-week-nav">
+            <button class="week-nav-btn" id="trend-week-prev" onclick="shiftViewWeek(-1)" aria-label="Previous week">‹</button>
+            <span class="week-nav-label" id="trend-week-label">This Week</span>
+            <button class="week-nav-btn" id="trend-week-next" onclick="shiftViewWeek(1)" aria-label="Next week" disabled>›</button>
+        </div>
         <div id="trend-chart-container"></div>
     </div>
 

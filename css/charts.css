@@ -15,6 +15,17 @@
 .garden-plot .freeze-badge { font-size: 12px; line-height: 1; display: inline-flex; align-items: center; }
 .garden-plot.is-today svg { filter: drop-shadow(0 0 6px rgba(56,189,248,0.5)); }
 
+/* ===== Week-nav control (shared by Garden / Questions / Trend) =====
+   Small, identical "‹ label ›" strip repeated under each of the three
+   widgets' titles — see week-nav.js. Deliberately its own centered row
+   below the header rather than crammed into it, so it looks the same in
+   all three cards regardless of what else each header already has going
+   on (streak pill, log button + legend, or nothing). */
+.week-nav { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+.week-nav-btn { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 2px 9px; cursor: pointer; font-weight: 700; font-size: 13px; line-height: 1.6; }
+.week-nav-btn:disabled { color: var(--muted); cursor: default; opacity: 0.5; }
+.week-nav-label { font-weight: 700; font-size: 12px; color: var(--muted); min-width: 90px; text-align: center; }
+
 /* ===== 12-month heatmap ===== */
 .heatmap-scroll { overflow-x: auto; padding-bottom: 6px; display: flex; justify-content: center; }
 .heatmap-legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 8px; justify-content: center; }

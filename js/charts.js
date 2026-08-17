@@ -1,6 +1,7 @@
 import { dateKeyFromWall, getTodayKey, mondayKeyFor, formatDateDDMMYYYY } from './utils.js';
 import { getDB, blankDay } from './storage.js';
 import { getTimerState, getSegmentElapsedMs } from './timer.js';
+import { getViewWeekOffset, mondayForOffset } from './week-nav.js';
 
 export const SUBJECT_COLORS = {
     "Physics": "#14b8a6",
@@ -78,8 +79,12 @@ export function computeStreak(db) {
 }
 
 export function renderGarden() {
-    let db = getDB(); let now = new Date(); let dow = now.getDay(); let mondayOffset = (dow === 0) ? -6 : 1 - dow;
-    let monday = new Date(now); monday.setDate(now.getDate() + mondayOffset); monday.setHours(0,0,0,0);
+    // Week-nav: monday is the current week's Monday when the shared view
+    // offset is 0 (the default — identical math to before this feature
+    // existed), or a past week's Monday when the user has navigated back
+    // via the ‹ This Week › control under the title.
+    let db = getDB(); let now = new Date();
+    let monday = mondayForOffset(getViewWeekOffset());
     let todayKey = getTodayKey(); const dowLabels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]; let html = ""; let freezeUsedThisWeek = false;
     for (let i = 0; i < 7; i++) {
         let d = new Date(monday); d.setDate(monday.getDate() + i);
@@ -181,7 +186,20 @@ export function renderHeatmap() {
 // ---------------- TREND CHART ----------------
 export function renderTrendChart() {
     let db = getDB(); let today = new Date(); today.setHours(0,0,0,0);
-    let days = []; for (let i = 6; i >= 0; i--) { let d = new Date(today); d.setDate(today.getDate() - i); days.push(dateKeyFromWall(d.getTime())); }
+    let offset = getViewWeekOffset();
+    let days = [];
+    if (offset === 0) {
+        // ORIGINAL BEHAVIOR, unchanged: trailing 7 calendar days ending
+        // today (not Monday-aligned) — exactly what this chart always
+        // showed before the week-nav control existed.
+        for (let i = 6; i >= 0; i--) { let d = new Date(today); d.setDate(today.getDate() - i); days.push(dateKeyFromWall(d.getTime())); }
+    } else {
+        // Past week selected via the shared week-nav control: show that
+        // Monday-Sunday week instead, so it lines up with the Garden and
+        // Question Practice widgets for the same week.
+        let monday = mondayForOffset(offset);
+        for (let i = 0; i < 7; i++) { let d = new Date(monday); d.setDate(monday.getDate() + i); days.push(dateKeyFromWall(d.getTime())); }
+    }
     let subjects = Object.keys(blankDay().subjects); let width = 1200, height = 400, padding = 60;
     // Fixed floor of 10h (the daily study goal) instead of 0.5h — a 0.5h
     // ceiling made every gridline within a hair of 0 and the chart looked

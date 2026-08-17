@@ -56,6 +56,35 @@ export function forceMobileZoomReflow() {
     requestAnimationFrame(() => { mw.style.zoom = ""; });
 }
 
+// ----------------- HOLIDAY REFERENCE (Google Calendar embed) -----------------
+// BUG FIX: on mobile, the embedded Google Calendar iframe would sometimes
+// render as a broken image on a cold first load — never on desktop, and
+// never again after the user manually refreshed. The page ships this
+// iframe with a `src` set right in the HTML, so on mobile it starts
+// loading immediately, at the exact moment this page's own boot is
+// busiest (parsing/executing ~19 JS modules plus the Firebase SDK) — a
+// slower mobile CPU/connection is far more likely to have that fight for
+// resources actually break the embed's own first paint than a desktop
+// ever would. A manual refresh only "fixes" it because the browser's disk
+// cache makes that second load much lighter, not because anything else
+// changed.
+// Instead of shipping a `src` at all, the iframe below only carries
+// `data-src`. This function assigns the real `src` only once the window's
+// `load` event fires — i.e. once every other page resource has already
+// finished — so the embed no longer has to compete with this app's own
+// boot. As a safety net matching exactly what a manual refresh does, it
+// also reassigns that same `src` once more a few seconds later — cheap,
+// and invisible to the user, but covers it even if something else still
+// slowed that first attempt down.
+export function initHolidayReference() {
+    let frame = document.getElementById("holiday-iframe");
+    if (!frame) return;
+    let src = frame.dataset.src;
+    if (!src) return;
+    frame.src = src;
+    setTimeout(() => { frame.src = src; }, 3000);
+}
+
 // ----------------- FULL DEVICE RESET (Delete Cookies & Reload) -----------------
 // This used to only clear the PWA's Cache Storage layer (so a stale cached
 // build wouldn't keep being served) and leave everything else — study data,
