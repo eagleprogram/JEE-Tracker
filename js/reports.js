@@ -7,6 +7,48 @@ import { computeStreak, SUBJECT_COLORS } from './charts.js';
 import { showToast } from './ui.js';
 import { getCurrentUser } from './firebase-sync.js';
 
+// BUG FIX: the report table's Status column used to draw "Goal Met ✅" /
+// "Missed ❌" as plain emoji characters inside the canvas text. Different
+// emoji glyphs are NOT drawn at a uniform visual size by a device's emoji
+// font — ❌ in particular renders noticeably smaller/lighter than ✅ at the
+// exact same CSS font-size, which is exactly the misalignment reported
+// ("Missed ❌" looking smaller than "Goal Met ✅"). Relying on the OS's
+// emoji font also means this could render differently again on another
+// device/browser. Hand-drawing a small fixed-size circle+checkmark or
+// circle+cross with canvas paths instead removes the emoji font from the
+// picture entirely — both badges are then built from the exact same
+// radius/stroke-width, so they're guaranteed pixel-identical in size on
+// every device. Returns how many px wide the badge (icon + gap) was, so
+// the caller knows where to start the text that follows it.
+const STATUS_ICON_R = 8;        // circle radius
+const STATUS_ICON_GAP = 6;      // gap between the circle and the text that follows
+function drawStatusIcon(ctx, x, yBaseline, met) {
+    let cx = x + STATUS_ICON_R;
+    let cy = yBaseline - STATUS_ICON_R * 0.6; // nudge up from the text baseline to sit at roughly its vertical center
+    let color = met ? "#10b981" : "#ef4444";
+    ctx.beginPath();
+    ctx.arc(cx, cy, STATUS_ICON_R, 0, Math.PI * 2);
+    ctx.fillStyle = met ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)";
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    if (met) {
+        ctx.moveTo(cx - 4, cy);
+        ctx.lineTo(cx - 1, cy + 3.5);
+        ctx.lineTo(cx + 4.5, cy - 4);
+    } else {
+        ctx.moveTo(cx - 3.5, cy - 3.5);
+        ctx.lineTo(cx + 3.5, cy + 3.5);
+        ctx.moveTo(cx + 3.5, cy - 3.5);
+        ctx.lineTo(cx - 3.5, cy + 3.5);
+    }
+    ctx.stroke();
+    return STATUS_ICON_R * 2 + STATUS_ICON_GAP;
+}
+
 export 
     function buildShareText(dt) {
         let db = getDB(); let day = db[dt];
@@ -554,7 +596,7 @@ ctx.textAlign = "left";
     // block sits with equal margins left and right, instead of being
     // pinned to the left edge while empty space collects on the right.
     ctx.font = "16px sans-serif";
-    const statusMaxWidth = Math.max(ctx.measureText("✅ Goal Met").width, ctx.measureText("❌ Missed").width);
+    const statusMaxWidth = (STATUS_ICON_R * 2 + STATUS_ICON_GAP) + Math.max(ctx.measureText("Goal Met").width, ctx.measureText("Missed").width);
     const colInnerGap = 112;   // date -> study -> break -> questions spacing within one block
     const queStatusGap = 50;   // questions -> status spacing — deliberately tighter than the rest,
                                 // since "Que" is a short number and doesn't need a full column's worth
@@ -604,8 +646,10 @@ ctx.textAlign = "left";
         ctx.fillStyle = "#10b981"; ctx.fillText(formatReadable(d.study), col.study, y);
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
         ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
-        ctx.fillStyle = d.study >= 36000 ? "#10b981" : "#ef4444";
-        ctx.fillText(d.study >= 36000 ? "Goal Met ✅" : "Missed ❌", col.status, y);
+        let metGoal = d.study >= 36000;
+        let statusTextX = col.status + drawStatusIcon(ctx, col.status, y, metGoal);
+        ctx.fillStyle = metGoal ? "#10b981" : "#ef4444"; ctx.font = "16px sans-serif";
+        ctx.fillText(metGoal ? "Goal Met" : "Missed", statusTextX, y);
     });
 
     // ---- Footer ----
