@@ -70,7 +70,7 @@ import {
     backQuestionsModal, deleteQuestionsSolved, openTodayQuestionsModal, renderQuestionsWidget
 } from './questions.js';
 
-import { getViewWeekOffset, setViewWeekOffset, renderWeekNavUI } from './week-nav.js';
+import { getWeekOffset, setWeekOffset, renderWeekNavUI } from './week-nav.js';
 
 import {
     downloadDayLog, shareDayLog, sendReportViaEmail, downloadReport, shareReport
@@ -93,17 +93,22 @@ import {
     reregisterPushIfEnabled
 } from './push-notifications.js';
 
-// Week-nav: the ‹ This Week › control repeated under the Garden/Questions/
-// Trend titles all call this same function (see week-nav.js for the
-// shared offset state). main.js is the one place that already imports all
-// three widgets' render functions, so it's what re-renders them together
-// after the offset changes, then repaints the nav control itself to match.
-function shiftViewWeek(delta) {
-    setViewWeekOffset(getViewWeekOffset() + delta);
-    renderGarden();
-    renderQuestionsWidget();
-    renderTrendChart();
-    renderWeekNavUI();
+// Week-nav: each of the Garden/Questions/Trend ‹ This Week › controls
+// calls this with its OWN key ("garden" | "questions" | "trend") — see
+// week-nav.js for the independent-per-widget offset state. Only the one
+// widget that was clicked re-renders (and only its own nav control
+// repaints); the other two are untouched.
+const WEEK_NAV_RENDERERS = {
+    garden: renderGarden,
+    questions: renderQuestionsWidget,
+    trend: renderTrendChart
+};
+function shiftViewWeek(key, delta) {
+    let renderFn = WEEK_NAV_RENDERERS[key];
+    if (!renderFn) return;
+    setWeekOffset(key, getWeekOffset(key) + delta);
+    renderFn();
+    renderWeekNavUI(key);
 }
 
 // -----------------------------------------------------------------------

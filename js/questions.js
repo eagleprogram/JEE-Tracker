@@ -18,7 +18,7 @@ import { getDB, saveDB, initDay, ensureDayShape } from './storage.js';
 // function bodies, safe once the full module graph is wired in main.js.
 import { showToast } from './ui.js';
 import { renderHeatmap } from './charts.js';
-import { getViewWeekOffset, mondayForOffset } from './week-nav.js';
+import { getWeekOffset, mondayForOffset } from './week-nav.js';
 
 let activeQuestionsDateKey = null;
 
@@ -148,7 +148,7 @@ export function renderQuestionsWidget() {
     let db = getDB();
     // Week-nav: same shared offset as the Garden/Trend widgets — see the
     // comment on renderGarden() in charts.js.
-    let monday = mondayForOffset(getViewWeekOffset());
+    let monday = mondayForOffset(getWeekOffset("questions"));
     let todayKey = getTodayKey();
     const dowLabels = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
     let html = "";

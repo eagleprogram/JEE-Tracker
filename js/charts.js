@@ -1,7 +1,7 @@
 import { dateKeyFromWall, getTodayKey, mondayKeyFor, formatDateDDMMYYYY } from './utils.js';
 import { getDB, blankDay } from './storage.js';
 import { getTimerState, getSegmentElapsedMs } from './timer.js';
-import { getViewWeekOffset, mondayForOffset } from './week-nav.js';
+import { getWeekOffset, mondayForOffset } from './week-nav.js';
 
 export const SUBJECT_COLORS = {
     "Physics": "#14b8a6",
@@ -84,7 +84,7 @@ export function renderGarden() {
     // existed), or a past week's Monday when the user has navigated back
     // via the ‹ This Week › control under the title.
     let db = getDB(); let now = new Date();
-    let monday = mondayForOffset(getViewWeekOffset());
+    let monday = mondayForOffset(getWeekOffset("garden"));
     let todayKey = getTodayKey(); const dowLabels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]; let html = ""; let freezeUsedThisWeek = false;
     for (let i = 0; i < 7; i++) {
         let d = new Date(monday); d.setDate(monday.getDate() + i);
@@ -186,7 +186,7 @@ export function renderHeatmap() {
 // ---------------- TREND CHART ----------------
 export function renderTrendChart() {
     let db = getDB(); let today = new Date(); today.setHours(0,0,0,0);
-    let offset = getViewWeekOffset();
+    let offset = getWeekOffset("trend");
     let days = [];
     if (offset === 0) {
         // ORIGINAL BEHAVIOR, unchanged: trailing 7 calendar days ending
