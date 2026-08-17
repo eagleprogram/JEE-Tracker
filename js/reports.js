@@ -367,21 +367,17 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
         for (let [cat, sec] of Object.entries(aggregateSubjects)) { if (sec <= 0) continue; subjectHtml += `<div style="display: flex; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #1e293b; font-size: 14px;"><span style="color: #94a3b8;">${cat}:&nbsp;</span><span style="color: #38bdf8; font-weight: 600;">${formatReadable(sec)}</span></div>`; }
         if (!subjectHtml) subjectHtml = "<div style='padding: 12px; color: #64748b; text-align:center;'>No study time logged.</div>";
 
-        // Sleep data for the email payload — weekly/monthly only, matching
-        // the downloaded report/share text. NOTE: the Cloudflare Worker's
-        // email template (outside this repo) still needs to be updated to
-        // actually render avg_sleep/sleep_list_html — adding them to the
+        // Sleep average for the email payload — weekly/monthly only, matching
+        // the downloaded report/share text. No per-day list here either: it's
+        // already visible in the attached report image's table. NOTE: the
+        // Cloudflare Worker's email template (outside this repo) still needs
+        // to be updated to actually render avg_sleep — adding it to the
         // payload here doesn't by itself change what the emailed HTML shows.
-        let avgSleepText = null, sleepHtml = "";
+        let avgSleepText = null;
         if (type !== 'daily') {
             let sleepLog = getSleepLog();
-            let sleepPending = getSleepPending();
             let numericMins = days.map(d => sleepLog[d]).filter(e => e && e.durationMin != null).map(e => e.durationMin);
             avgSleepText = numericMins.length ? fmtDuration(Math.round(numericMins.reduce((a, b) => a + b, 0) / numericMins.length)) : "N/A";
-            for (let d of days) {
-                let cell = getSleepCell(d, sleepLog, sleepPending);
-                sleepHtml += `<div style="display: flex; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #1e293b; font-size: 14px;"><span style="color: #94a3b8;">${formatDateDDMMYY(d)}:&nbsp;</span><span style="color: ${cell.color}; font-weight: 600;">${cell.text}</span></div>`;
-            }
         }
         let imageBlob = await new Promise(resolve => canvas.toBlob(resolve));
         let reader = new FileReader(); 
@@ -403,7 +399,7 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
                         streak: computeStreak(db),
                         subject_list_html: subjectHtml,
                         report_image: cleanBase64,
-                        ...(type !== 'daily' ? { avg_sleep: avgSleepText, sleep_list_html: sleepHtml } : {})
+                        ...(type !== 'daily' ? { avg_sleep: avgSleepText } : {})
                     })
                 });
 
@@ -766,16 +762,13 @@ function buildReportShareText(days, type) {
     let lines = [label, `🗓 ${formatDateDDMMYY(days[0])} → ${formatDateDDMMYY(days[days.length - 1])}`, `⏱ Total Study: ${formatReadable(totalStudy)}`, `☕ Total Break: ${formatReadable(totalBreak)}`, `🔥 Streak: ${computeStreak(db)} days`, `🧮 Total Questions Solved: ${totalQuestions}`, ``];
     lines.push(`Subject breakdown:`);
     for (let [cat, sec] of Object.entries(aggregateSubjects)) if (sec > 0) lines.push(`• ${cat}: ${formatReadable(sec)}`);
-    // Sleep summary — average across days with a logged duration, plus a
-    // day-by-day breakdown in the same "• label: value" style as the
-    // subject breakdown above.
+    // Sleep summary — just the average across days with a logged duration.
+    // (No day-by-day breakdown here: that's already visible in the report
+    // image's table, so repeating it in the text just bloats the message.)
     let sleepLog = getSleepLog();
-    let sleepPending = getSleepPending();
     let numericMins = days.map(d => sleepLog[d]).filter(e => e && e.durationMin != null).map(e => e.durationMin);
     let avgSleepText = numericMins.length ? fmtDuration(Math.round(numericMins.reduce((a, b) => a + b, 0) / numericMins.length)) : "N/A";
     lines.push(``, `😴 Avg Sleep: ${avgSleepText}`);
-    lines.push(`Sleep breakdown:`);
-    for (let d of days) lines.push(`• ${formatDateDDMMYY(d)}: ${getSleepCell(d, sleepLog, sleepPending).text}`);
     lines.push(``, `Tracked with @ẞhì's JEE Study Tracker 🎯`);
     return lines.join("\n");
 }
