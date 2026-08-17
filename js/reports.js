@@ -1,5 +1,5 @@
-import { formatReadable, dateKeyFromWall, getTodayKey, formatDateDDMMYY } from './utils.js';
-import { getDB, ensureDayShape, blankDay } from './storage.js';
+import { formatReadable, dateKeyFromWall, getTodayKey, formatDateDDMMYY, fmtDuration } from './utils.js';
+import { getDB, ensureDayShape, blankDay, getSleepLog, getSleepPending } from './storage.js';
 import { computeStreak, SUBJECT_COLORS } from './charts.js';
 // Forward references — ui.js, firebase-sync.js land in later steps. Only
 // called inside function bodies, safe once the full module graph is wired
@@ -14,6 +14,30 @@ import { getCurrentUser } from './firebase-sync.js';
 // text now), so the column layout below measures each string's actual
 // width instead of assuming a fixed box.
 const STATUS_LABELS = { met: "Goal Met ✅", missed: "Missed ❌" };
+
+// Sleep column (weekly/monthly reports only — NOT the daily single-day
+// report). Shared by buildReportCanvas (PNG table), buildReportShareText
+// (plain-text summary), and sendReportViaEmail (Worker payload) so the
+// value/formatting logic is identical everywhere it appears.
+//
+// `sleepLog` is keyed by wake date, and that key already IS the report
+// row's date — no ±1 day shifting needed. `pending` is a single
+// app-wide "bedtime logged, wake not yet logged" record and is only
+// ever relevant to the row whose date matches pending.expectedWakeDate.
+const SLEEP_GOOD_COLOR = "#10b981";   // same green as Study / "Goal Met"
+const SLEEP_BAD_COLOR = "#ef4444";    // same red as "Missed"
+const SLEEP_NEUTRAL_COLOR = "#64748b"; // same muted gray as other "no data" states
+function getSleepCell(dateKey, sleepLog, pending) {
+    if (pending && pending.type === 'sleep' && pending.expectedWakeDate === dateKey) {
+        return { text: "Pending", color: SLEEP_NEUTRAL_COLOR };
+    }
+    let entry = sleepLog[dateKey];
+    if (!entry || entry.durationMin == null) {
+        return { text: "N/A", color: SLEEP_NEUTRAL_COLOR };
+    }
+    let inGoalRange = entry.durationMin >= 390 && entry.durationMin <= 450; // 6.5h–7.5h inclusive
+    return { text: fmtDuration(entry.durationMin), color: inGoalRange ? SLEEP_GOOD_COLOR : SLEEP_BAD_COLOR };
+}
 
 export 
     function buildShareText(dt) {
@@ -342,6 +366,23 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
         let subjectHtml = "";
         for (let [cat, sec] of Object.entries(aggregateSubjects)) { if (sec <= 0) continue; subjectHtml += `<div style="display: flex; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #1e293b; font-size: 14px;"><span style="color: #94a3b8;">${cat}:&nbsp;</span><span style="color: #38bdf8; font-weight: 600;">${formatReadable(sec)}</span></div>`; }
         if (!subjectHtml) subjectHtml = "<div style='padding: 12px; color: #64748b; text-align:center;'>No study time logged.</div>";
+
+        // Sleep data for the email payload — weekly/monthly only, matching
+        // the downloaded report/share text. NOTE: the Cloudflare Worker's
+        // email template (outside this repo) still needs to be updated to
+        // actually render avg_sleep/sleep_list_html — adding them to the
+        // payload here doesn't by itself change what the emailed HTML shows.
+        let avgSleepText = null, sleepHtml = "";
+        if (type !== 'daily') {
+            let sleepLog = getSleepLog();
+            let sleepPending = getSleepPending();
+            let numericMins = days.map(d => sleepLog[d]).filter(e => e && e.durationMin != null).map(e => e.durationMin);
+            avgSleepText = numericMins.length ? fmtDuration(Math.round(numericMins.reduce((a, b) => a + b, 0) / numericMins.length)) : "N/A";
+            for (let d of days) {
+                let cell = getSleepCell(d, sleepLog, sleepPending);
+                sleepHtml += `<div style="display: flex; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid #1e293b; font-size: 14px;"><span style="color: #94a3b8;">${formatDateDDMMYY(d)}:&nbsp;</span><span style="color: ${cell.color}; font-weight: 600;">${cell.text}</span></div>`;
+            }
+        }
         let imageBlob = await new Promise(resolve => canvas.toBlob(resolve));
         let reader = new FileReader(); 
         reader.readAsDataURL(imageBlob);
@@ -361,7 +402,8 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
                         total_questions: totalQuestions,
                         streak: computeStreak(db),
                         subject_list_html: subjectHtml,
-                        report_image: cleanBase64
+                        report_image: cleanBase64,
+                        ...(type !== 'daily' ? { avg_sleep: avgSleepText, sleep_list_html: sleepHtml } : {})
                     })
                 });
 
@@ -385,6 +427,8 @@ function buildReportCanvas(days, title) {
     let totalStudy = 0, totalBreak = 0;
     let aggregateSubjects = { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Preparation": 0, "Mock Test / Analysis": 0 };
     let dayData = [];
+    let sleepLog = getSleepLog();
+    let sleepPending = getSleepPending();
     days.forEach(key => {
         let day = db[key];
         if (!day) return;
@@ -392,15 +436,17 @@ function buildReportCanvas(days, title) {
         totalStudy += day.totalStudy || 0;
         totalBreak += day.totalBreak || 0;
         for (let [cat, sec] of Object.entries(day.subjects)) { aggregateSubjects[cat] = (aggregateSubjects[cat] || 0) + (sec || 0); }
-        dayData.push({ date: key, study: day.totalStudy || 0, break: day.totalBreak || 0, questions: day.questionsSolved || 0 });
+        dayData.push({ date: key, study: day.totalStudy || 0, break: day.totalBreak || 0, questions: day.questionsSolved || 0, sleep: getSleepCell(key, sleepLog, sleepPending) });
     });
     let entries = Object.entries(aggregateSubjects).filter(([, sec]) => sec > 0);
     let totalSubjectSec = entries.reduce((sum, [, sec]) => sum + sec, 0);
     let hasData = entries.length > 0 && totalSubjectSec > 0;
 
-    const width = 1200;
-    const leftHalfCenter = 300;    // midpoint of the 0–600 left half
-    const rightHalfCenter = 900;   // midpoint of the 600–1200 right half
+    const width = 1280;   // widened from 1200 to fit the new Sleep column without cramping
+    const leftHalfCenter = width * 0.25;    // midpoint of the left half
+    const rightHalfCenter = width * 0.75;   // midpoint of the right half — proportional so the
+                                             // heatmap/pie sections (positioned relative to these
+                                             // centers) stay correctly centered at the new width
 
     // Canvas/context created up front (before the Y-position math below)
     // purely so ctx.measureText is available early — the new subject
@@ -619,20 +665,25 @@ ctx.textAlign = "left";
     // pinned to the left edge while empty space collects on the right.
     ctx.font = "16px sans-serif";
     const statusMaxWidth = Math.max(ctx.measureText(STATUS_LABELS.met).width, ctx.measureText(STATUS_LABELS.missed).width);
+    // Sleep cell text varies per row ("7h 30m" / "Pending" / "N/A"), so its
+    // max width is measured from the actual rendered rows rather than a
+    // fixed label set like Status — same reasoning, just data-driven.
+    const sleepMaxWidth = dayData.reduce((max, d) => Math.max(max, ctx.measureText(d.sleep.text).width), ctx.measureText("Pending").width);
     const colInnerGap = 112;   // date -> study -> break -> questions spacing within one block
-    const queStatusGap = 50;   // questions -> status spacing — deliberately tighter than the rest,
+    const queSleepGap = 50;    // questions -> sleep spacing — deliberately tighter than the rest,
                                 // since "Que" is a short number and doesn't need a full column's worth
-                                // of breathing room before "Status" starts.
+                                // of breathing room before "Sleep" starts.
+    const sleepStatusGap = sleepMaxWidth + 30; // just wide enough for the longest sleep value plus padding
     const blockGap = 50;       // gap between the left block and the right block
-    const blockContentWidth = 3 * colInnerGap + queStatusGap + statusMaxWidth; // date..status offset + status text width
+    const blockContentWidth = 3 * colInnerGap + queSleepGap + sleepStatusGap + statusMaxWidth; // date..status offset + status text width
     const tableTotalWidth = blockContentWidth * 2 + blockGap;
     const tableLeftMargin = (width - tableTotalWidth) / 2;
 
     const colX = {
-        left: { date: tableLeftMargin, study: tableLeftMargin + colInnerGap, break: tableLeftMargin + 2 * colInnerGap, questions: tableLeftMargin + 3 * colInnerGap, status: tableLeftMargin + 3 * colInnerGap + queStatusGap },
+        left: { date: tableLeftMargin, study: tableLeftMargin + colInnerGap, break: tableLeftMargin + 2 * colInnerGap, questions: tableLeftMargin + 3 * colInnerGap, sleep: tableLeftMargin + 3 * colInnerGap + queSleepGap, status: tableLeftMargin + 3 * colInnerGap + queSleepGap + sleepStatusGap },
         right: {}
     };
-    colX.right = { date: colX.left.date + blockContentWidth + blockGap, study: colX.left.study + blockContentWidth + blockGap, break: colX.left.break + blockContentWidth + blockGap, questions: colX.left.questions + blockContentWidth + blockGap, status: colX.left.status + blockContentWidth + blockGap };
+    colX.right = { date: colX.left.date + blockContentWidth + blockGap, study: colX.left.study + blockContentWidth + blockGap, break: colX.left.break + blockContentWidth + blockGap, questions: colX.left.questions + blockContentWidth + blockGap, sleep: colX.left.sleep + blockContentWidth + blockGap, status: colX.left.status + blockContentWidth + blockGap };
 
     ctx.fillStyle = "#f1f5f9"; ctx.font = "bold 22px sans-serif"; ctx.fillText("Daily Performance Breakdown", tableLeftMargin, tableTitleY);
 
@@ -648,9 +699,11 @@ ctx.textAlign = "left";
     ctx.fillStyle = "#64748b"; ctx.font = "16px sans-serif";
     ctx.fillText("Date", colX.left.date, tableHeaderY); ctx.fillText("Study", colX.left.study, tableHeaderY); ctx.fillText("Break", colX.left.break, tableHeaderY);
     ctx.fillText("Que.", colX.left.questions, tableHeaderY);
+    ctx.fillText("Sleep", colX.left.sleep, tableHeaderY);
     ctx.fillText("Status", colX.left.status, tableHeaderY);
     ctx.fillText("Date", colX.right.date, tableHeaderY); ctx.fillText("Study", colX.right.study, tableHeaderY); ctx.fillText("Break", colX.right.break, tableHeaderY);
     ctx.fillText("Que.", colX.right.questions, tableHeaderY);
+    ctx.fillText("Sleep", colX.right.sleep, tableHeaderY);
     ctx.fillText("Status", colX.right.status, tableHeaderY);
     ctx.strokeStyle = "#232f48"; ctx.beginPath(); ctx.moveTo(tableLeftMargin, tableDividerY); ctx.lineTo(width - tableLeftMargin, tableDividerY); ctx.stroke();
 
@@ -668,6 +721,7 @@ ctx.textAlign = "left";
         ctx.fillStyle = "#10b981"; ctx.fillText(formatReadable(d.study), col.study, y);
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
         ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
+        ctx.fillStyle = d.sleep.color; ctx.fillText(d.sleep.text, col.sleep, y);
         let metGoal = d.study >= 36000;
         ctx.fillStyle = metGoal ? "#10b981" : "#ef4444"; ctx.font = "16px sans-serif";
         ctx.fillText(metGoal ? STATUS_LABELS.met : STATUS_LABELS.missed, col.status, y);
@@ -712,6 +766,16 @@ function buildReportShareText(days, type) {
     let lines = [label, `🗓 ${formatDateDDMMYY(days[0])} → ${formatDateDDMMYY(days[days.length - 1])}`, `⏱ Total Study: ${formatReadable(totalStudy)}`, `☕ Total Break: ${formatReadable(totalBreak)}`, `🔥 Streak: ${computeStreak(db)} days`, `🧮 Total Questions Solved: ${totalQuestions}`, ``];
     lines.push(`Subject breakdown:`);
     for (let [cat, sec] of Object.entries(aggregateSubjects)) if (sec > 0) lines.push(`• ${cat}: ${formatReadable(sec)}`);
+    // Sleep summary — average across days with a logged duration, plus a
+    // day-by-day breakdown in the same "• label: value" style as the
+    // subject breakdown above.
+    let sleepLog = getSleepLog();
+    let sleepPending = getSleepPending();
+    let numericMins = days.map(d => sleepLog[d]).filter(e => e && e.durationMin != null).map(e => e.durationMin);
+    let avgSleepText = numericMins.length ? fmtDuration(Math.round(numericMins.reduce((a, b) => a + b, 0) / numericMins.length)) : "N/A";
+    lines.push(``, `😴 Avg Sleep: ${avgSleepText}`);
+    lines.push(`Sleep breakdown:`);
+    for (let d of days) lines.push(`• ${formatDateDDMMYY(d)}: ${getSleepCell(d, sleepLog, sleepPending).text}`);
     lines.push(``, `Tracked with @ẞhì's JEE Study Tracker 🎯`);
     return lines.join("\n");
 }
