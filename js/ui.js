@@ -774,7 +774,15 @@ export function renderQuoteOfDay() {
 }
 
 // ----------------- EXAM YEAR / COUNTDOWNS -----------------
-function fmtExamDate(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+// Matches the app-wide DD-MM-YY date format (e.g. 24-01-27) instead of the
+// previous "24 Jan 2027" — built manually rather than via
+// toLocaleDateString so the separator/order can't drift by locale.
+function fmtExamDate(d) {
+    let dd = String(d.getDate()).padStart(2, '0');
+    let mm = String(d.getMonth() + 1).padStart(2, '0');
+    let yy = String(d.getFullYear()).slice(2);
+    return `${dd}-${mm}-${yy}`;
+}
 
 let JEE_MAINS_DATE, JEE_MAINS2_DATE, JEE_ADV_DATE;
 

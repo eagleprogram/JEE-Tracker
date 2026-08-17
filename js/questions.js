@@ -12,7 +12,7 @@
 // blankDay()/ensureDayShape() in storage.js) — so this rides along for free
 // with the existing backup export/import and Firebase cloud sync, both of
 // which copy the whole day object generically without listing fields.
-import { formatDateDDMMYYYY, getTodayKey, dateKeyFromWall } from './utils.js';
+import { formatDateDDMMYY, getTodayKey, dateKeyFromWall } from './utils.js';
 import { getDB, saveDB, initDay, ensureDayShape } from './storage.js';
 // Forward reference — ui.js lands in a later step. Only called inside
 // function bodies, safe once the full module graph is wired in main.js.
@@ -41,7 +41,7 @@ export function openQuestionsModal(dateKey) {
     let db = getDB();
     let day = db[dateKey] || initDay(dateKey);
     ensureDayShape(day);
-    document.getElementById("questions-modal-date").innerText = formatDateDDMMYYYY(dateKey);
+    document.getElementById("questions-modal-date").innerText = formatDateDDMMYY(dateKey);
     document.getElementById("questions-count-input").value = day.questionsSolved > 0 ? day.questionsSolved : "";
     document.getElementById("questions-modal").style.display = "flex";
     setTimeout(() => { let inp = document.getElementById("questions-count-input"); if (inp) inp.focus(); }, 50);
@@ -74,7 +74,7 @@ export function saveQuestionsSolved() {
     closeQuestionsModal();
     renderQuestionsWidget();
     renderHeatmap();
-    showToast(`✅ ${val} question${val === 1 ? '' : 's'} solved logged for ${formatDateDDMMYYYY(dateKey)}.`);
+    showToast(`✅ ${val} question${val === 1 ? '' : 's'} solved logged for ${formatDateDDMMYY(dateKey)}.`);
 }
 
 // "Back" just closes the modal without saving anything — unlike the old
@@ -100,7 +100,7 @@ export function deleteQuestionsSolved() {
     closeQuestionsModal();
     renderQuestionsWidget();
     renderHeatmap();
-    showToast(`Questions log deleted for ${formatDateDDMMYYYY(dateKey)}.`);
+    showToast(`Questions log deleted for ${formatDateDDMMYY(dateKey)}.`);
 }
 
 // ---------------- WEEKLY QUESTION-PRACTICE RING WIDGET ----------------

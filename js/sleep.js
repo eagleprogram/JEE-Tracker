@@ -1,4 +1,4 @@
-import { formatDateDDMMYYYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWall, getTodayKey } from './utils.js';
+import { formatDateDDMMYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWall, getTodayKey } from './utils.js';
 import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
@@ -220,8 +220,8 @@ export function renderSleepPendingBanner() {
     banner.style.display = "flex";
     let pType = pendingType(pending);
     let text = (pType === 'wake')
-        ? `⏳ Pending: woke at ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYYYY(pending.date)} — waiting for your bedtime.`
-        : `⏳ Pending: slept ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYYYY(pending.date)} — waiting for wake time.`;
+        ? `⏳ Pending: woke at ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYY(pending.date)} — waiting for your bedtime.`
+        : `⏳ Pending: slept ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYY(pending.date)} — waiting for wake time.`;
     banner.innerHTML = `<span>${text}</span><button onclick="cancelPendingSleepLog()" title="Cancel this pending log" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0;">✕</button>`;
 }
 
@@ -263,8 +263,8 @@ export function renderSleepHistory() {
     if (pending) {
         let pType = pendingType(pending);
         let label = (pType === 'wake')
-            ? `-- --:-- → ${formatDateDDMMYYYY(pending.date)} ${formatTime12Hour(pending.time)}`
-            : `${formatDateDDMMYYYY(pending.date)} ${formatTime12Hour(pending.time)} → -- --:--`;
+            ? `-- --:-- → ${formatDateDDMMYY(pending.date)} ${formatTime12Hour(pending.time)}`
+            : `${formatDateDDMMYY(pending.date)} ${formatTime12Hour(pending.time)} → -- --:--`;
         html += `<div style="display:grid; grid-template-columns: 1fr auto 28px; gap:8px; padding:6px 4px; align-items:center; font-size:12px; color:var(--warning);">
             <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span>
             <span style="white-space:nowrap;">—</span>
@@ -285,7 +285,7 @@ export function renderSleepHistory() {
                 let wakeTime = formatTime12Hour(fmtTime(e.wakeTime));
                 return `<div style="display:grid; grid-template-columns: 1fr auto 28px; gap:8px; padding:6px 4px; align-items:center; font-size:12px; color:var(--danger); border-bottom:1px solid var(--border);">
                     <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                        ⚠️ Impossible Log: ${formatDateDDMMYYYY(e.sleepDate)} ${sleepTime} → ${formatDateDDMMYYYY(wakeDate)} ${wakeTime}
+                        ⚠️ Impossible Log: ${formatDateDDMMYY(e.sleepDate)} ${sleepTime} → ${formatDateDDMMYY(wakeDate)} ${wakeTime}
                     </span>
                     <span style="white-space:nowrap;">--</span>
                     <button onclick="deleteSleepLogEntry('${wakeDate}')" title="Delete" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px; padding:0;">✕</button>
@@ -294,14 +294,14 @@ export function renderSleepHistory() {
         }
 
         let sleepLabel = hasSleepSide
-            ? `${formatDateDDMMYYYY(e.sleepDate)} ${formatTime12Hour(fmtTime(e.sleepTime))}`
+            ? `${formatDateDDMMYY(e.sleepDate)} ${formatTime12Hour(fmtTime(e.sleepTime))}`
             : `-- --:--`;
         let wakeTime = formatTime12Hour(fmtTime(e.wakeTime));
         let durationLabel = (e.durationMin != null) ? fmtDuration(e.durationMin) : '--';
 
         return `<div style="display:grid; grid-template-columns: 1fr auto 28px; gap:8px; padding:6px 4px; align-items:center; font-size:12px; border-bottom:1px solid var(--border);">
             <span style="color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                ${sleepLabel} → ${formatDateDDMMYYYY(wakeDate)} ${wakeTime}
+                ${sleepLabel} → ${formatDateDDMMYY(wakeDate)} ${wakeTime}
             </span>
             <span style="color:var(--primary); font-weight:700; white-space:nowrap;">${durationLabel}</span>
             <button onclick="deleteSleepLogEntry('${wakeDate}')" title="Delete" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px; padding:0;">✕</button>

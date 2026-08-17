@@ -146,7 +146,25 @@ export function playAlarmSound() {
 // means the context is already running long before an alarm ever needs to
 // fire from a background timer tick, instead of trying (and sometimes
 // failing) to resume it in that same non-gesture callback.
-function unlockAudioOnce() {
+//
+// BUG FIX: this used to run on the very first "click" event with no check
+// on where it came from. The app itself fires several *synthetic* clicks
+// during normal use — every download (Download Log, Download Report,
+// backup export, mock-test attachments) creates a hidden <a> and calls
+// a.click() on it to trigger the browser's save dialog. That synthetic
+// click bubbles up to this document-level listener exactly like a real
+// one, but it carries no real "user activation" as far as the browser's
+// autoplay policy is concerned — so if a download happened to be the
+// very first click of the session, the AudioContext got created/resumed
+// outside a real gesture (silently failing to actually start, which is
+// exactly the "AudioContext was not allowed to start" console warning),
+// AND the listener still removed itself afterward, permanently skipping
+// the real unlock for the rest of the session — meaning alarms could stay
+// silent for the whole session even though the user did click things
+// later. Checking event.isTrusted ignores script-dispatched clicks so
+// only a genuine user gesture ever attempts the unlock.
+function unlockAudioOnce(e) {
+    if (e && e.isTrusted === false) return;
     try {
         if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (sharedAudioCtx.state === "suspended") sharedAudioCtx.resume().catch(() => {});

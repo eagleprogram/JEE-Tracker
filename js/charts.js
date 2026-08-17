@@ -1,4 +1,4 @@
-import { dateKeyFromWall, getTodayKey, mondayKeyFor, formatDateDDMMYYYY } from './utils.js';
+import { dateKeyFromWall, getTodayKey, mondayKeyFor, formatDateDDMMYY } from './utils.js';
 import { getDB, blankDay } from './storage.js';
 import { getTimerState, getSegmentElapsedMs } from './timer.js';
 import { getWeekOffset, mondayForOffset } from './week-nav.js';
@@ -176,7 +176,7 @@ export function renderHeatmap() {
             // color is only reached at the actual goal (10h+), not 9h —
             // matches the updated "10h+" legend label in index.html.
             let colorIdx = day.hrs >= 10 ? 4 : day.hrs > 6 ? 3 : day.hrs > 3 ? 2 : day.hrs > 0 ? 1 : 0;
-            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="${hmColors[colorIdx]}"><title>${formatDateDDMMYYYY(day.key)}: ${day.hrs.toFixed(1)}hr & ${day.q}Q</title></rect>`;
+            svg += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="${hmColors[colorIdx]}"><title>${formatDateDDMMYY(day.key)}: ${day.hrs.toFixed(1)}hr & ${day.q}Q</title></rect>`;
         });
     });
     svg += `</svg>`;

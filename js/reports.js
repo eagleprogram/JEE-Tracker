@@ -1,4 +1,4 @@
-import { formatReadable, dateKeyFromWall, getTodayKey, formatDateDDMMYYYY } from './utils.js';
+import { formatReadable, dateKeyFromWall, getTodayKey, formatDateDDMMYY } from './utils.js';
 import { getDB, ensureDayShape, blankDay } from './storage.js';
 import { computeStreak, SUBJECT_COLORS } from './charts.js';
 // Forward references — ui.js, firebase-sync.js land in later steps. Only
@@ -7,54 +7,85 @@ import { computeStreak, SUBJECT_COLORS } from './charts.js';
 import { showToast } from './ui.js';
 import { getCurrentUser } from './firebase-sync.js';
 
-// BUG FIX: the report table's Status column used to draw "Goal Met ✅" /
-// "Missed ❌" as plain emoji characters inside the canvas text. Different
-// emoji glyphs are NOT drawn at a uniform visual size by a device's emoji
-// font — ❌ in particular renders noticeably smaller/lighter than ✅ at the
-// exact same CSS font-size, which is exactly the misalignment reported
-// ("Missed ❌" looking smaller than "Goal Met ✅"). Relying on the OS's
-// emoji font also means this could render differently again on another
-// device/browser. Hand-drawing a small fixed-size circle+checkmark or
-// circle+cross with canvas paths instead removes the emoji font from the
-// picture entirely — both badges are then built from the exact same
-// radius/stroke-width, so they're guaranteed pixel-identical in size on
-// every device. Returns how many px wide the badge (icon + gap) was, so
-// the caller knows where to start the text that follows it.
-const STATUS_ICON_R = 8;        // circle radius
-const STATUS_ICON_GAP = 6;      // gap between the circle and the text that follows
-function drawStatusIcon(ctx, x, yBaseline, met) {
-    let cx = x + STATUS_ICON_R;
-    let cy = yBaseline - STATUS_ICON_R * 0.6; // nudge up from the text baseline to sit at roughly its vertical center
+// BUG FIX (earlier pass): the report table's Status column used to draw
+// "Goal Met ✅" / "Missed ❌" as plain emoji characters inside the canvas
+// text. Different emoji glyphs are NOT drawn at a uniform visual size by a
+// device's emoji font — ❌ in particular renders noticeably smaller/lighter
+// than ✅ at the exact same CSS font-size. Hand-drawing a small fixed-size
+// circle+checkmark or circle+cross with canvas paths removed the emoji
+// font from the picture, but the two badges could still end up visibly
+// different SIZES overall, because "Goal Met" and "Missed" are different
+// lengths of text — the icon was pixel-identical, but the icon+text
+// combo wasn't.
+//
+// BUG FIX (this pass): both badges are now drawn as a fixed-width rounded
+// pill (STATUS_BADGE_W/H, same for every row) with the icon+label centered
+// inside it, instead of bare icon+text floating at column width. "Missed"
+// and "Goal Met" pills are now identical width and height on every row —
+// the pill's own footprint is the alignment guarantee, not the text
+// inside it. Returns the pill's fixed width so callers can lay out the
+// next column at a known offset.
+const STATUS_BADGE_W = 108, STATUS_BADGE_H = 26;
+const STATUS_ICON_R = 7;
+function drawStatusBadge(ctx, x, yBaseline, met) {
+    let label = met ? "Goal Met" : "Missed";
     let color = met ? "#10b981" : "#ef4444";
+    let top = yBaseline - STATUS_BADGE_H * 0.72;
+    let radius = STATUS_BADGE_H / 2;
+
+    // Pill background — same fixed width/height for every row.
     ctx.beginPath();
-    ctx.arc(cx, cy, STATUS_ICON_R, 0, Math.PI * 2);
+    ctx.moveTo(x + radius, top);
+    ctx.arcTo(x + STATUS_BADGE_W, top, x + STATUS_BADGE_W, top + STATUS_BADGE_H, radius);
+    ctx.arcTo(x + STATUS_BADGE_W, top + STATUS_BADGE_H, x, top + STATUS_BADGE_H, radius);
+    ctx.arcTo(x, top + STATUS_BADGE_H, x, top, radius);
+    ctx.arcTo(x, top, x + STATUS_BADGE_W, top, radius);
+    ctx.closePath();
     ctx.fillStyle = met ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)";
     ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Icon (hand-drawn check/cross — still avoids the emoji-font size mismatch).
+    let iconCx = x + 17, iconCy = top + STATUS_BADGE_H / 2;
+    ctx.beginPath();
+    ctx.arc(iconCx, iconCy, STATUS_ICON_R, 0, Math.PI * 2);
+    ctx.fillStyle = color; let prevAlpha = ctx.globalAlpha; ctx.globalAlpha = 0.22; ctx.fill(); ctx.globalAlpha = prevAlpha;
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
     if (met) {
-        ctx.moveTo(cx - 4, cy);
-        ctx.lineTo(cx - 1, cy + 3.5);
-        ctx.lineTo(cx + 4.5, cy - 4);
+        ctx.moveTo(iconCx - 3.5, iconCy);
+        ctx.lineTo(iconCx - 1, iconCy + 3);
+        ctx.lineTo(iconCx + 4, iconCy - 3.5);
     } else {
-        ctx.moveTo(cx - 3.5, cy - 3.5);
-        ctx.lineTo(cx + 3.5, cy + 3.5);
-        ctx.moveTo(cx + 3.5, cy - 3.5);
-        ctx.lineTo(cx - 3.5, cy + 3.5);
+        ctx.moveTo(iconCx - 3, iconCy - 3);
+        ctx.lineTo(iconCx + 3, iconCy + 3);
+        ctx.moveTo(iconCx + 3, iconCy - 3);
+        ctx.lineTo(iconCx - 3, iconCy + 3);
     }
     ctx.stroke();
-    return STATUS_ICON_R * 2 + STATUS_ICON_GAP;
+
+    // Label — vertically centered against the icon, same for both states.
+    ctx.fillStyle = color;
+    ctx.font = "13px sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, iconCx + STATUS_ICON_R + 8, iconCy);
+    ctx.textBaseline = "alphabetic";
+
+    return STATUS_BADGE_W;
 }
 
 export 
     function buildShareText(dt) {
         let db = getDB(); let day = db[dt];
-        if (!day) return `No study data logged for ${formatDateDDMMYYYY(dt)}.`;
+        if (!day) return `No study data logged for ${formatDateDDMMYY(dt)}.`;
         ensureDayShape(day);
-        let lines = [`📚 Study Log — ${formatDateDDMMYYYY(dt)}`, `⏱ Total Study: ${formatReadable(day.totalStudy)}`, `☕ Total Break: ${formatReadable(day.totalBreak)}`, ``];
+        let lines = [`📚 Study Log — ${formatDateDDMMYY(dt)}`, `⏱ Total Study: ${formatReadable(day.totalStudy)}`, `☕ Total Break: ${formatReadable(day.totalBreak)}`, ``];
         lines.push(`Subject breakdown:`);
         for (let [cat, sec] of Object.entries(day.subjects)) if (sec > 0) lines.push(`• ${cat}: ${formatReadable(sec)}`);
         lines.push(``, `🧮 Questions Solved: ${day.questionsSolved || 0}`);
@@ -108,7 +139,7 @@ function buildShareCanvas(dt) {
     
     ctx.fillStyle = "#64748b";
     ctx.font = "16px sans-serif";
-    ctx.fillText(dt, width / 2, 80);
+    ctx.fillText(formatDateDDMMYY(dt), width / 2, 80);
     ctx.textAlign = "left"; // Reset alignment so the rest of the canvas stays perfectly unchanged
     
     // ============= HORIZONTAL SEPARATOR 1 =============
@@ -361,7 +392,7 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
             totalQuestions = day.questionsSolved || 0;
             aggregateSubjects = { ...day.subjects };
             days = [dt];
-            dateRangeLabel = dt;
+            dateRangeLabel = formatDateDDMMYY(dt);
             canvas = buildShareCanvas(dt);
         } else {
             let today = new Date(); let range = (type === 'weekly') ? 6 : 29;
@@ -370,7 +401,7 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
             totalStudy = 0; totalBreak = 0; totalQuestions = 0;
             aggregateSubjects = { "Physics": 0, "Organic Chemistry": 0, "Inorganic Chemistry": 0, "Physical Chemistry": 0, "Mathematics": 0, "Revision": 0, "School Preparation": 0, "Mock Test / Analysis": 0 };
             days.forEach(key => { let day = db[key]; if (!day) return; ensureDayShape(day); totalStudy += day.totalStudy || 0; totalBreak += day.totalBreak || 0; totalQuestions += day.questionsSolved || 0; for (let [cat, sec] of Object.entries(day.subjects)) { aggregateSubjects[cat] = (aggregateSubjects[cat] || 0) + (sec || 0); } });
-            dateRangeLabel = `${days[0]} → ${days[days.length - 1]}`;
+            dateRangeLabel = `${formatDateDDMMYY(days[0])} → ${formatDateDDMMYY(days[days.length - 1])}`;
             canvas = buildReportCanvas(days, type === 'weekly' ? 'Weekly Study Report' : 'Monthly Study Report');
         }
         let subjectHtml = "";
@@ -436,6 +467,41 @@ function buildReportCanvas(days, title) {
     const leftHalfCenter = 300;    // midpoint of the 0–600 left half
     const rightHalfCenter = 900;   // midpoint of the 600–1200 right half
 
+    // Canvas/context created up front (before the Y-position math below)
+    // purely so ctx.measureText is available early — the new subject
+    // legend under the pie wraps onto multiple centered rows depending on
+    // how many subject names actually need to fit, and that row count has
+    // to be known before tableTitleY (and therefore the final canvas
+    // height) can be computed. Setting canvas.width/height further down
+    // clears this canvas, which is harmless since none of the actual
+    // drawing happens until after that point anyway.
+    let canvas = document.createElement("canvas");
+    let ctx = canvas.getContext("2d");
+
+    // ---- Subject legend layout (color swatch + name per subject with
+    // logged time), wrapped across as many centered rows as needed so it
+    // never overlaps neighbouring sections even with all 8 subjects
+    // present at once — same wrapping idea as the heatmap's color key,
+    // just wrapped across multiple lines since 8 subject names are far
+    // wider than 5 short heatmap bucket labels. ----
+    const legendMaxWidth = 560;    // stays within the right half's own margins
+    const legendSwatch = 12, legendSwatchGap = 6, legendItemGapX = 18, legendItemGapY = 22;
+    let legendRows = [];
+    if (hasData) {
+        ctx.font = "13px sans-serif";
+        let items = entries.map(([cat]) => ({ cat, width: legendSwatch + legendSwatchGap + ctx.measureText(cat).width }));
+        let row = [], rowWidth = 0;
+        items.forEach(item => {
+            let addedWidth = item.width + (row.length ? legendItemGapX : 0);
+            if (row.length && rowWidth + addedWidth > legendMaxWidth) {
+                legendRows.push({ items: row, width: rowWidth });
+                row = []; rowWidth = 0; addedWidth = item.width;
+            }
+            row.push(item); rowWidth += addedWidth;
+        });
+        if (row.length) legendRows.push({ items: row, width: rowWidth });
+    }
+
     // ---- Fixed Y positions above the table ----
     const titleY = 80;
     const subtitleY = 130;
@@ -470,7 +536,11 @@ function buildReportCanvas(days, title) {
     const pieCx = rightHalfCenter, pieRadius = 100;            // centered in right half
     const pieCy = sectionTitleY + 40 + pieRadius;
     const pieBottomY = pieCy + pieRadius;
-    const tableTitleY = Math.max(heatmapLegendBottomY, pieBottomY) + 55;
+    // Legend sits just under the pie; its own bottom (if it has any rows)
+    // is what the table needs to clear, not the bare pie circle.
+    const legendStartY = pieBottomY + 36;
+    const pieLegendBottomY = legendRows.length ? legendStartY + (legendRows.length - 1) * legendItemGapY + legendSwatch / 2 : pieBottomY;
+    const tableTitleY = Math.max(heatmapLegendBottomY, pieLegendBottomY) + 55;
     const tableHeaderY = tableTitleY + 45;
     const tableDividerY = tableHeaderY + 15;
     const tableFirstRowY = tableDividerY + 30;
@@ -481,16 +551,14 @@ function buildReportCanvas(days, title) {
     const footerY = tableBottomY + 60;
     const height = footerY + 30;
 
-    let canvas = document.createElement("canvas");
     canvas.width = width; canvas.height = height;
-    let ctx = canvas.getContext("2d");
     ctx.fillStyle = "#090d16"; ctx.fillRect(0, 0, width, height);
 
     // ---- Title ----
     ctx.fillStyle = "#38bdf8"; ctx.font = "bold 48px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(title, width / 2, titleY);
     ctx.fillStyle = "#64748b"; ctx.font = "26px sans-serif";
-    ctx.fillText(`${days.length} Days | ${days[0]} → ${days[days.length - 1]}`, width / 2, subtitleY);
+    ctx.fillText(`${days.length} Days | ${formatDateDDMMYY(days[0])} → ${formatDateDDMMYY(days[days.length - 1])}`, width / 2, subtitleY);
 
 // ---- Stats row (true equal gaps, computed from actual rendered text width) ----
 const study = formatReadable(totalStudy);
@@ -552,21 +620,21 @@ ctx.textAlign = "left";
     // not a separate section — same bucket thresholds as the coloring loop
     // just above (hrs>0 / >3 / >6 / >=10).
     const legendLabels = ["0h", "0–3h", "3–6h", "6–10h", "10h+"];
-    const legendSwatch = 12, legendSwatchGap = 5, legendItemGap = 13;
+    const hmLegendSwatch = 12, hmLegendSwatchGap = 5, hmLegendItemGap = 13;
     ctx.font = "12px sans-serif";
-    const legendItemWidths = legendLabels.map(l => legendSwatch + legendSwatchGap + ctx.measureText(l).width);
-    const legendTotalWidth = legendItemWidths.reduce((a, b) => a + b, 0) + legendItemGap * (legendLabels.length - 1);
+    const legendItemWidths = legendLabels.map(l => hmLegendSwatch + hmLegendSwatchGap + ctx.measureText(l).width);
+    const legendTotalWidth = legendItemWidths.reduce((a, b) => a + b, 0) + hmLegendItemGap * (legendLabels.length - 1);
     let legendX = leftHalfCenter - legendTotalWidth / 2;
     ctx.textBaseline = "middle";
     legendLabels.forEach((label, idx) => {
         ctx.fillStyle = hmColors[idx];
-        ctx.fillRect(legendX, heatmapLegendY - legendSwatch / 2, legendSwatch, legendSwatch);
+        ctx.fillRect(legendX, heatmapLegendY - hmLegendSwatch / 2, hmLegendSwatch, hmLegendSwatch);
         ctx.strokeStyle = hmStrokes[idx];
-        ctx.strokeRect(legendX, heatmapLegendY - legendSwatch / 2, legendSwatch, legendSwatch);
+        ctx.strokeRect(legendX, heatmapLegendY - hmLegendSwatch / 2, hmLegendSwatch, hmLegendSwatch);
         ctx.fillStyle = "#94a3b8";
         ctx.textAlign = "left";
-        ctx.fillText(label, legendX + legendSwatch + legendSwatchGap, heatmapLegendY + 1);
-        legendX += legendItemWidths[idx] + legendItemGap;
+        ctx.fillText(label, legendX + hmLegendSwatch + hmLegendSwatchGap, heatmapLegendY + 1);
+        legendX += legendItemWidths[idx] + hmLegendItemGap;
     });
     ctx.textBaseline = "alphabetic";
 
@@ -591,12 +659,31 @@ ctx.textAlign = "left";
     }
     ctx.textAlign = "left";
 
+    // ---- Subject legend (color swatch + name, wrapped rows computed above) ----
+    if (hasData) {
+        ctx.font = "13px sans-serif";
+        ctx.textBaseline = "middle";
+        legendRows.forEach((row, rowIdx) => {
+            let x = rightHalfCenter - row.width / 2;
+            let y = legendStartY + rowIdx * legendItemGapY;
+            row.items.forEach(item => {
+                ctx.fillStyle = SUBJECT_COLORS[item.cat] || "#64748b";
+                ctx.fillRect(x, y - legendSwatch / 2, legendSwatch, legendSwatch);
+                ctx.fillStyle = "#94a3b8";
+                ctx.textAlign = "left";
+                ctx.fillText(item.cat, x + legendSwatch + legendSwatchGap, y + 1);
+                x += item.width + legendItemGapX;
+            });
+        });
+        ctx.textBaseline = "alphabetic";
+    }
+
     // ---- Daily Performance Breakdown (2-column table, centered as a block) ----
     // Compute the table's horizontal layout dynamically so the two-column
     // block sits with equal margins left and right, instead of being
     // pinned to the left edge while empty space collects on the right.
     ctx.font = "16px sans-serif";
-    const statusMaxWidth = (STATUS_ICON_R * 2 + STATUS_ICON_GAP) + Math.max(ctx.measureText("Goal Met").width, ctx.measureText("Missed").width);
+    const statusMaxWidth = STATUS_BADGE_W; // fixed pill width — same for every row, see drawStatusBadge
     const colInnerGap = 112;   // date -> study -> break -> questions spacing within one block
     const queStatusGap = 50;   // questions -> status spacing — deliberately tighter than the rest,
                                 // since "Que" is a short number and doesn't need a full column's worth
@@ -642,14 +729,12 @@ ctx.textAlign = "left";
         let col = (i < rowsPerColumn) ? colX.left : colX.right;
         let rowIdx = (i < rowsPerColumn) ? i : i - rowsPerColumn;
         let y = tableFirstRowY + rowIdx * rowH;
-        ctx.fillStyle = "#f1f5f9"; ctx.font = "16px sans-serif"; ctx.fillText(d.date, col.date, y);
+        ctx.fillStyle = "#f1f5f9"; ctx.font = "16px sans-serif"; ctx.fillText(formatDateDDMMYY(d.date), col.date, y);
         ctx.fillStyle = "#10b981"; ctx.fillText(formatReadable(d.study), col.study, y);
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
         ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
         let metGoal = d.study >= 36000;
-        let statusTextX = col.status + drawStatusIcon(ctx, col.status, y, metGoal);
-        ctx.fillStyle = metGoal ? "#10b981" : "#ef4444"; ctx.font = "16px sans-serif";
-        ctx.fillText(metGoal ? "Goal Met" : "Missed", statusTextX, y);
+        drawStatusBadge(ctx, col.status, y, metGoal);
     });
 
     // ---- Footer ----
@@ -688,7 +773,7 @@ function buildReportShareText(days, type) {
         for (let [cat, sec] of Object.entries(day.subjects)) aggregateSubjects[cat] = (aggregateSubjects[cat] || 0) + (sec || 0);
     });
     let label = type === 'weekly' ? '📊 Weekly Study Report' : '📊 Monthly Study Report';
-    let lines = [label, `🗓 ${days[0]} → ${days[days.length - 1]}`, `⏱ Total Study: ${formatReadable(totalStudy)}`, `☕ Total Break: ${formatReadable(totalBreak)}`, `🔥 Streak: ${computeStreak(db)} days`, `🧮 Total Questions Solved: ${totalQuestions}`, ``];
+    let lines = [label, `🗓 ${formatDateDDMMYY(days[0])} → ${formatDateDDMMYY(days[days.length - 1])}`, `⏱ Total Study: ${formatReadable(totalStudy)}`, `☕ Total Break: ${formatReadable(totalBreak)}`, `🔥 Streak: ${computeStreak(db)} days`, `🧮 Total Questions Solved: ${totalQuestions}`, ``];
     lines.push(`Subject breakdown:`);
     for (let [cat, sec] of Object.entries(aggregateSubjects)) if (sec > 0) lines.push(`• ${cat}: ${formatReadable(sec)}`);
     lines.push(``, `Tracked with @ẞhì's JEE Study Tracker 🎯`);

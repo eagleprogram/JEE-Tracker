@@ -66,10 +66,15 @@ export function formatTime12Hour(timeStr) {
     return "--:--";
 }
 
-export function formatDateDDMMYYYY(dateStr) {
+// Renamed from formatDateDDMMYYYY: now renders a 2-digit year (17-08-26)
+// instead of 4-digit (17-08-2026) everywhere a date is shown to the user,
+// per request. Still takes a "YYYY-MM-DD" storage key and only ever
+// slices the last 2 digits of the year — it never reads/writes anything
+// with a 2-digit year, so this is purely a display change.
+export function formatDateDDMMYY(dateStr) {
     if (!dateStr) return "";
     let parts = dateStr.split('-');
-    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0].slice(2)}`;
     return dateStr;
 }
 

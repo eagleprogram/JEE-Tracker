@@ -1,4 +1,4 @@
-import { escapeHtml, fileToDataURL, getTodayKey, formatDateDDMMYYYY, downloadBlob } from './utils.js';
+import { escapeHtml, fileToDataURL, getTodayKey, formatDateDDMMYY, downloadBlob } from './utils.js';
 import { openMockDB, getAllMockTests, MOCK_STORE } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
@@ -149,7 +149,7 @@ export async function renderMockTestList() {
     let html = "";
     sortedEntries.forEach(e => {
         let attachedElsewhere = e.hasFiles && (!e.files || e.files.length === 0);
-        html += `<div class="mock-entry"><div class="mock-top"><div class="mock-title-wrap"><strong class="mock-title" title="${escapeHtml(e.subject)}">${escapeHtml(e.subject)}</strong><div class="small-note" style="margin:0;">${formatDateDDMMYYYY(e.date)}</div></div><div class="mock-score-wrap"><span class="mock-score">${e.score || '—'}${e.maxScore ? ' / ' + e.maxScore : ''}</span><button class="del" onclick="deleteMockTestEntry(${e.id})">✕</button></div></div>${e.notes ? `<div style="font-size:13px; margin-top:8px; white-space:pre-wrap;">${escapeHtml(e.notes)}</div>` : ''}${(e.mistakeTags && e.mistakeTags.length) ? `<div class="entry-tags">${e.mistakeTags.map(t => `<span>${escapeHtml(t)}</span>`).join('')}</div>` : ''}<div class="mock-files">${(e.files||[]).map((f, i) => f.type.startsWith('image/') ? `<img src="${f.dataUrl}" onclick="viewMockFile(${e.id},${i})">` : `<a class="pdf-chip" href="${f.dataUrl}" download="${f.name}">📄 ${escapeHtml(f.name)}</a>`).join('')}${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}</div></div>`;
+        html += `<div class="mock-entry"><div class="mock-top"><div class="mock-title-wrap"><strong class="mock-title" title="${escapeHtml(e.subject)}">${escapeHtml(e.subject)}</strong><div class="small-note" style="margin:0;">${formatDateDDMMYY(e.date)}</div></div><div class="mock-score-wrap"><span class="mock-score">${e.score || '—'}${e.maxScore ? ' / ' + e.maxScore : ''}</span><button class="del" onclick="deleteMockTestEntry(${e.id})">✕</button></div></div>${e.notes ? `<div style="font-size:13px; margin-top:8px; white-space:pre-wrap;">${escapeHtml(e.notes)}</div>` : ''}${(e.mistakeTags && e.mistakeTags.length) ? `<div class="entry-tags">${e.mistakeTags.map(t => `<span>${escapeHtml(t)}</span>`).join('')}</div>` : ''}<div class="mock-files">${(e.files||[]).map((f, i) => f.type.startsWith('image/') ? `<img src="${f.dataUrl}" onclick="viewMockFile(${e.id},${i})">` : `<a class="pdf-chip" href="${f.dataUrl}" download="${f.name}">📄 ${escapeHtml(f.name)}</a>`).join('')}${attachedElsewhere ? `<span class="small-note" style="font-style:italic;">📎 File Attached on another browser</span>` : ''}</div></div>`;
     });
     list.innerHTML = html + `<div style="height:40px;"></div>`; // Add bottom padding
 }
@@ -206,15 +206,15 @@ export async function exportAllMockTests() {
 
     sorted.forEach((e, idx) => {
         let num = idx + 1;
-        let safeName = `${num}. ${(e.subject || "Untitled").replace(/[\\/:*?"<>|]/g, "_")} (${formatDateDDMMYYYY(e.date)})`;
-        lines.push(`## #${num} · ${e.subject || "Untitled"} · ${formatDateDDMMYYYY(e.date)}`);
+        let safeName = `${num}. ${(e.subject || "Untitled").replace(/[\\/:*?"<>|]/g, "_")} (${formatDateDDMMYY(e.date)})`;
+        lines.push(`## #${num} · ${e.subject || "Untitled"} · ${formatDateDDMMYY(e.date)}`);
         lines.push(`Score: ${e.score || "—"}${e.maxScore ? " / " + e.maxScore : ""}`);
         if (e.mistakeTags && e.mistakeTags.length) lines.push(`Mistake tags: ${e.mistakeTags.join(", ")}`);
         lines.push("");
         lines.push(e.notes ? e.notes : "_(no notes)_");
 
         let entryNoteLines = [
-            `# ${e.subject || "Untitled"} · ${formatDateDDMMYYYY(e.date)}`,
+            `# ${e.subject || "Untitled"} · ${formatDateDDMMYY(e.date)}`,
             `Score: ${e.score || "—"}${e.maxScore ? " / " + e.maxScore : ""}`,
             (e.mistakeTags && e.mistakeTags.length) ? `Mistake tags: ${e.mistakeTags.join(", ")}` : "",
             "",
