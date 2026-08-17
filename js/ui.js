@@ -774,14 +774,19 @@ export function renderQuoteOfDay() {
 }
 
 // ----------------- EXAM YEAR / COUNTDOWNS -----------------
-// Matches the app-wide DD-MM-YY date format (e.g. 24-01-27) instead of the
-// previous "24 Jan 2027" — built manually rather than via
-// toLocaleDateString so the separator/order can't drift by locale.
+// Deliberately kept as a 4-digit year (24-01-2027) instead of the app-wide
+// DD-MM-YY used everywhere else. Every other date lives in a dense table
+// or a short inline note, where the 2-digit year keeps rows compact and
+// scannable. This one is different: it's a single, standalone date shown
+// alone in a tooltip on hover, next to text that already names the year
+// once ("JEE Main 2027") — cutting the year down to "27" right next to
+// that would look like a typo/mismatch rather than a deliberate format,
+// and there's no row-density reason here to save the two digits.
 function fmtExamDate(d) {
     let dd = String(d.getDate()).padStart(2, '0');
     let mm = String(d.getMonth() + 1).padStart(2, '0');
-    let yy = String(d.getFullYear()).slice(2);
-    return `${dd}-${mm}-${yy}`;
+    let yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
 }
 
 let JEE_MAINS_DATE, JEE_MAINS2_DATE, JEE_ADV_DATE;

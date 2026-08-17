@@ -7,78 +7,13 @@ import { computeStreak, SUBJECT_COLORS } from './charts.js';
 import { showToast } from './ui.js';
 import { getCurrentUser } from './firebase-sync.js';
 
-// BUG FIX (earlier pass): the report table's Status column used to draw
-// "Goal Met ✅" / "Missed ❌" as plain emoji characters inside the canvas
-// text. Different emoji glyphs are NOT drawn at a uniform visual size by a
-// device's emoji font — ❌ in particular renders noticeably smaller/lighter
-// than ✅ at the exact same CSS font-size. Hand-drawing a small fixed-size
-// circle+checkmark or circle+cross with canvas paths removed the emoji
-// font from the picture, but the two badges could still end up visibly
-// different SIZES overall, because "Goal Met" and "Missed" are different
-// lengths of text — the icon was pixel-identical, but the icon+text
-// combo wasn't.
-//
-// BUG FIX (this pass): both badges are now drawn as a fixed-width rounded
-// pill (STATUS_BADGE_W/H, same for every row) with the icon+label centered
-// inside it, instead of bare icon+text floating at column width. "Missed"
-// and "Goal Met" pills are now identical width and height on every row —
-// the pill's own footprint is the alignment guarantee, not the text
-// inside it. Returns the pill's fixed width so callers can lay out the
-// next column at a known offset.
-const STATUS_BADGE_W = 108, STATUS_BADGE_H = 26;
-const STATUS_ICON_R = 7;
-function drawStatusBadge(ctx, x, yBaseline, met) {
-    let label = met ? "Goal Met" : "Missed";
-    let color = met ? "#10b981" : "#ef4444";
-    let top = yBaseline - STATUS_BADGE_H * 0.72;
-    let radius = STATUS_BADGE_H / 2;
-
-    // Pill background — same fixed width/height for every row.
-    ctx.beginPath();
-    ctx.moveTo(x + radius, top);
-    ctx.arcTo(x + STATUS_BADGE_W, top, x + STATUS_BADGE_W, top + STATUS_BADGE_H, radius);
-    ctx.arcTo(x + STATUS_BADGE_W, top + STATUS_BADGE_H, x, top + STATUS_BADGE_H, radius);
-    ctx.arcTo(x, top + STATUS_BADGE_H, x, top, radius);
-    ctx.arcTo(x, top, x + STATUS_BADGE_W, top, radius);
-    ctx.closePath();
-    ctx.fillStyle = met ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)";
-    ctx.fill();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Icon (hand-drawn check/cross — still avoids the emoji-font size mismatch).
-    let iconCx = x + 17, iconCy = top + STATUS_BADGE_H / 2;
-    ctx.beginPath();
-    ctx.arc(iconCx, iconCy, STATUS_ICON_R, 0, Math.PI * 2);
-    ctx.fillStyle = color; let prevAlpha = ctx.globalAlpha; ctx.globalAlpha = 0.22; ctx.fill(); ctx.globalAlpha = prevAlpha;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    if (met) {
-        ctx.moveTo(iconCx - 3.5, iconCy);
-        ctx.lineTo(iconCx - 1, iconCy + 3);
-        ctx.lineTo(iconCx + 4, iconCy - 3.5);
-    } else {
-        ctx.moveTo(iconCx - 3, iconCy - 3);
-        ctx.lineTo(iconCx + 3, iconCy + 3);
-        ctx.moveTo(iconCx + 3, iconCy - 3);
-        ctx.lineTo(iconCx - 3, iconCy + 3);
-    }
-    ctx.stroke();
-
-    // Label — vertically centered against the icon, same for both states.
-    ctx.fillStyle = color;
-    ctx.font = "13px sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, iconCx + STATUS_ICON_R + 8, iconCy);
-    ctx.textBaseline = "alphabetic";
-
-    return STATUS_BADGE_W;
-}
+// Status column: plain colored text with the emoji trailing the label
+// ("Goal Met ✅" / "Missed ❌") — no pill, no outline, no background fill.
+// Per explicit request this replaces the earlier boxed-badge design; the
+// two labels are naturally different widths (that's fine, it's just
+// text now), so the column layout below measures each string's actual
+// width instead of assuming a fixed box.
+const STATUS_LABELS = { met: "Goal Met ✅", missed: "Missed ❌" };
 
 export 
     function buildShareText(dt) {
@@ -683,7 +618,7 @@ ctx.textAlign = "left";
     // block sits with equal margins left and right, instead of being
     // pinned to the left edge while empty space collects on the right.
     ctx.font = "16px sans-serif";
-    const statusMaxWidth = STATUS_BADGE_W; // fixed pill width — same for every row, see drawStatusBadge
+    const statusMaxWidth = Math.max(ctx.measureText(STATUS_LABELS.met).width, ctx.measureText(STATUS_LABELS.missed).width);
     const colInnerGap = 112;   // date -> study -> break -> questions spacing within one block
     const queStatusGap = 50;   // questions -> status spacing — deliberately tighter than the rest,
                                 // since "Que" is a short number and doesn't need a full column's worth
@@ -734,7 +669,8 @@ ctx.textAlign = "left";
         ctx.fillStyle = "#a78bfa"; ctx.fillText(formatReadable(d.break), col.break, y);
         ctx.fillStyle = "#38bdf8"; ctx.fillText(String(d.questions), col.questions, y);
         let metGoal = d.study >= 36000;
-        drawStatusBadge(ctx, col.status, y, metGoal);
+        ctx.fillStyle = metGoal ? "#10b981" : "#ef4444"; ctx.font = "16px sans-serif";
+        ctx.fillText(metGoal ? STATUS_LABELS.met : STATUS_LABELS.missed, col.status, y);
     });
 
     // ---- Footer ----
