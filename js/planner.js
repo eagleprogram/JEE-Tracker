@@ -1,4 +1,4 @@
-import { getTodayKey, dateKey, escapeHtml } from './utils.js';
+import { getTodayKey, dateKey, escapeHtml, generateId } from './utils.js';
 import { getPlannerDB, savePlannerDB } from './storage.js';
 // Forward reference — ui.js imports FROM this module (carryOverIncompleteTodos,
 // renderSidebarTools, renderPlannerCalendar), so this is a circular import.
@@ -52,7 +52,12 @@ export function addTodo() {
     // task already on today's list (done or not), same rule applied in
     // addPlannerTask() below for the calendar modal's add box.
     if (db[todayKey].some(t => t.text === text)) { showToast("That task is already on today's list."); return; }
-    db[todayKey].push({ text, done: false, priority }); savePlannerDB(db); inp.value = ""; renderSidebarTools(); renderPlannerCalendar();
+    // id/createdAt/updatedAt: needed so cloud sync can identify and merge
+    // this exact task later instead of only ever overwriting the whole
+    // day's list — see mergePlannerDB() in firebase-sync.js.
+    let now = Date.now();
+    db[todayKey].push({ id: generateId(), text, done: false, priority, createdAt: now, updatedAt: now });
+    savePlannerDB(db); inp.value = ""; renderSidebarTools(); renderPlannerCalendar();
 }
 
 export function renderSidebarTools() {
@@ -69,7 +74,12 @@ export function renderSidebarTools() {
 export function toggleTodo(idx) {
     let todayKey = getTodayKey(); let db = getPlannerDB();
     if (!db[todayKey] || !db[todayKey][idx]) return;
-    db[todayKey][idx].done = !db[todayKey][idx].done; savePlannerDB(db); renderSidebarTools(); renderPlannerCalendar();
+    db[todayKey][idx].done = !db[todayKey][idx].done;
+    // Stamp the edit — this is what lets a later sync merge know THIS
+    // change is newer than whatever's in the cloud (or vice versa) instead
+    // of guessing. See mergePlannerDB() in firebase-sync.js.
+    db[todayKey][idx].updatedAt = Date.now();
+    savePlannerDB(db); renderSidebarTools(); renderPlannerCalendar();
 }
 
 export function deleteTodo(idx) {
@@ -102,6 +112,19 @@ export function carryOverIncompleteTodos(oldDayKey, newDayKey) {
     let listText = incomplete.map((t, i) => `${i + 1}. ${getPriorityEmoji(t.priority)} ${t.text}`).join("\n");
     let message = `You have ${incomplete.length} incomplete ${isSingle ? "task" : "tasks"} from yesterday:\n\n${listText}\n\nWould you like to transfer ${isSingle ? "it" : "them"} to today?`;
     if (!confirm(message)) return;
+
+    // Bump updatedAt on every moved task. A task can end up listed under
+    // BOTH the old and new day-key after a merge — e.g. this device carries
+    // it over locally at the same moment a cloud snapshot (from before this
+    // carryover, or from another device that hasn't carried it over yet)
+    // still has it sitting under the old day. Both copies share the same
+    // id but live under different day-keys, and a per-day-key merge alone
+    // can't tell which one is "real". mergePlannerDB()'s second pass (in
+    // firebase-sync.js) resolves that by id, always keeping whichever copy
+    // was updated most recently and dropping the stale duplicate — which
+    // only works if "moved to a new day" itself counts as an update.
+    let now = Date.now();
+    incomplete = incomplete.map(t => ({ ...t, updatedAt: now }));
 
     db[oldDayKey] = oldTasks.filter(t => t.done);
     db[newDayKey] = (db[newDayKey] || []).concat(incomplete);
@@ -148,13 +171,17 @@ export function addPlannerTask() {
     let priority = prioritySel ? prioritySel.value : "medium";
     let db = getPlannerDB(); if (!db[plannerActiveDateKey]) db[plannerActiveDateKey] = [];
     if (db[plannerActiveDateKey].some(t => t.text === text)) { showToast("That task is already on this day's list."); return; }
-    db[plannerActiveDateKey].push({ text, done: false, priority }); savePlannerDB(db); inp.value = ""; renderPlannerTasks();
+    let now = Date.now();
+    db[plannerActiveDateKey].push({ id: generateId(), text, done: false, priority, createdAt: now, updatedAt: now });
+    savePlannerDB(db); inp.value = ""; renderPlannerTasks();
 }
 
 export function togglePlannerTask(idx) {
     let db = getPlannerDB();
     if (!db[plannerActiveDateKey] || !db[plannerActiveDateKey][idx]) return;
-    db[plannerActiveDateKey][idx].done = !db[plannerActiveDateKey][idx].done; savePlannerDB(db); renderPlannerTasks();
+    db[plannerActiveDateKey][idx].done = !db[plannerActiveDateKey][idx].done;
+    db[plannerActiveDateKey][idx].updatedAt = Date.now();
+    savePlannerDB(db); renderPlannerTasks();
 }
 
 export function deletePlannerTask(idx) {

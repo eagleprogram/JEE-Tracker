@@ -25,7 +25,7 @@ import { wipeLocalData } from './storage.js';
 // is safe here: signOutOfGoogle/getCurrentUser are only ever called from
 // inside deleteCookiesAndReload()'s function body, well after both modules
 // have finished evaluating — never at module-eval time.
-import { signOutOfGoogle, signInWithGoogle, getCurrentUser, pushToCloud } from './firebase-sync.js';
+import { signOutOfGoogle, signInWithGoogle, getCurrentUser, pushToCloud, catchUpPlannerFromCloud } from './firebase-sync.js';
 
 // ----------------- MOBILE "ZOOMED OUT" DEFAULT DENSITY (reflow fix) -----------------
 // css/base.css sets `.main-wrapper { zoom: 0.85; }` under its mobile
@@ -544,21 +544,54 @@ export function openSidebarPanel(name) {
 }
 
 // ----------------- DAY ROLLOVER -----------------
-export function checkDayRollover() {
+// BUG FIX (deep sync/race fix): this used to be fully synchronous, so the
+// moment a day boundary was detected — most commonly right when the phone
+// wakes up and tickCountdowns() fires from the visibilitychange listener
+// below — carryOverIncompleteTodos() ran immediately against whatever was
+// already sitting in local storage, with zero chance for the app to first
+// find out whether another device had pushed newer planner data overnight.
+// The real-time cloud listener (startCloudListener in firebase-sync.js)
+// stays attached while signed in, but on a cold wake it has to reconnect
+// over the network before it can deliver anything — a gap of anywhere from
+// under a second to several seconds on mobile — so its "new data from
+// another device" prompt would land AFTER the carryover had already run
+// and mutated local data. Reported as: "the todo transfer runs, then it
+// asks about syncing from another device, and the transfer just
+// disappears."
+// Now: the instant a rollover is detected, catchUpPlannerFromCloud()
+// (firebase-sync.js) is awaited FIRST — one bounded fetch that merges in
+// whatever's newest before carryOverIncompleteTodos() ever reads "what's
+// still incomplete". A guest/offline device, or a slow/dead network, still
+// proceeds on local data alone (bounded by that function's own 5s cap) —
+// this never blocks the app indefinitely.
+// rolloverInProgress guards against the 1-second tickCountdowns() interval
+// and a visibilitychange-triggered tick both calling in while the first
+// call is still awaiting that fetch — without it, a slow network could let
+// two overlapping calls both reach carryOverIncompleteTodos() and stack two
+// confirm() dialogs on top of each other for the same rollover.
+let rolloverInProgress = false;
+export async function checkDayRollover() {
     // BUG FIX: was `new Date().toISOString().split('T')[0]` (UTC date) —
     // see the comment on getTodayKey() in utils.js. That made day-rollover
     // fire at 5:30 AM local (IST) instead of local midnight, so anything
     // studied between 00:00–05:30 local got flushed/keyed to the wrong day.
     let nowKey = getTodayKey();
     if (nowKey === getCurrentDayKey()) return;
-    flushAndRestartSegment();
-    carryOverIncompleteTodos(getCurrentDayKey(), nowKey);
-    setCurrentDayKey(nowKey);
-    renderQuoteOfDay(); initToday(); renderSidebarTools(); updateLiveSummary(); renderPlannerCalendar();
-    let picker = document.getElementById("history-picker");
-    let maxAttr = picker.getAttribute("max");
-    if (picker.value === maxAttr) { picker.value = nowKey; loadHistoryData(); }
-    picker.setAttribute("max", nowKey);
+    if (rolloverInProgress) return;
+    rolloverInProgress = true;
+    try {
+        await catchUpPlannerFromCloud();
+        flushAndRestartSegment();
+        carryOverIncompleteTodos(getCurrentDayKey(), nowKey);
+        setCurrentDayKey(nowKey);
+        renderQuoteOfDay(); initToday(); renderSidebarTools(); updateLiveSummary(); renderPlannerCalendar();
+        let picker = document.getElementById("history-picker");
+        let maxAttr = picker.getAttribute("max");
+        if (picker.value === maxAttr) { picker.value = nowKey; loadHistoryData(); }
+        picker.setAttribute("max", nowKey);
+    } finally {
+        rolloverInProgress = false;
+    }
 }
 
 // ----------------- QUOTE OF THE DAY -----------------

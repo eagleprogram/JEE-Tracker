@@ -94,7 +94,50 @@ export function readActiveSessionRaw() { return localStorage.getItem("jee_active
 export function clearActiveSessionRaw() { localStorage.removeItem("jee_active_session"); }
 
 // ----------------- PLANNER (todo + calendar) -----------------
-export function getPlannerDB() { let raw = localStorage.getItem("jee_planner_tasks"); return raw ? JSON.parse(raw) : {}; }
+// BUG FIX (deep sync/race fix): tasks never carried a stable id or a
+// per-task updatedAt, so cloud sync could only ever save/restore the WHOLE
+// plannerDB object as one atomic blob (`savePlannerDB(data.plannerDB ||
+// {})` in firebase-sync.js) — there was no way to tell "the same task,
+// possibly edited on two devices" apart from "two different tasks". That's
+// exactly what turned an ordinary wake-from-background into data loss: the
+// device backgrounds overnight, wakes up, immediately runs
+// checkDayRollover()'s todo-carryover against today's still-local task
+// list, and moments later a cloud snapshot — captured before that
+// carryover, from an explicit "Load from Cloud", the very first auto-load,
+// or the real-time "new data from another device" listener — gets applied
+// on top and wipes it out wholesale. Reported as "the todo transfer runs,
+// then it asks about syncing from another device, and the transfer just
+// disappears." See mergePlannerDB() in firebase-sync.js for the actual
+// merge logic this identity now enables, and checkDayRollover() in ui.js
+// for the other half of the fix (catching up with the cloud BEFORE
+// carryover runs, not after).
+//
+// ensurePlannerTaskShape() backfills `id`/`createdAt`/`updatedAt` on every
+// task the moment it's first read — same pattern already used by
+// ensureDayShape() above for studySessions/breaks ids — so tasks created
+// before this change get upgraded automatically, with no separate
+// migration step, and the generated ids are written straight back to
+// localStorage so they stay stable across repeated getPlannerDB() calls
+// (this runs on every render/toggle) instead of being regenerated, which
+// would break identity-matching on the very next sync.
+function ensurePlannerTaskShape(db) {
+    let changed = false;
+    for (let dayKey in db) {
+        (db[dayKey] || []).forEach(t => {
+            if (!t.id) { t.id = generateId(); changed = true; }
+            if (!t.updatedAt) { t.updatedAt = t.createdAt || Date.now(); changed = true; }
+            if (!t.createdAt) { t.createdAt = t.updatedAt; changed = true; }
+        });
+    }
+    return changed;
+}
+
+export function getPlannerDB() {
+    let raw = localStorage.getItem("jee_planner_tasks");
+    let db = raw ? JSON.parse(raw) : {};
+    if (ensurePlannerTaskShape(db)) savePlannerDB(db);
+    return db;
+}
 export function savePlannerDB(data) { localStorage.setItem("jee_planner_tasks", JSON.stringify(data)); }
 
 // ----------------- SLEEP LOG -----------------

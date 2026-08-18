@@ -361,12 +361,139 @@ async function restoreMistakeChapters(chapters) {
     }
 }
 
+// ----------------- PLANNER MERGE (cloud <-> local) -----------------
+// Unlike mock tests / mistake chapters just above (which already merge by
+// id instead of overwriting — see restoreMockTests/restoreMistakeChapters),
+// plannerDB used to be applied with a blind `savePlannerDB(data.plannerDB ||
+// {})`. That's fine as long as a sync only ever runs against genuinely idle
+// local data — but on mobile it silently destroyed same-day work in exactly
+// the sequence users hit: the device backgrounds overnight, wakes up, and
+// checkDayRollover() (ui.js) runs the todo-carryover confirm against
+// today's still-local task list BEFORE any cloud snapshot has been fetched
+// or merged in. See checkDayRollover()'s own comment in ui.js for the other
+// half of this fix (fetching a fresh snapshot before carryover runs, not
+// after) — this half makes APPLYING that snapshot (from the real-time
+// listener, an explicit pull, the very first auto-load, or the new
+// catch-up below) safe to do at any point, in any order, without losing
+// whichever side wasn't in the snapshot yet.
+//
+// A task with no `id` (arriving from an older, not-yet-updated client
+// mid-rollout, before storage.js started backfilling ids) is matched by
+// exact text instead — the same fallback rule addTodo/addPlannerTask's own
+// duplicate guard already uses.
+function taskIdentity(t) { return t && t.id ? "id:" + t.id : "text:" + (t && t.text); }
+
+// Newest-updatedAt-wins per task, not per whole day — so a task completed
+// on one device and a DIFFERENT task added on another, both since the last
+// sync, both survive; only a genuine same-task conflict (edited/toggled on
+// both sides) picks a winner. A task that exists on only one side is always
+// kept — merging only ever adds, it never silently drops a task neither
+// side actually deleted.
+//
+// Known trade-off, shared with restoreMockTests above: there are no
+// tombstones, so a task deleted on this device can reappear if a cloud
+// snapshot that predates the deletion is merged in later. Same limitation
+// mock-test deletions already have in this codebase — flagging it here
+// rather than leaving it silent, since closing that gap properly needs a
+// soft-delete flag, which is a bigger change than this fix.
+function mergePlannerDB(cloudPlannerDB) {
+    if (!cloudPlannerDB || typeof cloudPlannerDB !== "object") return;
+    let localDB = getPlannerDB(); // already id/updatedAt-normalized by getPlannerDB()
+    let dayKeys = new Set([...Object.keys(localDB), ...Object.keys(cloudPlannerDB)]);
+
+    // Pass 1: merge each day's list independently — newest updatedAt wins
+    // per task identity WITHIN that one day-key.
+    let merged = {};
+    dayKeys.forEach(dayKey => {
+        let byIdentity = new Map();
+        (localDB[dayKey] || []).forEach(t => byIdentity.set(taskIdentity(t), t));
+        (cloudPlannerDB[dayKey] || []).forEach(ct => {
+            let key = taskIdentity(ct);
+            let existing = byIdentity.get(key);
+            if (!existing || (ct.updatedAt || 0) > (existing.updatedAt || 0)) byIdentity.set(key, ct);
+        });
+        merged[dayKey] = Array.from(byIdentity.values());
+    });
+
+    // Pass 2: the SAME task can legitimately end up under two different
+    // day-keys after pass 1 — e.g. this device carries a task over to today
+    // at the same moment a cloud snapshot (predating that carryover, or
+    // from another device that carried the same task over on ITS side)
+    // still lists it under yesterday. Pass 1 only compares within one
+    // day-key at a time and can't see that. A task belongs to exactly one
+    // day: whichever day-key holds its most-recently-updated copy — moving
+    // a task bumps its updatedAt (see carryOverIncompleteTodos in
+    // planner.js) — so every older duplicate under a different day-key is
+    // dropped here.
+    let idToLatest = new Map(); // id -> { dayKey, updatedAt }
+    Object.keys(merged).forEach(dayKey => {
+        merged[dayKey].forEach(t => {
+            if (!t.id) return; // no id to cross-check across days — leave text-matched fallback tasks alone
+            let cur = idToLatest.get(t.id);
+            if (!cur || (t.updatedAt || 0) > cur.updatedAt) idToLatest.set(t.id, { dayKey, updatedAt: t.updatedAt || 0 });
+        });
+    });
+    Object.keys(merged).forEach(dayKey => {
+        merged[dayKey] = merged[dayKey].filter(t => !t.id || idToLatest.get(t.id).dayKey === dayKey);
+        if (merged[dayKey].length === 0) delete merged[dayKey];
+    });
+
+    savePlannerDB(merged);
+}
+
+// ----------------- OPPORTUNISTIC PLANNER CATCH-UP (wake-from-background) -----------------
+// Called from checkDayRollover() (ui.js) the instant a day boundary is
+// crossed — the exact moment carryOverIncompleteTodos() is about to decide
+// which of yesterday's tasks are "incomplete". On mobile this is most
+// often the moment the device wakes from sleep: the app backgrounded
+// across midnight, another device may have pushed newer planner changes in
+// the meantime, and the real-time listener (startCloudListener below) —
+// still attached, but only reconnects once the network/tab actually
+// resumes — hasn't necessarily delivered them yet. Waiting here for one
+// bounded document fetch means carryOverIncompleteTodos() runs against the
+// freshest data available in a reasonable time, not a stale local copy.
+//
+// Safe to call unconditionally and even redundantly: mergePlannerDB() is a
+// pure newest-wins merge, so this firing AND the real-time listener firing
+// again moments later with the same (or a newer) snapshot is harmless —
+// merging the same or older data a second time changes nothing.
+//
+// Deliberately does NOT touch jee_last_sync — that flag gates the
+// full-category apply (study logs, sleep log, etc., which aren't
+// merge-safe the way planner now is). Bumping it here would make the
+// real-time listener think those OTHER categories are already caught up
+// when only planner actually was, and their own newer cloud changes would
+// get silently skipped.
+export async function catchUpPlannerFromCloud() {
+    if (!currentUser || !initFirebaseIfNeeded()) return; // guest/offline — proceed on local data only
+    try {
+        let doc = await Promise.race([
+            fbDb.collection("users").doc(currentUser.uid).get({ source: "server" }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("planner catch-up timed out")), 5000))
+        ]);
+        if (!doc.exists) return;
+        mergePlannerDB(doc.data().plannerDB);
+    } catch (e) {
+        // Offline, slow reconnect, or timed out — proceed with whatever's
+        // local rather than blocking the rollover indefinitely. The
+        // still-attached real-time listener and the next explicit/auto
+        // sync remain the safety net; this is a best-effort head start,
+        // not the only chance to catch up.
+        console.log("Planner catch-up skipped:", e.message);
+    }
+}
+
 // Shared by pullFromCloud (explicit, user-initiated) and the real-time
 // listener below (automatic, from another device). Applies every synced
 // category to local storage.
 async function applyCloudData(data) {
     saveDB(data.studyDB || {});
-    savePlannerDB(data.plannerDB || {});
+    // BUG FIX: was `savePlannerDB(data.plannerDB || {})` — a wholesale
+    // overwrite that discarded any local planner change (a carryover, a
+    // toggle, a newly-added task) made after this cloud snapshot was taken.
+    // mergePlannerDB() combines the two instead of picking one wholesale —
+    // see its own comment above for the full story.
+    mergePlannerDB(data.plannerDB || {});
     if (data.sleepLog) writeSleepLog(data.sleepLog);
     if (data.sleepPending !== undefined) setSleepPending(data.sleepPending);
     if (data.syllabusProgress) saveSyllabusProgress(data.syllabusProgress);
