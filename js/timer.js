@@ -139,11 +139,24 @@ export function resetOpenEntryRefs() { openEntryRefs = {}; }
 // (with an explanation) for as long as that heartbeat stays fresh.
 const SESSION_LOCK_KEY = "jee_session_lock";
 const LOCK_HEARTBEAT_MS = 3000;
-// Comfortably more than 2x the heartbeat interval so one missed/delayed
-// tick (a throttled background tab, a slow frame) never makes a still-live
-// owning tab look stale to everyone else — while still clearing out within
-// a few seconds of a tab actually closing/crashing without a clean unload.
-const LOCK_STALE_MS = 9000;
+// BUG FIX: this used to be 9000 (3x the heartbeat interval), sized only for
+// the case of a slow/delayed tick. It didn't account for real Chrome/Edge
+// background-tab timer throttling: once the OWNING tab (the one actually
+// running the session) is backgrounded — which is the normal case, since
+// the whole point of this lock is to be checked FROM a different, focused
+// tab — the browser is allowed to delay its setInterval heartbeat well past
+// a few seconds (and after ~5 minutes hidden, "intensive throttling" can
+// push it out to roughly once a minute). With a 9s staleness window, any
+// owning tab that had been backgrounded for a while looked "dead" to every
+// other tab long before it actually was, which is exactly the reported bug:
+// the "active session running in another tab" warning would incorrectly
+// clear itself (readable as stale) even though that other tab's session was
+// still genuinely running. 65s comfortably clears the worst-case throttled
+// gap. This only affects how long a truly CRASHED/force-closed tab's lock
+// lingers before another tab can start fresh — a clean close/refresh/
+// navigation already releases the lock instantly via the 'pagehide' handler
+// below, without waiting on staleness at all.
+const LOCK_STALE_MS = 65000;
 
 function readSessionLock() {
     let raw = getRawFlag(SESSION_LOCK_KEY);
@@ -173,12 +186,32 @@ function writeSessionLockHeartbeat() {
         if (lock && lock.tabId === getTabId()) clearRawFlag(SESSION_LOCK_KEY);
     }
 }
-setInterval(writeSessionLockHeartbeat, LOCK_HEARTBEAT_MS);
+// BUG FIX: this used to be `setInterval(writeSessionLockHeartbeat, ...)`
+// alone. writeSessionLockHeartbeat() only ever WRITES this tab's own lock
+// state — it never re-renders the "active session running in another tab"
+// banner/disabled buttons on an idle tab. That banner was only ever
+// refreshed by the 'storage' event below, which fires ONLY when the OTHER
+// tab actively writes a new value (a live heartbeat tick, or its own clean
+// close clearing the key). If that other tab stopped writing without a
+// clean close (backgrounded long enough to get throttled — see
+// LOCK_STALE_MS above — or genuinely crashed/force-quit), no further
+// 'storage' event ever fires here, so this tab's banner and greyed-out
+// Start/Break buttons stayed stuck showing "active session elsewhere"
+// indefinitely, long after the lock had actually gone stale — the exact
+// reported symptom of the warning only clearing itself after a manual
+// refresh. Reusing this same interval to re-check and re-render while IDLE
+// means the banner now self-corrects on its own within one heartbeat tick
+// of the lock actually going stale, no refresh needed.
+setInterval(() => {
+    writeSessionLockHeartbeat();
+    if (timerState === "IDLE") updateUIState();
+}, LOCK_HEARTBEAT_MS);
 
 // 'storage' fires in every OTHER tab (never the tab that made the change)
 // the instant the lock key changes — lets a second, otherwise-idle tab
 // react immediately (grey out/re-enable Start & Break) instead of waiting
-// on its own next heartbeat tick.
+// on its own next heartbeat tick. The interval above is the fallback for
+// when no such write ever arrives (see BUG FIX above it).
 window.addEventListener("storage", (e) => { if (e.key === SESSION_LOCK_KEY) updateUIState(); });
 
 // Shared guard for every click-time entry point that can start a BRAND NEW
@@ -399,6 +432,17 @@ export function cancelSubjectModal() {
 }
 
 export function confirmStartStudy() {
+    // BUG FIX: this used to unconditionally reset the segment on every call.
+    // A stray SECOND call while already STUDYING (a double-tap on touch,
+    // a duplicate/stuck event listener) would call startSegment() again,
+    // which resets segmentStartWallMs to "now" WITHOUT first banking
+    // whatever time had already elapsed since the last commit — silently
+    // discarding it (never logged, just gone). This can't happen via a
+    // single normal click (the flows that reach here — fresh IDLE start,
+    // or BREAK -> Start — always arrive with timerState something other
+    // than STUDYING), so guarding on that exact state is a safe, purely
+    // defensive no-op for every real transition already in use.
+    if (timerState === "STUDYING") return;
     activeSubject = document.getElementById("modal-subject-select").value;
     document.getElementById("subject-modal").style.display = "none";
     unlockBodyScroll(); // release the modal's own lock — enterZenMode() below takes its own
@@ -414,6 +458,12 @@ export function confirmStartStudy() {
 export function pauseStudy() { commitActiveSegment(); cancelAnimationFrame(animFrame); timerState = "PAUSED"; clearActiveSession(); updateUIState(); }
 
 export function resumeStudy() {
+    // BUG FIX: same class of issue as confirmStartStudy() above — a stray
+    // second call while already STUDYING would silently drop already-
+    // elapsed, uncommitted time by resetting segmentStartWallMs without
+    // banking it first. resumeStudy() is only ever reached from PAUSED in
+    // the real UI, so this guard is a no-op on every legitimate path.
+    if (timerState === "STUDYING") return;
     timerState = "STUDYING"; currentSegmentId++; startSegment(); updateUIState(); tick();
     // "Resume" from PAUSED also counts as (re)starting a study session — same
     // auto-zen behavior as confirmStartStudy() above.
