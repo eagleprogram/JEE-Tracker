@@ -244,6 +244,21 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 
 /* ===== Misc shared rows/lists ===== */
 .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 14px; }
+/* BUG FIX: a break's `reason` is freeform user-typed text (the "Forgot to
+   log a break?" field) with no length limit and no guaranteed whitespace —
+   a long string with no spaces (a pasted URL, a run-on word) has nothing
+   for the browser's default word-break to break on, so as a flex item it
+   refused to shrink below that string's full width. That squeezed the
+   sibling duration+delete-button span down to almost nothing, wrapping
+   "0h 24m 0s" onto three separate lines instead of staying put. min-width:0
+   lets the text side actually shrink to the row's available width instead
+   of being sized by its longest unbreakable run, and overflow-wrap/word-
+   break let it wrap mid-word as a last resort when it has to. The action
+   side gets the opposite treatment — flex-shrink:0 + white-space:nowrap —
+   so the duration/delete button always keeps its natural single-line size
+   regardless of how long the text side gets. */
+.stat-row-text { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.stat-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; white-space: nowrap; }
 /* margin: 6px 0 (not just margin-top) so items get breathing room both
    above AND below — previously only margin-top was set, so the very last
    item in the scrollable #todo-list had nothing separating it from the
