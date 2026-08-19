@@ -576,7 +576,32 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) flush
 // calls startSegment() again, so the segment's baseline is always correct
 // whether or not the page actually unloads. It also already guards for
 // STUDYING/BREAK, so this is a strict improvement with no downside.
-window.addEventListener("pagehide", () => { flushAndRestartSegment(); });
+window.addEventListener("pagehide", (e) => {
+    flushAndRestartSegment();
+    // BUG FIX: releases THIS tab's cross-tab session lock (SESSION_LOCK_KEY,
+    // above) the instant the tab is genuinely closed or navigated away from.
+    // e.persisted === true means the browser may restore this exact page
+    // from bfcache later (the session is still "live" in memory, so the
+    // lock must stay held); only a real close/unload (persisted === false)
+    // releases it. Previously the lock was only ever cleared by the next
+    // heartbeat tick seeing timerState go back to IDLE — which never
+    // happens on a hard close, since all JS simply stops running. The lock
+    // then just sat there, still looking "fresh" for up to LOCK_STALE_MS
+    // (9s), because its last-written timestamp was never updated again.
+    // Reopening the app inside that window (Ctrl+Shift+T, History) read
+    // that stale-but-not-yet-expired lock, saw a tabId that didn't match
+    // this new load's own sessionStorage-based tabId, and showed the false
+    // "Active session running in another tab" warning with Start/Break
+    // disabled — even though no other tab was actually running anything.
+    // Clearing it here removes that window entirely. This only ever clears
+    // a lock this tab itself owns (never another still-open tab's), so the
+    // original double-counting protection between two genuinely live tabs
+    // is completely unaffected.
+    if (!e.persisted) {
+        let lock = readSessionLock();
+        if (lock && lock.tabId === getTabId()) clearRawFlag(SESSION_LOCK_KEY);
+    }
+});
 
 // BUG FIX: requestAnimationFrame callbacks stop being invoked at all while
 // a tab is hidden (not just throttled — genuinely paused), and on top of
