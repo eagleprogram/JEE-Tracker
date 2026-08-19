@@ -6,6 +6,11 @@ import { showToast } from './ui.js';
 
 let ytPlayer = null, ytApiReady = false, ytLoopEnabled = false, ytPendingVideoId = null;
 let ytIsPlaying = false;
+// Cycled by ytCycleSpeed() below — 1x sits in the middle so the common
+// "slightly faster" bump (1.25x/1.5x) is one tap away either direction from
+// the default, same spirit as the Loop toggle being one tap.
+const YT_SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+let ytPlaybackRate = 1;
 
 export function extractYouTubeId(url) {
     try {
@@ -47,7 +52,15 @@ export function createOrLoadYTPlayer(id) {
         host: 'https://www.youtube-nocookie.com',
         playerVars: { rel: 0, origin: window.location.origin },
         events: {
-            onReady: (e) => { e.target.setVolume(parseInt(document.getElementById("yt-volume").value)); },
+            onReady: (e) => {
+                e.target.setVolume(parseInt(document.getElementById("yt-volume").value));
+                // Re-apply whatever speed was already selected — matters when
+                // loadYoutubeLink() swaps in a new video without the player
+                // having been closed first (createOrLoadYTPlayer's
+                // loadVideoById branch resets YouTube's own rate to 1x, but
+                // our button/state should stay consistent with what's shown).
+                if (ytPlaybackRate !== 1) e.target.setPlaybackRate(ytPlaybackRate);
+            },
             onStateChange: (e) => {
                 if (ytLoopEnabled && e.data === YT.PlayerState.ENDED) { ytPlayer.seekTo(0); ytPlayer.playVideo(); }
                 ytIsPlaying = (e.data === YT.PlayerState.PLAYING);
@@ -165,6 +178,18 @@ export function ytToggleLoop() {
     document.getElementById("yt-loop-btn").innerText = `🔁 Loop: ${ytLoopEnabled ? "On" : "Off"}`;
 }
 
+// Cycles forward through YT_SPEED_STEPS, wrapping back to the start after
+// 2x. Same one-button-cycles-through-states shape as ytToggleLoop() above,
+// just with more than two states.
+export function ytCycleSpeed() {
+    if (!ytPlayer) return;
+    let idx = YT_SPEED_STEPS.indexOf(ytPlaybackRate);
+    ytPlaybackRate = YT_SPEED_STEPS[(idx + 1) % YT_SPEED_STEPS.length];
+    if (ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(ytPlaybackRate);
+    let btn = document.getElementById("yt-speed-btn");
+    if (btn) btn.innerText = `⏩ Speed: ${ytPlaybackRate}x`;
+}
+
 // Fully shuts the player down: stops playback, tears down the YT.Player
 // instance (so the next Load starts completely fresh instead of trying to
 // reuse a destroyed player), hides the whole player block, and clears the
@@ -181,10 +206,13 @@ export function ytClosePlayer() {
     ytIsPlaying = false;
     ytPendingVideoId = null;
     ytLoopEnabled = false;
+    ytPlaybackRate = 1;
     document.getElementById("yt-player-wrap").style.display = "none";
     document.getElementById("yt-link-input").value = "";
     let playBtn = document.getElementById("yt-playpause-btn");
     if (playBtn) playBtn.innerText = "▶ Play";
     let loopBtn = document.getElementById("yt-loop-btn");
     if (loopBtn) loopBtn.innerText = "🔁 Loop: Off";
+    let speedBtn = document.getElementById("yt-speed-btn");
+    if (speedBtn) speedBtn.innerText = "⏩ Speed: 1x";
 }
