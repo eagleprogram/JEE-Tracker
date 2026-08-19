@@ -198,6 +198,19 @@ export function startSegment() {
     segmentElapsedMs = 0;
     refreshCachedTodayDay();
     persistActiveSession();
+    // BUG FIX: writeSessionLockHeartbeat() (below) previously only ran on
+    // its own setInterval tick, which doesn't fire until LOCK_HEARTBEAT_MS
+    // (3s) after the page loaded — NOT the moment a session actually
+    // starts. A session started right after page load (very common — Start
+    // is often the very first click) left up to a 3s window where
+    // SESSION_LOCK_KEY hadn't been written at all yet, so a second tab
+    // opened in that exact window saw no lock and could start its own
+    // session too — exactly the double-counting this lock exists to
+    // prevent. Writing the heartbeat immediately here, at every segment
+    // start (fresh start, resume, break, subject switch, autosave/pagehide
+    // restart, tab-restore), closes that gap; the periodic interval below
+    // just keeps it refreshed after.
+    writeSessionLockHeartbeat();
 }
 
 export function commitActiveSegment() {
@@ -458,6 +471,14 @@ export function changeSubjectMidSession() { activeSubject = document.getElementB
 export function endDay() {
     commitActiveSegment(); cancelAnimationFrame(animFrame);
     timerState = "IDLE"; segmentElapsedMs = 0; sessionStudySec = 0; sessionBreakSec = 0; carryMs = 0; clearActiveSession();
+    // BUG FIX: release this tab's session lock immediately instead of
+    // waiting up to LOCK_HEARTBEAT_MS (3s) for the next heartbeat tick to
+    // notice timerState is now IDLE. Without this, a second tab opened in
+    // that few-second gap right after End Day would still see a "fresh"
+    // lock and wrongly report a session as still running here. Only ever
+    // clears a lock this tab itself owns, same guard as everywhere else.
+    let endDayLock = readSessionLock();
+    if (endDayLock && endDayLock.tabId === getTabId()) clearRawFlag(SESSION_LOCK_KEY);
     // BUG FIX: End Day used to leave Zen Mode's overlay/backdrop on screen if
     // the user hit the red "End Day" button while zen'd in (reachable during
     // both STUDYING and BREAK — see index.html). exitZenMode() itself is a
