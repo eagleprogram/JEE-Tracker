@@ -62,15 +62,30 @@ export function ensureDayShape(day) {
     day.breaks.forEach(b => { if (!b.id) b.id = generateId(); });
     // Backfill the questions-solved fields for any day saved before this
     // feature existed, so old data reads as "0, not yet asked" instead of
-    // undefined.
+    // undefined. Coerce (not hard-reset) a truthy-but-non-boolean
+    // questionsAsked (e.g. `1` from hand-edited/imported data) to `true` —
+    // resetting it to `false` would silently re-trigger the daily
+    // "log your questions" popup for a day that was already answered.
     if (typeof day.questionsSolved !== "number" || isNaN(day.questionsSolved)) day.questionsSolved = 0;
-    if (typeof day.questionsAsked !== "boolean") day.questionsAsked = false;
+    if (typeof day.questionsAsked !== "boolean") day.questionsAsked = !!day.questionsAsked;
     return day;
 }
 
+// BUG FIX: unlike every sibling getter in this file (getSleepLog,
+// getSyllabusProgress, getYtHistory), this had no try/catch around
+// JSON.parse — a single corrupted byte in the main "jee_ypt_v3_data" key
+// (this app's primary data store) threw uncaught and broke the entire app
+// until the key was manually cleared from devtools. Matches the guarded
+// pattern already used everywhere else here: fall back to {} rather than
+// crash. A parse failure here is unusual enough (this key is only ever
+// written by saveDB() below) that returning {} — an "empty but bootable"
+// state — is safer than trying to partially recover it.
 export function getDB() {
     let raw = localStorage.getItem("jee_ypt_v3_data");
-    let db = raw ? JSON.parse(raw) : {};
+    let db = {};
+    if (raw) {
+        try { db = JSON.parse(raw); } catch (e) { db = {}; }
+    }
     if (migrateSubjectNames(db)) saveDB(db);
     return db;
 }
@@ -125,8 +140,12 @@ function ensurePlannerTaskShape(db) {
     for (let dayKey in db) {
         (db[dayKey] || []).forEach(t => {
             if (!t.id) { t.id = generateId(); changed = true; }
-            if (!t.updatedAt) { t.updatedAt = t.createdAt || Date.now(); changed = true; }
-            if (!t.createdAt) { t.createdAt = t.updatedAt; changed = true; }
+            // Bug fix: was a falsy check (`!t.updatedAt`), which mistreats a
+            // literal 0 timestamp as "missing" and clobbers it. Use an
+            // explicit type check instead, consistent with how
+            // ensureDayShape() above guards questionsSolved.
+            if (typeof t.updatedAt !== "number") { t.updatedAt = (typeof t.createdAt === "number") ? t.createdAt : Date.now(); changed = true; }
+            if (typeof t.createdAt !== "number") { t.createdAt = t.updatedAt; changed = true; }
         });
     }
     return changed;
@@ -166,7 +185,16 @@ export function getSyllabusProgress() { try { return JSON.parse(localStorage.get
 export function saveSyllabusProgress(p) { localStorage.setItem(SYLLABUS_KEY, JSON.stringify(p)); }
 
 // ----------------- NOTIFICATIONS -----------------
-export function getNotifSettings() { let raw = localStorage.getItem("jee_notif_settings"); return raw ? { ...NOTIF_DEFAULTS, ...JSON.parse(raw) } : { ...NOTIF_DEFAULTS }; }
+// BUG FIX: no try/catch around JSON.parse (same class of bug as getDB()
+// above) — corrupted "jee_notif_settings" threw uncaught, breaking
+// notifications entirely. Falls back to defaults on parse failure, same as
+// "nothing stored" does.
+export function getNotifSettings() {
+    let raw = localStorage.getItem("jee_notif_settings");
+    if (!raw) return { ...NOTIF_DEFAULTS };
+    try { return { ...NOTIF_DEFAULTS, ...JSON.parse(raw) }; }
+    catch (e) { return { ...NOTIF_DEFAULTS }; }
+}
 export function saveNotifSettings(s) { localStorage.setItem("jee_notif_settings", JSON.stringify(s)); }
 
 // ----------------- YOUTUBE HISTORY -----------------
@@ -214,6 +242,25 @@ export const YT_HISTORY_MAX_ENTRIES = YT_HISTORY_MAX;
 // the store — no data in "tests" or "mistakes" is touched.
 export const MISTAKE_STORE = "mistakes";
 const MOCK_DB_VERSION = 4;
+// BUG FIX (two-part, same root cause): nothing in this codebase ever
+// called db.close() on a connection returned by openMockDB() — not here,
+// not in mocktest.js/backup.js/firebase-sync.js's own direct calls to it
+// either (those three are outside this batch's scope and still need the
+// same treatment when audited). Two consequences, both fixed within this
+// function/module's own responsibility:
+//  1. Every connection opened by the four functions below (getAllMockTests,
+//     getMistakeEntry, saveMistakeEntry, getAllMistakeChapters) is now
+//     explicitly closed once that operation settles, so a later
+//     wipeLocalData() -> indexedDB.deleteDatabase() call isn't blocked by
+//     a stale connection from routine app use. (mocktest.js/backup.js/
+//     firebase-sync.js's own direct openMockDB() calls are NOT covered by
+//     this — flagged for their own batches.)
+//  2. openMockDB() itself now has an onblocked handler. Previously, a
+//     version-upgrade open() that got blocked (e.g. by an old connection
+//     nothing had closed) would sit pending forever — no timeout, no
+//     error, every mock-test/mistakes read or write silently hangs.
+//     Now it rejects with a clear message instead, so callers see a real
+//     error rather than a silent freeze.
 export function openMockDB() {
     return new Promise((resolve, reject) => {
         let req = indexedDB.open(MOCK_DB_NAME, MOCK_DB_VERSION);
@@ -224,47 +271,69 @@ export function openMockDB() {
         };
         req.onsuccess = (e) => resolve(e.target.result);
         req.onerror = (e) => reject(e.target.error);
+        req.onblocked = () => reject(new Error("IndexedDB upgrade blocked: another connection to the mock-test/mistakes database is still open (another tab, or a connection this session didn't close). Close other tabs running this app and reload."));
     });
 }
 
-export function getAllMockTests() {
-    return openMockDB().then(db => new Promise((resolve, reject) => {
-        let tx = db.transaction(MOCK_STORE, "readonly");
-        let req = tx.objectStore(MOCK_STORE).getAll();
-        req.onsuccess = () => resolve(req.result.sort((a,b) => b.id - a.id));
-        req.onerror = () => reject(req.error);
-    }));
+export async function getAllMockTests() {
+    let db = await openMockDB();
+    try {
+        return await new Promise((resolve, reject) => {
+            let tx = db.transaction(MOCK_STORE, "readonly");
+            let req = tx.objectStore(MOCK_STORE).getAll();
+            req.onsuccess = () => resolve(req.result.sort((a,b) => b.id - a.id));
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
 // ----------------- MISTAKES (per syllabus chapter, IndexedDB) -----------------
 // One record per "Subject|Chapter" key — the same key format syllabus.js
 // uses for its progress object, so the chapter list can be shared.
-export function getMistakeEntry(key) {
-    return openMockDB().then(db => new Promise((resolve, reject) => {
-        let tx = db.transaction(MISTAKE_STORE, "readonly");
-        let req = tx.objectStore(MISTAKE_STORE).get(key);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => reject(req.error);
-    }));
+export async function getMistakeEntry(key) {
+    let db = await openMockDB();
+    try {
+        return await new Promise((resolve, reject) => {
+            let tx = db.transaction(MISTAKE_STORE, "readonly");
+            let req = tx.objectStore(MISTAKE_STORE).get(key);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
-export function saveMistakeEntry(entry) {
-    return openMockDB().then(db => new Promise((resolve, reject) => {
-        let tx = db.transaction(MISTAKE_STORE, "readwrite");
-        tx.objectStore(MISTAKE_STORE).put(entry);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    }));
+export async function saveMistakeEntry(entry) {
+    let db = await openMockDB();
+    try {
+        return await new Promise((resolve, reject) => {
+            let tx = db.transaction(MISTAKE_STORE, "readwrite");
+            tx.objectStore(MISTAKE_STORE).put(entry);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    } finally {
+        db.close();
+    }
 }
 
-export function getAllMistakeChapters() {
-    return openMockDB().then(db => new Promise((resolve, reject) => {
-        let tx = db.transaction(MISTAKE_STORE, "readonly");
-        let req = tx.objectStore(MISTAKE_STORE).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
-    }));
+export async function getAllMistakeChapters() {
+    let db = await openMockDB();
+    try {
+        return await new Promise((resolve, reject) => {
+            let tx = db.transaction(MISTAKE_STORE, "readonly");
+            let req = tx.objectStore(MISTAKE_STORE).getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
 }
+
 
 // ----------------- EXAM YEAR -----------------
 export function getExamYear() {
