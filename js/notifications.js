@@ -37,6 +37,7 @@ export function renderNotifSettingsUI() {
     document.getElementById("notif-backupReminder").checked = s.backupReminder;
     document.getElementById("notif-waterBreakReminder").checked = s.waterBreakReminder;
     document.getElementById("notif-waterBreakFrequency").value = s.waterBreakFrequencyMin;
+    document.getElementById("notif-smRadioReminders").checked = s.smRadioReminders;
     updateNotifPermissionStatus();
 }
 
@@ -67,7 +68,8 @@ export function saveNotifSettingsFromUI() {
         parentLogReminderTime: document.getElementById("notif-parentLogReminderTime").value || "22:30",
         backupReminder: document.getElementById("notif-backupReminder").checked,
         waterBreakReminder: document.getElementById("notif-waterBreakReminder").checked,
-        waterBreakFrequencyMin: waterFreqSnapped
+        waterBreakFrequencyMin: waterFreqSnapped,
+        smRadioReminders: document.getElementById("notif-smRadioReminders").checked
     };
     saveNotifSettings(s); showToast("Notification settings saved.");
     // A frequency/on-off change should take effect immediately for a water

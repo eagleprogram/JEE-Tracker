@@ -21,21 +21,38 @@ import { renderHeatmap } from './charts.js';
 import { getWeekOffset, mondayForOffset } from './week-nav.js';
 
 let activeQuestionsDateKey = null;
+// Optional "what happens after this modal closes" hook — set only by the
+// maybeAskQuestionsSolved(dateKey, onDone) chain path below, fired once
+// from closeQuestionsModal() and then cleared. Lets sleep.js chain straight
+// into its evening attendance reminder (Questions Solved → Attendance →
+// Planner) without questions.js needing to import anything from sleep.js.
+let questionsModalChainCallback = null;
 
 // Called after a sleep log entry is saved for `dateKey` (the day whose
-// study is being "closed out" by that log). No-op if that day has already
-// been asked (or answered/skipped) — see the field comment in storage.js.
-export function maybeAskQuestionsSolved(dateKey) {
-    if (!dateKey) return;
+// study is being "closed out" by that log). If that day was already asked
+// (see the field comment in storage.js), this is a no-op EXCEPT it still
+// fires onDone immediately — the night's Questions → Attendance → Planner
+// chain (see sleep.js) still needs to continue even when there's nothing
+// left to ask here.
+export function maybeAskQuestionsSolved(dateKey, onDone) {
+    if (!dateKey) { if (onDone) onDone(); return; }
     let db = getDB();
     let day = db[dateKey];
     if (!day) day = initDay(dateKey);
     ensureDayShape(day);
-    if (day.questionsAsked) return;
+    if (day.questionsAsked) { if (onDone) onDone(); return; }
     openQuestionsModal(dateKey);
+    // Must be set AFTER openQuestionsModal(), which clears any stale
+    // callback left over from an unrelated manual open (see below).
+    questionsModalChainCallback = onDone || null;
 }
 
 export function openQuestionsModal(dateKey) {
+    // A directly/manually opened modal (e.g. the "Log Today's Questions"
+    // button, or re-opening a past day to edit it) never chains into
+    // anything else — only the maybeAskQuestionsSolved() path above does,
+    // and it re-sets this right after calling here.
+    questionsModalChainCallback = null;
     if (!dateKey) dateKey = getTodayKey();
     activeQuestionsDateKey = dateKey;
     let db = getDB();
@@ -56,6 +73,12 @@ export function openTodayQuestionsModal() { openQuestionsModal(getTodayKey()); }
 export function closeQuestionsModal() {
     document.getElementById("questions-modal").style.display = "none";
     activeQuestionsDateKey = null;
+    // Fire (and clear) any chain callback exactly once, however this modal
+    // ended — Save, Back, or Delete all funnel through here. Cleared before
+    // calling so the callback itself can't accidentally re-trigger it.
+    let cb = questionsModalChainCallback;
+    questionsModalChainCallback = null;
+    if (cb) cb();
 }
 
 export function saveQuestionsSolved() {

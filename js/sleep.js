@@ -1,5 +1,5 @@
 import { formatDateDDMMYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWall, getTodayKey } from './utils.js';
-import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending } from './storage.js';
+import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getNotifSettings } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast } from './ui.js';
@@ -92,8 +92,10 @@ export function saveSleepLog() {
         showToast("Bedtime logged — log your wake time to complete it.");
         // Bedtime logged = today's study day is effectively "closed out" —
         // this is the natural moment to ask how many questions were solved
-        // today. No-ops if today was already asked (see the function).
-        maybeAskQuestionsSolved(sleepDate);
+        // today, then chain into the night's Questions Solved → Attendance
+        // → (Tomorrow's) Planner flow. No-ops straight to the attendance
+        // step if today was already asked (see the function).
+        maybeAskQuestionsSolved(sleepDate, openEveningAttendanceReminderModal);
         // Going to sleep is the "sleep log saved" moment the water-break
         // reminder is scoped to stop at — no point nudging someone to drink
         // water while they're asleep.
@@ -144,10 +146,12 @@ export function saveSleepLog() {
         document.getElementById("sleep-time-input").value = "";
         renderSleepLog();
         renderSleepPendingBanner();
-        // A wake-up log (either sub-case above) is the new trigger for the
-        // attendance reminder — see openAttendanceReminderModal() below.
-        // Acknowledging it opens today's to-do list in the Planner.
-        openAttendanceReminderModal();
+        // A wake-up log (either sub-case above) is the trigger for the
+        // morning attendance reminder — see openAttendanceReminderModal()
+        // below. The day's to-do planner no longer opens from here; it now
+        // opens at night instead (see openEveningAttendanceReminderModal()),
+        // for tomorrow — see the Settings decision this was built against.
+        if (getNotifSettings().smRadioReminders) openAttendanceReminderModal();
         return;
     }
 
@@ -187,7 +191,9 @@ export function saveSleepLog() {
         renderSleepLog();
         renderSleepPendingBanner();
         showToast("Sleep log saved.");
-        maybeAskQuestionsSolved(sleepDate);
+        // Same night chain as CASE 1 above — Questions Solved → Attendance
+        // → Tomorrow's Planner.
+        maybeAskQuestionsSolved(sleepDate, openEveningAttendanceReminderModal);
         // Both times entered together still represents a completed sleep
         // log for the night (same as CASE 1's bedtime-only save) — stop the
         // water reminder here too.
@@ -195,16 +201,40 @@ export function saveSleepLog() {
     }
 }
 
-// Fires after a wake time is saved (see CASE 2 above) instead of the old
-// "questions solved" popup. A single acknowledgment button; closing it
-// redirects straight into today's to-do list in the Planner so the user can
-// fill it in right after marking attendance, per the requested flow.
+// Fires after a wake time is saved (see CASE 2 above). A simple morning
+// "mark yourself present" nudge — a single acknowledgment button. The
+// to-do Planner no longer opens from here (see openEveningAttendanceReminderModal()
+// below for where it now lives). Skippable entirely via the "SM Radio
+// Reminders" toggle in Settings (checked before this is even called — see
+// CASE 2 above).
 export function openAttendanceReminderModal() {
     document.getElementById("attendance-reminder-modal").style.display = "flex";
 }
 export function closeAttendanceReminderModal() {
     document.getElementById("attendance-reminder-modal").style.display = "none";
-    openPlannerModal(getTodayKey());
+}
+
+// Fires at night once the "questions solved" step for the day is done (see
+// maybeAskQuestionsSolved(sleepDate, openEveningAttendanceReminderModal) in
+// CASE 1/3 above) — reminds the user to mark in SM Radio whether they
+// completed today's tasks and 360R/440R. Skippable via the same "SM Radio
+// Reminders" toggle in Settings, in which case this steps straight through
+// to opening tomorrow's Planner. Either way, acknowledging it (or skipping
+// it) opens tomorrow's to-do list in the Planner — the single daily
+// planning touchpoint, moved here from the morning so tomorrow gets planned
+// while today is still fresh, instead of first thing in a groggy morning.
+export function openEveningAttendanceReminderModal() {
+    if (!getNotifSettings().smRadioReminders) { openTomorrowPlanner(); return; }
+    document.getElementById("evening-attendance-modal").style.display = "flex";
+}
+export function closeEveningAttendanceReminderModal() {
+    document.getElementById("evening-attendance-modal").style.display = "none";
+    openTomorrowPlanner();
+}
+function openTomorrowPlanner() {
+    let d = new Date(getTodayKey() + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    openPlannerModal(dateKeyFromWall(d.getTime()));
 }
 
 // Shows a small banner with a ✕ button whenever a bedtime has been logged

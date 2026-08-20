@@ -196,6 +196,10 @@
                     <input type="checkbox" id="notif-backupReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
+                    <label>SM Radio Reminders (attendance, morning &amp; night)</label>
+                    <input type="checkbox" id="notif-smRadioReminders" onchange="saveNotifSettingsFromUI()">
+                </div>
+                <div class="settings-row">
                     <label>Exam milestone pings</label>
                     <input type="checkbox" id="notif-examMilestones" onchange="saveNotifSettingsFromUI()">
                 </div>
@@ -618,14 +622,32 @@
 
 <!-- Wake-up reminder: fires after a wake time is logged (see saveSleepLog()
      in sleep.js) instead of the old "questions solved" popup, which never
-     made sense to ask about right after waking up. Acknowledging it opens
-     today's to-do list in the Planner (see closeAttendanceReminderModal()
-     in sleep.js). -->
+     made sense to ask about right after waking up. Just an acknowledgment —
+     the to-do Planner no longer opens from here, see evening-attendance-modal
+     below for where that moved to (closeAttendanceReminderModal() in
+     sleep.js). Skippable via the "Morning Attendance Reminder" toggle in
+     Settings. -->
 <div class="modal" id="attendance-reminder-modal">
     <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
         <h3 style="margin-top:0;">📻 Reminder</h3>
         <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark your attendance in the SM Radio YouTube channel!</p>
         <button class="btn btn-start" style="width:100%;" onclick="closeAttendanceReminderModal()">Got it</button>
+    </div>
+</div>
+
+<!-- End-of-day reminder: fires after the "questions solved" step is done
+     for a bedtime save (see maybeAskQuestionsSolved(sleepDate,
+     openEveningAttendanceReminderModal) in sleep.js's CASE 1/3). Reminds
+     the user to mark in SM Radio whether they completed today's tasks and
+     360R/440R. Acknowledging it opens tomorrow's Planner (see
+     closeEveningAttendanceReminderModal() in sleep.js) — the single daily
+     planning touchpoint. Skippable via the "Evening Attendance Reminder"
+     toggle in Settings, in which case tomorrow's Planner opens directly. -->
+<div class="modal" id="evening-attendance-modal">
+    <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
+        <h3 style="margin-top:0;">📻 Reminder</h3>
+        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark in the SM Radio YouTube channel whether you completed today's tasks and 360R/440R!</p>
+        <button class="btn btn-start" style="width:100%;" onclick="closeEveningAttendanceReminderModal()">Got it</button>
     </div>
 </div>
 

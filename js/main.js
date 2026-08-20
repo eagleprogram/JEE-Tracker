@@ -37,7 +37,8 @@ import {
 
 import {
     saveSleepLog, toggleSleepHistory, deleteSleepLogEntry,
-    renderSleepPendingBanner, cancelPendingSleepLog, closeAttendanceReminderModal
+    renderSleepPendingBanner, cancelPendingSleepLog, closeAttendanceReminderModal,
+    closeEveningAttendanceReminderModal
 } from './sleep.js';
 
 import {
@@ -145,7 +146,7 @@ Object.assign(window, {
     deleteBreakEntry, deleteStudyLog, deleteBreakLog, addMissedBreak,
     // sleep.js
     saveSleepLog, toggleSleepHistory, deleteSleepLogEntry, cancelPendingSleepLog,
-    closeAttendanceReminderModal,
+    closeAttendanceReminderModal, closeEveningAttendanceReminderModal,
     // syllabus.js
     toggleSyllabusChapterExpand, toggleSyllabusTag, setSyllabusSubject,
     // mistakes.js
