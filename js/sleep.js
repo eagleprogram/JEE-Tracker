@@ -84,15 +84,10 @@ export function saveSleepLog() {
     if (sleepVal && !wakeVal) {
         let sleepDate = today;
 
-        // Guard against only the genuinely ambiguous case: a bedtime
-        // that's still PENDING (no wake time logged for it yet) — there's
-        // only one pending slot, so a second bedtime right now would either
-        // silently overwrite it (losing it) or create a confusing duplicate
-        // "waiting" row. Once a bedtime is completed (wake time logged),
-        // it's no longer pending, and a new bedtime can always be logged
-        // after that — including a second one later the SAME calendar day
-        // (an early-AM nap followed by tonight's real bedtime, sleep in AM
-        // as well as PM, etc. all still work exactly as before).
+        // Guard 1: a bedtime that's still PENDING (no wake time logged for
+        // it yet) — there's only one pending slot, so a second bedtime
+        // right now would either silently overwrite it (losing it) or
+        // create a confusing duplicate "waiting" row.
         if (pending && pendingType(pending) === 'sleep') {
             if (pending.date === sleepDate) {
                 showToast("⚠️ You already have a bedtime pending — log your wake time to complete it, or cancel it (✕ on the banner) first.");
@@ -103,6 +98,18 @@ export function saveSleepLog() {
             // discard it via the overwrite below, so confirm first.
             let ok = confirm(`You still have a bedtime pending from ${formatDateDDMMYY(pending.date)} with no wake time logged yet. Log a new bedtime now anyway and discard that old pending entry?`);
             if (!ok) return;
+        }
+
+        // Guard 2: cap at 2 completed sleep entries per calendar date — a
+        // genuine early-AM one (e.g. 12:17 AM → 8:26 AM) plus a genuine
+        // nighttime one (e.g. 10:58 PM → next morning) both legitimately
+        // share the same sleepDate. A 3rd is never a real third "sleep" for
+        // the same day — that's what the Break timer is for (a nap
+        // mid-study), not the Sleep/Wake log.
+        let sameDateCount = Object.values(log).filter(e => e.sleepDate === sleepDate).length;
+        if (sameDateCount >= 2) {
+            showToast("⚠️ You've already logged 2 sleep entries for this date (the max — one AM, one PM). For a nap, use the Break timer instead. Delete one in History first if you really need to redo it.");
+            return;
         }
 
         let expectedWakeDate = expectedWakeDateFor(sleepDate, sleepVal);
