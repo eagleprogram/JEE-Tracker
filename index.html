@@ -52,7 +52,7 @@
                 <div class="card" style="padding: 12px;">
     <div class="section-header-row" style="margin-top:0;">
         <h4 class="section-subtitle">📌 Today's To-Do <span class="todo-count-badge" id="todo-count-badge" title="Tasks left">0</span></h4>
-        <select id="todo-sort-select" class="sort-select" onchange="renderSidebarTools()" title="Sort tasks">
+        <select id="todo-sort-select" class="sort-select" aria-label="Sort tasks" onchange="renderSidebarTools()" title="Sort tasks">
             <option value="added">Added order</option>
             <option value="priority-desc" selected>High → Low</option>
             <option value="priority-asc">Low → High</option>
@@ -64,10 +64,10 @@
         <span class="pl-item"><span class="pl-dot pl-low"></span>Low priority</span>
     </div>
     <div style="display:flex; align-items:stretch; gap:6px; margin-top:10px;">
-        <input type="text" id="todo-input" placeholder="Add something to do today..."
+        <input type="text" id="todo-input" aria-label="Add something to do today" placeholder="Add something to do today..."
                onkeypress="if(event.key==='Enter') addTodo()"
                style="flex:1; margin:0;">
-        <select id="todo-priority-select" class="priority-select" title="Priority for this task">
+        <select id="todo-priority-select" class="priority-select" aria-label="Priority for this task" title="Priority for this task">
             <option value="high">🔴</option>
             <option value="medium" selected>🟡</option>
             <option value="low">🟢</option>
@@ -81,11 +81,11 @@
             <h4 style="margin:0 0 10px 0;">🌙 Sleep / Wake Log</h4>
             <div style="display:flex; gap:8px;">
                 <div style="flex:1;">
-                    <label style="font-size:11px; color:var(--muted);">Woke at (AM)</label>
+                    <label for="wake-time-input" style="font-size:11px; color:var(--muted);">Woke at (AM)</label>
                     <input type="time" id="wake-time-input">
                 </div>
                 <div style="flex:1;">
-                    <label style="font-size:11px; color:var(--muted);">Slept at (PM)</label>
+                    <label for="sleep-time-input" style="font-size:11px; color:var(--muted);">Slept at (PM)</label>
                     <input type="time" id="sleep-time-input">
                 </div>
             </div>
@@ -99,7 +99,7 @@
 
         <div class="card" style="padding: 12px;">
             <h4 style="margin:0 0 10px 0;">🎵 Study Music (YouTube)</h4>
-            <input type="text" id="yt-link-input" placeholder="Paste a YouTube link...">
+            <input type="text" id="yt-link-input" aria-label="Paste a YouTube link" placeholder="Paste a YouTube link...">
             <div style="display:flex; gap:6px; margin-top:6px;">
                 <button class="btn btn-start btn-small" style="flex:1;" onclick="loadYoutubeLink()">Load</button>
                 <button class="btn btn-break btn-small" style="flex:1;" onclick="toggleYtHistory()">🕘 History</button>
@@ -115,7 +115,7 @@
                 </div>
                 <div class="yt-controls">
                     <span style="font-size:11px; color:var(--muted);">🔊</span>
-                    <input type="range" id="yt-volume" min="0" max="100" value="70" oninput="ytSetVolume(this.value)">
+                    <input type="range" id="yt-volume" aria-label="Volume" min="0" max="100" value="70" oninput="ytSetVolume(this.value)">
                 </div>
                 <div class="small-note">YouTube requires the player to stay visibly on screen.</div>
             </div>
@@ -151,73 +151,73 @@
 
             <div style="margin-top:12px;">
                 <div class="settings-row">
-                    <label>Break overrun alert</label>
+                    <label for="notif-breakOverrun">Break overrun alert</label>
                     <input type="checkbox" id="notif-breakOverrun" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
-                    <span style="font-size:12px; color:var(--muted);">Ping after</span>
+                    <label for="notif-breakThreshold" style="font-size:12px; color:var(--muted);">Ping after</label>
                     <input type="number" id="notif-breakThreshold" min="5" max="240" onchange="saveNotifSettingsFromUI()">
                     <span style="font-size:12px; color:var(--muted);">min on break</span>
                 </div>
                 <div class="settings-row">
-                    <label>Planner task reminder (2hr window, remind every 30min)</label>
+                    <label for="notif-plannerReminder">Planner task reminder (2hr window, remind every 30min)</label>
                     <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
-                    <span style="font-size:12px; color:var(--muted);">Start at</span>
+                    <label for="notif-plannerReminderStartTime" style="font-size:12px; color:var(--muted);">Start at</label>
                     <input type="time" id="notif-plannerReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Revision reminder (once/day)</label>
+                    <label for="notif-revisionReminder">Revision reminder (once/day)</label>
                     <input type="checkbox" id="notif-revisionReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
-                    <span style="font-size:12px; color:var(--muted);">Remind at</span>
+                    <label for="notif-revisionReminderTime" style="font-size:12px; color:var(--muted);">Remind at</label>
                     <input type="time" id="notif-revisionReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Sleep reminder (30-min window, remind every 5min)</label>
+                    <label for="notif-sleepReminder">Sleep reminder (30-min window, remind every 5min)</label>
                     <input type="checkbox" id="notif-sleepReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
-                    <span style="font-size:12px; color:var(--muted);">Start at</span>
+                    <label for="notif-sleepReminderStartTime" style="font-size:12px; color:var(--muted);">Start at</label>
                     <input type="time" id="notif-sleepReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Send daily log to parent (once/day)</label>
+                    <label for="notif-parentLogReminder">Send daily log to parent (once/day)</label>
                     <input type="checkbox" id="notif-parentLogReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
-                    <span style="font-size:12px; color:var(--muted);">Send at</span>
+                    <label for="notif-parentLogReminderTime" style="font-size:12px; color:var(--muted);">Send at</label>
                     <input type="time" id="notif-parentLogReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Export local backup reminder (every 2 days)</label>
+                    <label for="notif-backupReminder">Export local backup reminder (every 2 days)</label>
                     <input type="checkbox" id="notif-backupReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>SM Radio Reminders (attendance, morning &amp; night)</label>
+                    <label for="notif-smRadioReminders">SM Radio Reminders (attendance, morning &amp; night)</label>
                     <input type="checkbox" id="notif-smRadioReminders" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Exam milestone pings</label>
+                    <label for="notif-examMilestones">Exam milestone pings</label>
                     <input type="checkbox" id="notif-examMilestones" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Water break reminder (while studying)</label>
+                    <label for="notif-waterBreakReminder">Water break reminder (while studying)</label>
                     <input type="checkbox" id="notif-waterBreakReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
-                    <span style="font-size:12px; color:var(--muted);">Every</span>
+                    <label for="notif-waterBreakFrequency" style="font-size:12px; color:var(--muted);">Every</label>
                     <input type="number" id="notif-waterBreakFrequency" min="15" max="180" step="15" onchange="saveNotifSettingsFromUI()">
                     <span style="font-size:12px; color:var(--muted);">min</span>
                 </div>
                 <div class="settings-row">
-                    <label>Idle nudge ("still there?")</label>
+                    <label for="notif-idleNudge">Idle nudge ("still there?")</label>
                     <input type="checkbox" id="notif-idleNudge" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
-                    <span style="font-size:12px; color:var(--muted);">Nudge after</span>
+                    <label for="notif-idleThreshold" style="font-size:12px; color:var(--muted);">Nudge after</label>
                     <input type="number" id="notif-idleThreshold" min="10" max="240" onchange="saveNotifSettingsFromUI()">
                     <span style="font-size:12px; color:var(--muted);">min idle</span>
                 </div>
@@ -277,28 +277,28 @@
         <h3 style="margin:0; color:var(--primary);">📝 Mock Test Score & Analysis</h3>
         <button class="btn btn-pause btn-small" style="width:100%;" onclick="exportAllMockTests()" title="Downloads a .zip of every mock test entry">⬇ Export All Mock Tests (.zip)</button>
         <div class="card" style="padding:12px;">
-            <label style="font-size:12px; color:var(--muted);">Date</label>
+            <label for="mock-date-input" style="font-size:12px; color:var(--muted);">Date</label>
             <div class="date-field-wrap">
                 <input type="date" id="mock-date-input">
                 <button type="button" class="date-picker-btn" title="Open date picker" onclick="openDatePicker('mock-date-input')">📅</button>
             </div>
-            <label style="font-size:12px; color:var(--muted);">Exam / Subject</label>
+            <label for="mock-subject-input" style="font-size:12px; color:var(--muted);">Exam / Subject</label>
             <input type="text" id="mock-subject-input" placeholder="e.g. Full Syllabus Mock, Chapter Test, etc.">
             <div style="display:flex; gap:8px;">
                 <div style="flex:1;">
-                    <label style="font-size:12px; color:var(--muted);">Score</label>
+                    <label for="mock-score-input" style="font-size:12px; color:var(--muted);">Score</label>
                     <input type="number" step="any" inputmode="decimal" id="mock-score-input" placeholder="e.g. 199">
                 </div>
                 <div style="flex:1;">
-                    <label style="font-size:12px; color:var(--muted);">Out of</label>
+                    <label for="mock-maxscore-input" style="font-size:12px; color:var(--muted);">Out of</label>
                     <input type="number" step="any" inputmode="decimal" id="mock-maxscore-input" placeholder="e.g. 300">
                 </div>
             </div>
-            <label style="font-size:12px; color:var(--muted);">Analysis / Notes</label>
+            <label for="mock-notes-input" style="font-size:12px; color:var(--muted);">Analysis / Notes</label>
             <textarea class="mock-notes" id="mock-notes-input" placeholder="Mistakes, weak chapters, plan to improve..."></textarea>
-            <label style="font-size:12px; color:var(--muted);">Mistake tags (tap all that apply)</label>
-            <div class="mistake-tag-picker" id="mistake-tag-picker"></div>
-            <label style="font-size:12px; color:var(--muted);">Attach files (images / PDFs)</label>
+            <label id="mistake-tag-picker-label" style="font-size:12px; color:var(--muted);">Mistake tags (tap all that apply)</label>
+            <div class="mistake-tag-picker" id="mistake-tag-picker" role="group" aria-labelledby="mistake-tag-picker-label"></div>
+            <label for="mock-files-input" style="font-size:12px; color:var(--muted);">Attach files (images / PDFs)</label>
             <input type="file" id="mock-files-input" accept="image/*,application/pdf" multiple style="padding:6px 0;">
             <button class="btn btn-start btn-small" style="width:100%; margin-top:8px;" onclick="addMockTestEntry()">Save Entry</button>
             <div class="small-note">Stored in this browser's IndexedDB.</div>
@@ -313,7 +313,7 @@
         <div class="mock-mistake-summary-section">
             <div class="section-header-row" style="margin-top:0;">
                 <h4 class="section-subtitle">Mistake pattern frequency</h4>
-                <select id="mock-sort-select" class="sort-select" onchange="renderMockTestList()" title="Sort mock test entries">
+                <select id="mock-sort-select" class="sort-select" aria-label="Sort mock test entries" onchange="renderMockTestList()" title="Sort mock test entries">
                     <option value="added-desc">Sort: Newest added</option>
                     <option value="added-asc">Sort: Oldest added</option>
                     <option value="date-desc">Sort: Test date (newest)</option>
@@ -349,10 +349,10 @@
         <div id="mistake-add-wrap"></div>
 
         <div id="mistake-view-wrap" style="display:none;">
-            <input type="text" id="mistake-search-box" class="mistake-search-box" placeholder="🔍 Jump to chapter..." oninput="filterMistakeSearch(this.value)">
+            <input type="text" id="mistake-search-box" class="mistake-search-box" aria-label="Jump to chapter" placeholder="🔍 Jump to chapter..." oninput="filterMistakeSearch(this.value)">
             <div class="section-header-row" style="margin-top:10px;">
                 <span class="small-note" style="margin:0;">Sort chapters</span>
-                <select id="mistake-sort-select" class="sort-select" onchange="setMistakeSort(this.value)" title="Sort chapters">
+                <select id="mistake-sort-select" class="sort-select" aria-label="Sort chapters" onchange="setMistakeSort(this.value)" title="Sort chapters">
                     <option value="most">Most mistakes first</option>
                     <option value="least">Least mistakes first</option>
                     <option value="new">Newest mistakes first</option>
@@ -387,7 +387,7 @@
             </div>
             <div class="app-title-text">
                 <span class="app-title-sub">Study Tracker</span>
-                <select id="exam-year-select" onchange="setExamYear(this.value)" title="Shifts the countdowns and title. Dates are estimated — confirm official JEE dates once announced." style="background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:5px;">
+                <select id="exam-year-select" aria-label="Exam year" onchange="setExamYear(this.value)" title="Shifts the countdowns and title. Dates are estimated — confirm official JEE dates once announced." style="background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:5px;">
                 </select>
             </div>
         </div>
@@ -435,7 +435,7 @@
                 </div>
                 <div id="session-lock-note" class="small-note" style="display:none; color:var(--warning); text-align:center;"></div>
                 <div id="change-subject-box" style="display:none; margin-top:15px;">
-                    <label style="font-size:12px; color:var(--muted);">Switch Subject Mid-Session:</label>
+                    <label for="switch-subject-select" style="font-size:12px; color:var(--muted);">Switch Subject Mid-Session:</label>
                     <select id="switch-subject-select" onchange="changeSubjectMidSession()">
                         <option value="Physics">Physics</option>
                         <option value="Organic Chemistry">Organic Chemistry</option>
@@ -540,7 +540,7 @@
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="btn btn-export" onclick="exportDataJSON()">Export Backup</button>
-                <input type="file" id="import-file-input" accept="application/json" style="display:none;" onchange="importDataJSON(this.files[0]); this.value='';">
+                <input type="file" id="import-file-input" aria-label="Import backup file" accept="application/json" style="display:none;" onchange="importDataJSON(this.files[0]); this.value='';">
                 <button class="btn btn-export" onclick="document.getElementById('import-file-input').click()">Import Backup</button>
             </div>
         </div>
@@ -560,7 +560,7 @@
 
     <div class="card" style="margin-top:20px;">
         <h3 style="margin-top:0;">Historical Records & Break Log</h3>
-        <label style="color:var(--muted); font-size:13px;">Select History Date:</label>
+        <label for="history-picker" style="color:var(--muted); font-size:13px;">Select History Date:</label>
         <div class="date-field-wrap">
             <input type="date" id="history-picker" onchange="loadHistoryData()">
             <button type="button" class="date-picker-btn" title="Open date picker" onclick="openDatePicker('history-picker')">📅</button>
@@ -582,11 +582,11 @@
         <div>
             <h4>Logged Breaks</h4>
             <div class="missed-break-form">
-                <input type="text" id="missed-break-reason" placeholder="Forgot to log a break? (Add here)">
+                <input type="text" id="missed-break-reason" aria-label="Missed break reason" placeholder="Forgot to log a break? (Add here)">
                 <div class="missed-break-times">
-                    <input type="time" id="missed-break-start" title="Start time">
+                    <input type="time" id="missed-break-start" aria-label="Missed break start time" title="Start time">
                     <span>&ndash;</span>
-                    <input type="time" id="missed-break-end" title="End time">
+                    <input type="time" id="missed-break-end" aria-label="Missed break end time" title="End time">
                     <button type="button" class="btn btn-pause btn-compact" onclick="addMissedBreak()">+ Add Missed Break</button>
                 </div>
             </div>
@@ -603,7 +603,7 @@
 <div class="modal" id="subject-modal">
     <div class="modal-content">
         <h3 style="margin-top:0;">Select Subject</h3>
-        <select id="modal-subject-select">
+        <select id="modal-subject-select" aria-label="Select subject">
             <option value="Physics">Physics</option>
             <option value="Organic Chemistry">Organic Chemistry</option>
             <option value="Inorganic Chemistry">Inorganic Chemistry</option>
@@ -655,7 +655,7 @@
     <div class="modal-content q-modal-content" style="text-align:center;" onclick="event.stopPropagation()">
         <h3 style="margin-top:0;">Questions Solved:</h3>
         <p style="color:var(--muted); font-size:13px; margin:0 0 14px;">How many questions did you solve on <strong id="questions-modal-date" style="color:var(--text);">--</strong>?</p>
-        <input type="number" id="questions-count-input" min="0" step="1" placeholder="e.g. 55" style="text-align:center;">
+        <input type="number" id="questions-count-input" aria-label="Questions solved" min="0" step="1" placeholder="e.g. 55" style="text-align:center;">
         <div style="margin-top:16px; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
             <button class="btn btn-start" onclick="saveQuestionsSolved()">Save</button>
             <button class="btn btn-pause btn-small" onclick="backQuestionsModal()">Back</button>
@@ -676,7 +676,7 @@
     <div class="modal-content wide">
         <div class="section-header-row" style="margin-top:0;">
             <h3 style="margin:0;" id="planner-modal-title">Tasks</h3>
-            <select id="planner-sort-select" class="sort-select" onchange="renderPlannerTasks()" title="Sort tasks">
+            <select id="planner-sort-select" class="sort-select" aria-label="Sort tasks" onchange="renderPlannerTasks()" title="Sort tasks">
                 <option value="added">Added order</option>
                 <option value="priority-desc">High → Low</option>
                 <option value="priority-asc">Low → High</option>
@@ -688,10 +688,10 @@
             <span class="pl-item"><span class="pl-dot pl-low"></span>Low priority</span>
         </div>
               <div id="planner-input-row" style="display:flex; align-items:stretch; gap:6px; margin-top:10px;">
-    <input type="text" id="planner-task-input" placeholder="Add task for this day..."
+    <input type="text" id="planner-task-input" aria-label="Add task for this day" placeholder="Add task for this day..."
            onkeypress="if(event.key==='Enter') addPlannerTask()"
            style="flex:1; margin:0;">
-    <select id="planner-priority-select" class="priority-select" title="Priority for this task">
+    <select id="planner-priority-select" class="priority-select" aria-label="Priority for this task" title="Priority for this task">
         <option value="high">🔴</option>
         <option value="medium" selected>🟡</option>
         <option value="low">🟢</option>
