@@ -84,33 +84,25 @@ export function saveSleepLog() {
     if (sleepVal && !wakeVal) {
         let sleepDate = today;
 
-        // BUG FIX: nothing used to stop a second (or third...) bedtime being
-        // logged for the same calendar night — setSleepPending() just
-        // silently overwrote whatever was there, and a completed entry from
-        // earlier tonight was never checked at all, so you could end up with
-        // duplicate/near-duplicate sleep-log rows for one actual night (see
-        // the History list). Two guards now:
-
-        // 1) An outstanding pending bedtime from a DIFFERENT, earlier date
-        // (you forgot to log its wake time) would otherwise be silently
-        // discarded by the overwrite below — ask before losing it.
-        if (pending && pendingType(pending) === 'sleep' && pending.date !== sleepDate) {
-            let ok = confirm(`You still have a bedtime pending from ${formatDateDDMMYY(pending.date)} with no wake time logged yet. Log a new bedtime for tonight anyway and discard that old pending entry?`);
+        // Guard against only the genuinely ambiguous case: a bedtime
+        // that's still PENDING (no wake time logged for it yet) — there's
+        // only one pending slot, so a second bedtime right now would either
+        // silently overwrite it (losing it) or create a confusing duplicate
+        // "waiting" row. Once a bedtime is completed (wake time logged),
+        // it's no longer pending, and a new bedtime can always be logged
+        // after that — including a second one later the SAME calendar day
+        // (an early-AM nap followed by tonight's real bedtime, sleep in AM
+        // as well as PM, etc. all still work exactly as before).
+        if (pending && pendingType(pending) === 'sleep') {
+            if (pending.date === sleepDate) {
+                showToast("⚠️ You already have a bedtime pending — log your wake time to complete it, or cancel it (✕ on the banner) first.");
+                return;
+            }
+            // Pending is from an earlier, different date (a forgotten
+            // night) — logging a new one now would otherwise silently
+            // discard it via the overwrite below, so confirm first.
+            let ok = confirm(`You still have a bedtime pending from ${formatDateDDMMYY(pending.date)} with no wake time logged yet. Log a new bedtime now anyway and discard that old pending entry?`);
             if (!ok) return;
-        }
-
-        // 2) A bedtime for TONIGHT specifically has already been logged —
-        // either still pending (waiting on a wake time) or already
-        // completed with a wake time. Block outright rather than creating a
-        // duplicate; the existing entry should be completed (log the wake
-        // time) or deleted first (✕ on the pending banner, or in History).
-        if (pending && pendingType(pending) === 'sleep' && pending.date === sleepDate) {
-            showToast("⚠️ You already have tonight's bedtime pending — log your wake time to complete it, or cancel it (✕ on the banner) first.");
-            return;
-        }
-        if (Object.values(log).some(e => e.sleepDate === sleepDate)) {
-            showToast("⚠️ A sleep log already exists starting tonight. Delete it in History first if you need to log it again.");
-            return;
         }
 
         let expectedWakeDate = expectedWakeDateFor(sleepDate, sleepVal);
