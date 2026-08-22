@@ -27,7 +27,7 @@ import {
     initPlannerCalendar, addTodo, renderSidebarTools, toggleTodo, deleteTodo,
     calShiftMonth, renderPlannerCalendar, openPlannerModal, closePlannerModal,
     addPlannerTask, togglePlannerTask, deletePlannerTask, renderPlannerTasks,
-    openDatePicker
+    openDatePicker, confirmCarryOverTodos, declineCarryOverTodos
 } from './planner.js';
 
 import {
@@ -38,7 +38,7 @@ import {
 import {
     saveSleepLog, toggleSleepHistory, deleteSleepLogEntry,
     renderSleepPendingBanner, cancelPendingSleepLog, closeAttendanceReminderModal,
-    closeEveningAttendanceReminderModal
+    closeEveningAttendanceReminderModal, closeMorningTodoReminderModal
 } from './sleep.js';
 
 import {
@@ -61,7 +61,7 @@ import {
 import {
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
-    ytClosePlayer, ytCycleSpeed
+    ytClosePlayer, ytCycleSpeed, ytSeekPreview, ytSeekCommit
 } from './youtube.js';
 
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
@@ -133,7 +133,7 @@ Object.assign(window, {
     addTodo, toggleTodo, deleteTodo, calShiftMonth, renderSidebarTools,
     renderPlannerCalendar, openPlannerModal, closePlannerModal,
     addPlannerTask, togglePlannerTask, deletePlannerTask, renderPlannerTasks,
-    openDatePicker,
+    openDatePicker, confirmCarryOverTodos, declineCarryOverTodos,
     // charts.js
     renderGarden, renderHeatmap, renderTrendChart,
     // questions.js
@@ -147,6 +147,7 @@ Object.assign(window, {
     // sleep.js
     saveSleepLog, toggleSleepHistory, deleteSleepLogEntry, cancelPendingSleepLog,
     closeAttendanceReminderModal, closeEveningAttendanceReminderModal,
+    closeMorningTodoReminderModal,
     // syllabus.js
     toggleSyllabusChapterExpand, toggleSyllabusTag, setSyllabusSubject,
     // mistakes.js
@@ -159,7 +160,7 @@ Object.assign(window, {
     // youtube.js
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
-    ytClosePlayer, ytCycleSpeed,
+    ytClosePlayer, ytCycleSpeed, ytSeekPreview, ytSeekCommit,
     // reports.js
     downloadDayLog, shareDayLog, sendReportViaEmail, downloadReport, shareReport,
     // backup.js

@@ -176,20 +176,23 @@ export function addMissedBreak() {
     // is now converted to its own [start,end) window and checked for overlap
     // before the new one is allowed to save.
     //
-    // Interval reconstruction has to handle two different stamp conventions
-    // that already coexist in this same day.breaks array: a live timer break
-    // (committed by timer.js's commitActiveSegment) stamps the time it
-    // ENDED, so its window is [time-duration, time); a manually-added missed
-    // break (this function) stamps the time it STARTED — see the comment
-    // below — so its window is [time, time+duration). The `manual` flag
-    // added below is how a future check tells the two apart; entries saved
-    // before this fix has no flag and are treated as the (older, still
-    // correct for them) end-stamped case.
+    // BUG FIX #2: the first version of this check assumed a live timer break
+    // (committed by timer.js's commitActiveSegment) stamped the time it
+    // ENDED, so it computed that entry's window backwards as
+    // [time-duration, time). That assumption is stale — commitActiveSegment()
+    // stamps `cursor`, the segment's START, and never rewrites .time on
+    // later commits (see its own comment), so a live break's stored time IS
+    // its start, exactly like a manual entry's. Computing the window
+    // backwards made the check look at completely the wrong minutes for any
+    // live-logged break, silently letting a manual entry get added right on
+    // top of it (reported: a live-run break and a since-added missed break
+    // overlapping with no warning). Every entry in day.breaks — live or
+    // manual — is start-stamped now, so all of them use the same
+    // [time, time+duration) window here.
     let newDayEntries = day.breaks || [];
     let overlap = newDayEntries.find((b) => {
-        let t = timeToMinutes(b.time);
-        let existingStart = b.manual ? t : t - Math.round(b.duration / 60);
-        let existingEnd = b.manual ? t + Math.round(b.duration / 60) : t;
+        let existingStart = timeToMinutes(b.time);
+        let existingEnd = existingStart + Math.round(b.duration / 60);
         return newStartMin < existingEnd && existingStart < newEndMin;
     });
     if (overlap) {

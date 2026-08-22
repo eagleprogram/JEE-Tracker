@@ -100,6 +100,7 @@
         <div class="card" style="padding: 12px;">
             <h4 style="margin:0 0 10px 0;">🎵 Study Music (YouTube)</h4>
             <input type="text" id="yt-link-input" aria-label="Paste a YouTube link" placeholder="Paste a YouTube link...">
+            <div class="yt-now-playing" id="yt-now-playing" style="display:none;"></div>
             <div style="display:flex; gap:6px; margin-top:6px;">
                 <button class="btn btn-start btn-small" style="flex:1;" onclick="loadYoutubeLink()">Load</button>
                 <button class="btn btn-break btn-small" style="flex:1;" onclick="toggleYtHistory()">🕘 History</button>
@@ -107,6 +108,11 @@
             <div class="yt-history-panel" id="yt-history-panel"></div>
             <div class="yt-player-wrap" id="yt-player-wrap" style="display:none;">
                 <div id="yt-player"></div>
+                <div class="yt-progress-row">
+                    <span class="yt-time" id="yt-current-time">0:00</span>
+                    <input type="range" id="yt-seek" aria-label="Seek" min="0" max="100" value="0" step="0.1" oninput="ytSeekPreview(this.value)" onchange="ytSeekCommit(this.value)">
+                    <span class="yt-time" id="yt-duration-time">0:00</span>
+                </div>
                 <div class="yt-controls">
                     <button onclick="ytTogglePlay()" id="yt-playpause-btn">▶ Play</button>
                     <button onclick="ytCycleSpeed()" id="yt-speed-btn">⏩ Speed: 1x</button>
@@ -431,20 +437,20 @@
                     <button class="btn btn-start" id="btn-start" onclick="openSubjectModal()">Start</button>
                     <button class="btn btn-pause" id="btn-pause" onclick="pauseStudy()" style="display:none;">Pause</button>
                     <button class="btn btn-break" id="btn-break" onclick="takeBreak()" style="display:none;">Break</button>
-                    <button class="btn btn-stop" id="btn-stop" onclick="endDay()" style="display:none;">End Day</button>
+                    <button class="btn btn-stop" id="btn-stop" onclick="endDay()" style="display:none;">End Session</button>
                 </div>
                 <div id="session-lock-note" class="small-note" style="display:none; color:var(--warning); text-align:center;"></div>
                 <div id="change-subject-box" style="display:none; margin-top:15px;">
                     <label for="switch-subject-select" style="font-size:12px; color:var(--muted);">Switch Subject Mid-Session:</label>
                     <select id="switch-subject-select" onchange="changeSubjectMidSession()">
                         <option value="Physics">Physics</option>
+                        <option value="Mathematics">Mathematics</option>
                         <option value="Organic Chemistry">Organic Chemistry</option>
                         <option value="Inorganic Chemistry">Inorganic Chemistry</option>
                         <option value="Physical Chemistry">Physical Chemistry</option>
-                        <option value="Mathematics">Mathematics</option>
                         <option value="Revision">Revision</option>
-                        <option value="School Preparation">School Preparation</option>
                         <option value="Mock Test / Analysis">Mock Test / Analysis</option>
+                        <option value="School Preparation">School Preparation</option>
                     </select>
                 </div>
             </div>
@@ -600,18 +606,33 @@
     </div>
 </div>
 
+<!-- Todo carryover: opened by carryOverIncompleteTodos() (planner.js) when
+     day-rollover finds undone tasks left on any earlier day. Replaces a
+     native confirm() dialog — see that function's comment for why the old
+     one was unreliable, especially on mobile. -->
+<div class="modal" id="carryover-modal">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3 id="carryover-modal-title" style="margin-top:0; font-size:16px;"></h3>
+        <div id="carryover-modal-list" style="max-height:240px; overflow-y:auto; font-size:13px; color:var(--text); scrollbar-width:thin; scrollbar-color:var(--border) var(--card);"></div>
+        <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:12px; align-items:center;">
+            <button class="btn btn-start" onclick="confirmCarryOverTodos()">Transfer to Today</button>
+            <button class="btn btn-stop btn-small" onclick="declineCarryOverTodos()">Not Now</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal" id="subject-modal">
     <div class="modal-content">
         <h3 style="margin-top:0;">Select Subject</h3>
         <select id="modal-subject-select" aria-label="Select subject">
             <option value="Physics">Physics</option>
+            <option value="Mathematics">Mathematics</option>
             <option value="Organic Chemistry">Organic Chemistry</option>
             <option value="Inorganic Chemistry">Inorganic Chemistry</option>
             <option value="Physical Chemistry">Physical Chemistry</option>
-            <option value="Mathematics">Mathematics</option>
             <option value="Revision">Revision</option>
-            <option value="School Preparation">School Preparation</option>
             <option value="Mock Test / Analysis">Mock Test / Analysis</option>
+            <option value="School Preparation">School Preparation</option>
         </select>
         <div style="margin-top:15px; display:flex; justify-content:flex-end; gap:12px; align-items:center;">
             <button class="btn btn-start" onclick="confirmStartStudy()">Begin Session</button>
@@ -632,6 +653,18 @@
         <h3 style="margin-top:0;">📻 Reminder</h3>
         <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark your attendance in the SM Radio YouTube channel!</p>
         <button class="btn btn-start" style="width:100%;" onclick="closeAttendanceReminderModal()">Got it</button>
+    </div>
+</div>
+
+<!-- Second morning nudge, right after the one above — reminds the user to
+     jot down today's study targets in their to-do list. Separate from the
+     Planner (which gets built the night before), see
+     openMorningTodoReminderModal() in sleep.js. -->
+<div class="modal" id="morning-todo-reminder-modal">
+    <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
+        <h3 style="margin-top:0;">📝 Reminder</h3>
+        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Also make a list of today's study to-dos/targets!</p>
+        <button class="btn btn-start" style="width:100%;" onclick="closeMorningTodoReminderModal()">Got it</button>
     </div>
 </div>
 

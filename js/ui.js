@@ -567,8 +567,13 @@ export function openSidebarPanel(name) {
 // rolloverInProgress guards against the 1-second tickCountdowns() interval
 // and a visibilitychange-triggered tick both calling in while the first
 // call is still awaiting that fetch — without it, a slow network could let
-// two overlapping calls both reach carryOverIncompleteTodos() and stack two
-// confirm() dialogs on top of each other for the same rollover.
+// two overlapping calls both run catchUpPlannerFromCloud() and
+// carryOverIncompleteTodos() concurrently for the same rollover.
+// carryOverIncompleteTodos() itself no longer blocks this function at all —
+// it now opens its own in-app modal and returns immediately (see its
+// comment in planner.js for why the old confirm()-based version was
+// unreliable), so today's UI renders right away regardless of when/whether
+// the user answers that modal.
 let rolloverInProgress = false;
 export async function checkDayRollover() {
     // BUG FIX: was `new Date().toISOString().split('T')[0]` (UTC date) —
@@ -582,7 +587,7 @@ export async function checkDayRollover() {
     try {
         await catchUpPlannerFromCloud();
         flushAndRestartSegment();
-        carryOverIncompleteTodos(getCurrentDayKey(), nowKey);
+        carryOverIncompleteTodos(nowKey);
         setCurrentDayKey(nowKey);
         renderQuoteOfDay(); initToday(); renderSidebarTools(); updateLiveSummary(); renderPlannerCalendar();
         let picker = document.getElementById("history-picker");

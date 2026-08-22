@@ -241,6 +241,21 @@ export function openAttendanceReminderModal() {
 }
 export function closeAttendanceReminderModal() {
     document.getElementById("attendance-reminder-modal").style.display = "none";
+    openMorningTodoReminderModal();
+}
+
+// Fires right after the morning attendance reminder is dismissed (see
+// closeAttendanceReminderModal() above) — a second, separate nudge to jot
+// down today's STUDY targets specifically (the small diary-style list of
+// just study goals), distinct from the general to-do Planner (which is
+// built the night before — see openTomorrowPlanner() below). Just an
+// acknowledgment, same shape as the attendance reminder it follows; it
+// doesn't open anything itself, it's only a nudge.
+export function openMorningTodoReminderModal() {
+    document.getElementById("morning-todo-reminder-modal").style.display = "flex";
+}
+export function closeMorningTodoReminderModal() {
+    document.getElementById("morning-todo-reminder-modal").style.display = "none";
 }
 
 // Fires at night once the "questions solved" step for the day is done (see

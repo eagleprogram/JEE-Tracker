@@ -5,7 +5,7 @@ import { getPlannerDB, savePlannerDB } from './storage.js';
 // Same pattern already used by notifications.js: only called inside function
 // bodies at runtime, never at module top-level, so it's safe once main.js
 // has wired the full module graph.
-import { showToast } from './ui.js';
+import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
 
 let calViewYear, calViewMonth;
 let plannerActiveDateKey = null;
@@ -65,7 +65,12 @@ export function renderSidebarTools() {
     let todoHtml = ""; if (tasks.length === 0) todoHtml = "<div style='color:var(--muted); font-size:12px; margin-top:8px;'>No tasks for today yet.</div>";
     let sortSelect = document.getElementById("todo-sort-select");
     let order = sortTaskIndices(tasks, sortSelect ? sortSelect.value : "priority-desc");
-    order.forEach(i => { let t = tasks[i]; todoHtml += `<div class="todo-item"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${i})"><span style="flex:1; ${t.done?'text-decoration:line-through;color:var(--muted);':''}">${getPriorityEmoji(t.priority)} ${escapeHtml(t.text)}</span><button class="del" onclick="deleteTodo(${i})">✕</button></div>`; });
+    // BUG FIX: the priority dot and the task text used to share one <span>,
+    // so the done-state line-through (and the muted color) struck through
+    // the emoji dot too — a strikethrough dash cutting across the colored
+    // dot. The dot now sits in its own span that never gets line-through;
+    // only the text span does.
+    order.forEach(i => { let t = tasks[i]; todoHtml += `<div class="todo-item"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${i})"><span style="flex:1;"><span class="priority-dot">${getPriorityEmoji(t.priority)}</span> <span style="${t.done?'text-decoration:line-through;color:var(--muted);':''}">${escapeHtml(t.text)}</span></span><button class="del" onclick="deleteTodo(${i})">✕</button></div>`; });
     document.getElementById("todo-list").innerHTML = todoHtml;
     let countBadge = document.getElementById("todo-count-badge");
     if (countBadge) countBadge.textContent = tasks.filter(t => !t.done).length;
@@ -88,31 +93,71 @@ export function deleteTodo(idx) {
     db[todayKey].splice(idx, 1); savePlannerDB(db); renderSidebarTools(); renderPlannerCalendar();
 }
 
-// Called once from checkDayRollover() (ui.js) at the exact moment local
-// midnight flips over. Any todo still unchecked on the day that just ended
-// is offered forward onto the new day's list instead of silently vanishing
-// onto a date the user will likely never revisit — the 8pm planner reminder
+// Called once from checkDayRollover() (ui.js) whenever local midnight is
+// detected to have flipped over. Any todo still unchecked on a past day is
+// offered forward onto today's list instead of silently vanishing onto a
+// date the user will likely never revisit — the 8pm planner reminder
 // (notifications.js) nudges them beforehand, but this is the last chance.
 // Completed tasks stay put on the day they were finished either way.
 //
-// The move now requires explicit confirmation (numbered list, one line per
-// task, each prefixed with its priority color so the user can see at a
-// glance what they'd be carrying forward) instead of moving automatically.
-// Declining leaves the incomplete tasks on the old day untouched — they'll
-// be offered again (re-numbered, priority-colored) on the NEXT rollover
-// too, so nothing is lost by saying no once.
-export function carryOverIncompleteTodos(oldDayKey, newDayKey) {
+// BUG FIX (persistent carryover failures — "sometimes it doesn't work,
+// sometimes it doesn't appear at all"): this used to gate the whole
+// transfer behind a native `confirm()` dialog, called synchronously from
+// inside checkDayRollover()'s async flow — often triggered by a
+// visibilitychange tick firing in the background (phone screen turning on
+// overnight, a laptop waking from sleep). Two things about that combination
+// are unreliable on real devices: (1) browsers can silently ignore/auto-
+// dismiss alert()/confirm()/prompt() calls that aren't tied to a direct tap
+// or click, especially from a backgrounded or not-yet-focused tab, so the
+// dialog sometimes just never appeared; (2) even when it did, the caller
+// (checkDayRollover()) advanced the stored "current day" pointer right
+// after this call returned NO MATTER what the user answered — so a
+// declined, or silently-swallowed, dialog permanently orphaned that day's
+// tasks: the pointer had already moved past them, and the next rollover
+// only ever looks at the single most-recent day, never that older one.
+//
+// Fixed by dropping confirm() for a normal in-app modal (works exactly like
+// every other dialog in this app, immune to the background-dialog-
+// suppression behavior above), and — the more important half of the fix —
+// no longer trusting a single "yesterday" pointer at all. Every call scans
+// the WHOLE planner DB for any day before today that still has undone
+// tasks sitting in it, however many days back and for whatever reason they
+// never got moved (a missed dialog, a decline, the app not being opened for
+// several days). That list is re-offered every single rollover until the
+// user actually accepts it or clears those tasks themselves — so nothing
+// ends up permanently stuck no matter what happened on any earlier attempt.
+let pendingCarryOver = null;
+export function carryOverIncompleteTodos(newDayKey) {
     let db = getPlannerDB();
-    let oldTasks = db[oldDayKey];
-    if (!oldTasks || oldTasks.length === 0) return;
-    let incomplete = oldTasks.filter(t => !t.done);
+    let staleDayKeys = Object.keys(db)
+        .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && k < newDayKey && (db[k] || []).some(t => !t.done))
+        .sort();
+    if (staleDayKeys.length === 0) return;
+
+    let incomplete = [];
+    staleDayKeys.forEach(k => (db[k] || []).filter(t => !t.done).forEach(t => incomplete.push(t)));
     if (incomplete.length === 0) return;
 
-    let isSingle = incomplete.length === 1;
-    let listText = incomplete.map((t, i) => `${i + 1}. ${getPriorityEmoji(t.priority)} ${t.text}`).join("\n");
-    let message = `You have ${incomplete.length} incomplete ${isSingle ? "task" : "tasks"} from yesterday:\n\n${listText}\n\nWould you like to transfer ${isSingle ? "it" : "them"} to today?`;
-    if (!confirm(message)) return;
+    pendingCarryOver = { staleDayKeys, newDayKey, incomplete };
+    renderCarryOverModal(incomplete);
+    document.getElementById("carryover-modal").style.display = "flex";
+    lockBodyScroll();
+}
 
+function renderCarryOverModal(incomplete) {
+    let isSingle = incomplete.length === 1;
+    document.getElementById("carryover-modal-title").textContent =
+        `You have ${incomplete.length} incomplete ${isSingle ? "task" : "tasks"} from before today:`;
+    document.getElementById("carryover-modal-list").innerHTML = incomplete
+        .map((t, i) => `<div class="carryover-item">${i + 1}. ${getPriorityEmoji(t.priority)} ${escapeHtml(t.text)}</div>`)
+        .join("");
+}
+
+// "Yes, transfer" button on the carryover modal.
+export function confirmCarryOverTodos() {
+    if (!pendingCarryOver) { closeCarryOverModal(); return; }
+    let { staleDayKeys, newDayKey, incomplete } = pendingCarryOver;
+    let db = getPlannerDB();
     // Bump updatedAt on every moved task. A task can end up listed under
     // BOTH the old and new day-key after a merge — e.g. this device carries
     // it over locally at the same moment a cloud snapshot (from before this
@@ -124,11 +169,27 @@ export function carryOverIncompleteTodos(oldDayKey, newDayKey) {
     // was updated most recently and dropping the stale duplicate — which
     // only works if "moved to a new day" itself counts as an update.
     let now = Date.now();
-    incomplete = incomplete.map(t => ({ ...t, updatedAt: now }));
-
-    db[oldDayKey] = oldTasks.filter(t => t.done);
-    db[newDayKey] = (db[newDayKey] || []).concat(incomplete);
+    staleDayKeys.forEach(k => { db[k] = (db[k] || []).filter(t => t.done); });
+    let moved = incomplete.map(t => ({ ...t, updatedAt: now }));
+    db[newDayKey] = (db[newDayKey] || []).concat(moved);
     savePlannerDB(db);
+    let count = moved.length;
+    closeCarryOverModal();
+    renderSidebarTools(); renderPlannerCalendar();
+    showToast(`Moved ${count} ${count === 1 ? "task" : "tasks"} to today.`);
+}
+
+// "Not now" button on the carryover modal — leaves the old tasks exactly
+// where they are (still on their original day, still undone), so they get
+// offered again on the next rollover instead of being lost.
+export function declineCarryOverTodos() {
+    closeCarryOverModal();
+}
+
+function closeCarryOverModal() {
+    pendingCarryOver = null;
+    document.getElementById("carryover-modal").style.display = "none";
+    unlockBodyScroll();
 }
 
 // ----------------- CALENDAR + PER-DAY PLANNER MODAL -----------------
@@ -200,7 +261,9 @@ export function renderPlannerTasks() {
     let html = ""; if (tasks.length === 0 && !isPast) html = "<div style='color:var(--muted); font-size:13px; margin-top:8px;'>No tasks yet.</div>";
     let sortSelect = document.getElementById("planner-sort-select");
     let order = sortTaskIndices(tasks, sortSelect ? sortSelect.value : "added");
-    order.forEach(i => { let t = tasks[i]; html += `<div class="task-item"><input type="checkbox" ${t.done ? 'checked' : ''} onchange="togglePlannerTask(${i})"><span class="task-text ${t.done ? 'done' : ''}">${getPriorityEmoji(t.priority)} ${escapeHtml(t.text)}</span><button class="del" onclick="deletePlannerTask(${i})">✕</button></div>`; });
+    // Same fix as renderSidebarTools() above — dot isolated from the
+    // line-through so the strike only crosses the task text, not the dot.
+    order.forEach(i => { let t = tasks[i]; html += `<div class="task-item"><input type="checkbox" ${t.done ? 'checked' : ''} onchange="togglePlannerTask(${i})"><span class="task-text"><span class="priority-dot">${getPriorityEmoji(t.priority)}</span> <span class="${t.done ? 'done' : ''}">${escapeHtml(t.text)}</span></span><button class="del" onclick="deletePlannerTask(${i})">✕</button></div>`; });
     document.getElementById("planner-task-list").innerHTML = html;
 }
 
