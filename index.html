@@ -4,6 +4,60 @@
     <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=0.85, viewport-fit=cover">
+    <script>
+    // Auto "pinch out to fit" for mobile — replaces the fixed 0.85
+    // initial-scale above with whatever scale actually makes the full
+    // layout fit on screen with no horizontal scroll, on every load and
+    // refresh. This changes ONLY the page's rendered zoom level, exactly
+    // like a manual pinch gesture would — no CSS dimension (font size,
+    // padding, card width, etc.) is touched anywhere; the layout itself
+    // is identical, just rendered smaller so all of it is visible at once.
+    //
+    // Desktop (>850px) is intentionally left running the exact original
+    // "initial-scale=0.85" content string — ORIGINAL_VIEWPORT below is
+    // that same string, restored verbatim whenever this runs on a wider
+    // screen, so nothing changes there at all.
+    (function () {
+        var ORIGINAL_VIEWPORT = "width=device-width, initial-scale=0.85, viewport-fit=cover";
+        function fitMobileViewport() {
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (!meta) return;
+            // Reset to a neutral 1x scale first so the scrollWidth read
+            // below reflects the page's true, un-zoomed required width —
+            // otherwise measuring while already scaled from a previous
+            // run (e.g. a prior orientation change) would compound.
+            meta.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover");
+            // Two animation-frame waits: one for the browser to actually
+            // apply the scale-1 reflow, one more so the measurement below
+            // reads the settled layout rather than a mid-reflow value.
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    if (window.innerWidth > 850) { meta.setAttribute("content", ORIGINAL_VIEWPORT); return; }
+                    var neededWidth = document.documentElement.scrollWidth;
+                    var haveWidth = window.innerWidth;
+                    if (!neededWidth || !haveWidth) return;
+                    var scale = haveWidth / neededWidth;
+                    // Never zoom IN past 1x (a page narrower than the screen
+                    // shouldn't get blown up), and never below 0.4 (guards
+                    // against an unreadably tiny page if scrollWidth is ever
+                    // thrown off by a stray off-screen element).
+                    scale = Math.max(0.4, Math.min(1, scale));
+                    meta.setAttribute("content", "width=device-width, initial-scale=" + scale.toFixed(3) + ", viewport-fit=cover");
+                });
+            });
+        }
+        // 'load' (not just DOMContentLoaded) so late-applied webfonts —
+        // which can change measured card/text widths — are already in by
+        // the time we measure. DOMContentLoaded also runs first for a
+        // faster initial pass; 'load' then corrects it if fonts shifted
+        // anything. orientationchange/pageshow re-fit on rotation and on
+        // browser back-forward-cache restores (e.g. iOS Safari).
+        document.addEventListener("DOMContentLoaded", fitMobileViewport);
+        window.addEventListener("load", fitMobileViewport);
+        window.addEventListener("orientationchange", function () { setTimeout(fitMobileViewport, 300); });
+        window.addEventListener("pageshow", function (e) { if (e.persisted) fitMobileViewport(); });
+    })();
+    </script>
     <title>JEE 2027 Study Tracker & Planner</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#070b14">
