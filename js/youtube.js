@@ -11,6 +11,15 @@ let ytIsPlaying = false;
 // title it just resolved still belongs to what's on screen before using it
 // to update the "Now Playing" label.
 let ytCurrentId = null;
+// Volume sync: our slider pushes to the player on every drag (ytSetVolume,
+// wired inline below), but the native control bar's own volume slider is
+// inside the iframe — cross-origin, so we can't listen to it directly. This
+// interval polls getVolume() instead, which reflects the player's actual
+// level no matter which UI changed it, and mirrors it back onto our
+// slider. ytVolumeDragging guards against the poll fighting an in-progress
+// drag on our own slider.
+let ytVolumeSyncInterval = null;
+let ytVolumeDragging = false;
 // Cycled by ytCycleSpeed() below — 1x sits in the middle so the common
 // "slightly faster" bump (1.25x/1.5x) is one tap away either direction from
 // the default, same spirit as the Loop toggle being one tap.
@@ -52,19 +61,19 @@ export function createOrLoadYTPlayer(id) {
     if (ytPlayer && ytPlayer.loadVideoById) { ytPlayer.loadVideoById(id); return; }
     let container = document.getElementById('yt-player');
     if (!container) return;
+    bindVolumeSliderDragTracking();
     ytPlayer = new YT.Player('yt-player', {
         // Fills whatever box #yt-player sits in — that box is intentionally
-        // rendered at 2x the visible player's size and then CSS-scaled back
-        // down by 0.5 (see .yt-player-shrink in components.css). YouTube
-        // lays out its native control bar's buttons at roughly the same
-        // fixed pixel size regardless of how narrow the iframe is asked to
-        // be — that's what made them look oversized on a player this
-        // narrow. Giving the iframe itself double the room to lay those
-        // buttons out in, then shrinking the whole rendered result (video
-        // and controls together) back down with one CSS transform, is what
-        // actually makes the buttons appear smaller on screen — a plain
-        // narrower iframe alone doesn't, since the buttons don't shrink
-        // with it below their own minimum.
+        // rendered larger than the visible player and then CSS-scaled back
+        // down (see .yt-player-shrink in components.css). YouTube lays out
+        // its native control bar's buttons at roughly a fixed pixel size
+        // regardless of how narrow the iframe is asked to be — that's what
+        // made them look oversized on a player this narrow. Giving the
+        // iframe extra room to lay those buttons out in, then shrinking the
+        // whole rendered result (video and controls together) back down
+        // with one CSS transform, is what actually makes the buttons appear
+        // smaller on screen — a plain narrower iframe alone doesn't, since
+        // the buttons don't shrink with it below their own minimum.
         height: '100%', width: '100%', videoId: id,
         host: 'https://www.youtube-nocookie.com',
         // Back to YouTube's normal control bar — controls:0 (an earlier
@@ -82,6 +91,7 @@ export function createOrLoadYTPlayer(id) {
                 // loadVideoById branch resets YouTube's own rate to 1x, but
                 // our button/state should stay consistent with what's shown).
                 if (ytPlaybackRate !== 1) e.target.setPlaybackRate(ytPlaybackRate);
+                startYtVolumeSync();
             },
             onStateChange: (e) => {
                 if (ytLoopEnabled && e.data === YT.PlayerState.ENDED) { ytPlayer.seekTo(0); ytPlayer.playVideo(); }
@@ -223,6 +233,33 @@ export function ytTogglePlay() {
 
 export function ytSetVolume(v) { if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(v); }
 
+// Marks our slider as "being dragged" so the poll below doesn't yank the
+// handle mid-gesture. Bound once per slider element (dataset flag guards
+// against re-binding on every load) since createOrLoadYTPlayer() runs on
+// every video load, not just the first.
+function bindVolumeSliderDragTracking() {
+    let slider = document.getElementById("yt-volume");
+    if (!slider || slider.dataset.dragTrackingBound) return;
+    slider.dataset.dragTrackingBound = "1";
+    slider.addEventListener("pointerdown", () => { ytVolumeDragging = true; });
+    let release = () => { ytVolumeDragging = false; };
+    slider.addEventListener("pointerup", release);
+    slider.addEventListener("pointercancel", release);
+}
+function startYtVolumeSync() {
+    stopYtVolumeSync();
+    ytVolumeSyncInterval = setInterval(() => {
+        if (!ytPlayer || !ytPlayer.getVolume || ytVolumeDragging) return;
+        let slider = document.getElementById("yt-volume");
+        if (!slider || document.activeElement === slider) return;
+        let live = Math.round(ytPlayer.getVolume());
+        if (String(live) !== slider.value) slider.value = live;
+    }, 1000);
+}
+function stopYtVolumeSync() {
+    if (ytVolumeSyncInterval) { clearInterval(ytVolumeSyncInterval); ytVolumeSyncInterval = null; }
+}
+
 export function ytToggleLoop() {
     ytLoopEnabled = !ytLoopEnabled;
     document.getElementById("yt-loop-btn").innerText = `🔁 Loop: ${ytLoopEnabled ? "On" : "Off"}`;
@@ -253,6 +290,8 @@ export function ytClosePlayer() {
         } catch (e) { /* non-fatal — we're tearing it down anyway */ }
         ytPlayer = null;
     }
+    stopYtVolumeSync();
+    ytVolumeDragging = false;
     ytIsPlaying = false;
     ytPendingVideoId = null;
     ytCurrentId = null;

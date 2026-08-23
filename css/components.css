@@ -547,13 +547,15 @@ button.del:hover { color: #fca5a5; }
    var(--text), which read as too stark for a label that's just there for
    reference — but still white rather than var(--muted)'s gray-blue. */
 .yt-now-playing { margin-top: 6px; padding: 6px 8px; font-size: 12px; color: rgba(241, 245, 249, 0.72); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Renders the YouTube iframe at 2x this box's own size, then scales the
-   whole thing back down 0.5x — see createOrLoadYTPlayer()'s comment in
-   youtube.js for why this (rather than a narrower iframe alone) is what
-   actually shrinks the native control bar's buttons on screen, while
-   keeping every native feature (captions, quality, fullscreen) intact. */
+/* Renders the YouTube iframe larger than this box, then scales the whole
+   thing back down — see createOrLoadYTPlayer()'s comment in youtube.js for
+   why this (rather than a narrower iframe alone) is what actually changes
+   the native control bar's on-screen button size, while keeping every
+   native feature (captions, quality, fullscreen) intact. 160%/0.625 is a
+   middle ground: the very first (unshrunk, 100%/no-scale) render had
+   oversized buttons; 200%/0.5 swung the other way and made them too tiny. */
 .yt-player-shrink { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #000; }
-.yt-player-shrink #yt-player, .yt-player-shrink iframe { position: absolute; top: 0; left: 0; width: 200%; height: 200%; transform: scale(0.5); transform-origin: top left; border: 0; }
+.yt-player-shrink #yt-player, .yt-player-shrink iframe { position: absolute; top: 0; left: 0; width: 160%; height: 160%; transform: scale(0.625); transform-origin: top left; border: 0; }
 .yt-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 .yt-controls button { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
 /* Small red "close player" button — sits after Loop in the same row.
@@ -564,6 +566,14 @@ button.del:hover { color: #fca5a5; }
 .yt-close-btn { background: rgba(var(--tint-rose), 0.12) !important; border: 1px solid rgba(var(--tint-rose), 0.4) !important; color: rgb(var(--tint-rose)) !important; font-weight: 700; }
 .yt-close-btn:hover { background: rgba(var(--tint-rose), 0.22) !important; }
 .yt-controls input[type="range"] { flex: 1; }
+/* Thinner volume track than the browser default (which reads as a thick
+   blue bar) — same slim look as the app's other sliders. Chrome/Firefox
+   need separate vendor rules since neither reads the other's. */
+.yt-volume-slider { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; }
+.yt-volume-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--border); }
+.yt-volume-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--primary); margin-top: -4.5px; }
+.yt-volume-slider::-moz-range-track { height: 4px; border-radius: 2px; background: var(--border); }
+.yt-volume-slider::-moz-range-thumb { width: 13px; height: 13px; border: none; border-radius: 50%; background: var(--primary); }
 /* scrollbar-width/color + the ::-webkit-scrollbar rules below match the
    thin track used by #todo-list and .sidebar — without them this panel
    fell back to the browser's default (much thicker) scrollbar, which is
