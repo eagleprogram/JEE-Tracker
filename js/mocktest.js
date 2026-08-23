@@ -2,7 +2,7 @@ import { escapeHtml, fileToDataURL, getTodayKey, formatDateDDMMYY, downloadBlob 
 import { openMockDB, getAllMockTests, MOCK_STORE } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
-import { showToast } from './ui.js';
+import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
 
 export const MISTAKE_TAGS = ["Silly mistake", "Concept gap", "Time pressure", "Calculation error", "Misread question", "Not revised", "Panic/anxiety", "Guessed wrong", "Formula error", "Skipped step", "Overconfidence", "Other"];
 let selectedMistakeTags = [];
@@ -166,11 +166,15 @@ export async function viewMockFile(entryId, fileIdx) {
     currentModalFile = f;
     document.getElementById("mock-file-modal-body").innerHTML = `<img src="${f.dataUrl}" style="max-width:100%; border-radius:8px;">`;
     document.getElementById("mock-file-modal").style.display = "flex";
+    // BUG FIX: same missing scroll-lock as the Tasks/carryover modals —
+    // see lockBodyScroll()'s callers elsewhere for the pattern.
+    lockBodyScroll();
 }
 
 export function closeMockFileModal() {
     document.getElementById("mock-file-modal").style.display = "none";
     currentModalFile = null;
+    unlockBodyScroll();
 }
 
 // Renames an attachment for the flat export below — same pattern as

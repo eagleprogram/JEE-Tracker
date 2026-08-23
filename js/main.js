@@ -61,7 +61,7 @@ import {
 import {
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
-    ytClosePlayer, ytCycleSpeed, ytSeekPreview, ytSeekCommit
+    ytClosePlayer, ytCycleSpeed
 } from './youtube.js';
 
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
@@ -160,7 +160,7 @@ Object.assign(window, {
     // youtube.js
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
-    ytClosePlayer, ytCycleSpeed, ytSeekPreview, ytSeekCommit,
+    ytClosePlayer, ytCycleSpeed,
     // reports.js
     downloadDayLog, shareDayLog, sendReportViaEmail, downloadReport, shareReport,
     // backup.js

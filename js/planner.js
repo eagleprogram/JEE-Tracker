@@ -218,10 +218,17 @@ export function openPlannerModal(key) {
     input.value = ""; input.disabled = isPast; addBtn.disabled = isPast; addBtn.style.opacity = isPast ? "0.4" : "1"; input.placeholder = isPast ? "Cannot add tasks for a past date" : "Add task for this day...";
     if (prioritySel) prioritySel.disabled = isPast;
     renderPlannerTasks(); document.getElementById("planner-modal").style.display = "flex";
+    // BUG FIX: this modal never called lockBodyScroll() (every other modal
+    // in the app does — see the carryover modal above for the same pattern)
+    // so the page behind it kept scrolling while it was open. Reported as
+    // "background scrolling is coming" when opening a day's Tasks list from
+    // the planner calendar.
+    lockBodyScroll();
 }
 
 export function closePlannerModal() {
     document.getElementById("planner-modal").style.display = "none"; renderPlannerCalendar(); renderSidebarTools();
+    unlockBodyScroll();
 }
 
 export function addPlannerTask() {

@@ -53,19 +53,26 @@ export function createOrLoadYTPlayer(id) {
     let container = document.getElementById('yt-player');
     if (!container) return;
     ytPlayer = new YT.Player('yt-player', {
-        height: '160', width: '100%', videoId: id,
+        // Fills whatever box #yt-player sits in — that box is intentionally
+        // rendered at 2x the visible player's size and then CSS-scaled back
+        // down by 0.5 (see .yt-player-shrink in components.css). YouTube
+        // lays out its native control bar's buttons at roughly the same
+        // fixed pixel size regardless of how narrow the iframe is asked to
+        // be — that's what made them look oversized on a player this
+        // narrow. Giving the iframe itself double the room to lay those
+        // buttons out in, then shrinking the whole rendered result (video
+        // and controls together) back down with one CSS transform, is what
+        // actually makes the buttons appear smaller on screen — a plain
+        // narrower iframe alone doesn't, since the buttons don't shrink
+        // with it below their own minimum.
+        height: '100%', width: '100%', videoId: id,
         host: 'https://www.youtube-nocookie.com',
-        // controls:0 hides YouTube's own control bar entirely — that bar's
-        // buttons (CC/settings/fullscreen/volume) render at a fixed native
-        // size YouTube itself sets, and CSS can't reach into the iframe to
-        // shrink them; on a player this narrow they end up oversized and
-        // crowd out the ones people actually need. The custom row below
-        // (seek bar + Play/Pause/Speed/Loop/Close, already on the page)
-        // replaces it with something sized to fit here. disablekb keeps
-        // stray keyboard shortcuts from reaching a hidden control surface;
-        // fs:0/iv_load_policy:3/modestbranding:1 drop the fullscreen button,
-        // video annotations, and YouTube logo the native bar would've had.
-        playerVars: { rel: 0, origin: window.location.origin, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1 },
+        // Back to YouTube's normal control bar — controls:0 (an earlier
+        // attempt at the same "buttons too big" complaint) hid captions,
+        // quality/settings, and fullscreen along with everything else,
+        // which wasn't the ask; only the size was. The .yt-player-shrink
+        // wrapper above is what actually addresses the size.
+        playerVars: { rel: 0, origin: window.location.origin },
         events: {
             onReady: (e) => {
                 e.target.setVolume(parseInt(document.getElementById("yt-volume").value));
@@ -75,15 +82,12 @@ export function createOrLoadYTPlayer(id) {
                 // loadVideoById branch resets YouTube's own rate to 1x, but
                 // our button/state should stay consistent with what's shown).
                 if (ytPlaybackRate !== 1) e.target.setPlaybackRate(ytPlaybackRate);
-                updateYtProgress();
             },
             onStateChange: (e) => {
                 if (ytLoopEnabled && e.data === YT.PlayerState.ENDED) { ytPlayer.seekTo(0); ytPlayer.playVideo(); }
                 ytIsPlaying = (e.data === YT.PlayerState.PLAYING);
                 let btn = document.getElementById("yt-playpause-btn");
                 if (btn) btn.innerText = ytIsPlaying ? "⏸ Pause" : "▶ Play";
-                if (ytIsPlaying) startYtProgressLoop(); else stopYtProgressLoop();
-                if (e.data === YT.PlayerState.ENDED && !ytLoopEnabled) updateYtProgress();
             },
             onError: (e) => {
                 let reasons = { 2: "Invalid video link.", 5: "Can't play in embedded player.", 100: "Video not found.", 101: "Embedding disabled.", 150: "Embedding disabled." };
@@ -219,58 +223,6 @@ export function ytTogglePlay() {
 
 export function ytSetVolume(v) { if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(v); }
 
-// ----------------- CUSTOM SEEK BAR -----------------
-// Replaces the scrubbing YouTube's native control bar used to provide
-// (hidden now via controls:0 above — see createOrLoadYTPlayer()'s comment).
-let ytProgressInterval = null;
-// True for as long as the user has the seek handle down — the polling loop
-// below skips updating the bar/time while true so a live position update
-// doesn't fight the drag and yank the handle back mid-gesture.
-let ytSeeking = false;
-
-function startYtProgressLoop() {
-    stopYtProgressLoop();
-    ytProgressInterval = setInterval(updateYtProgress, 500);
-}
-function stopYtProgressLoop() {
-    if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
-}
-function formatYtTime(sec) {
-    sec = Math.max(0, Math.floor(sec || 0));
-    let m = Math.floor(sec / 60), s = sec % 60;
-    return `${m}:${String(s).padStart(2, "0")}`;
-}
-function updateYtProgress() {
-    if (!ytPlayer || ytSeeking || !ytPlayer.getCurrentTime) return;
-    let cur = ytPlayer.getCurrentTime() || 0;
-    let dur = ytPlayer.getDuration() || 0;
-    let seekEl = document.getElementById("yt-seek");
-    let curEl = document.getElementById("yt-current-time");
-    let durEl = document.getElementById("yt-duration-time");
-    if (seekEl && dur > 0) seekEl.value = (cur / dur) * 100;
-    if (curEl) curEl.textContent = formatYtTime(cur);
-    if (durEl) durEl.textContent = formatYtTime(dur);
-}
-// Fires continuously while the handle is being dragged (range input's
-// `oninput`) — updates only the time label so it tracks the drag; the
-// actual seek only happens once on release (ytSeekCommit), since seeking
-// the real player on every pixel of drag would be choppy and wasteful.
-export function ytSeekPreview(percent) {
-    ytSeeking = true;
-    if (!ytPlayer || !ytPlayer.getDuration) return;
-    let dur = ytPlayer.getDuration() || 0;
-    let curEl = document.getElementById("yt-current-time");
-    if (curEl) curEl.textContent = formatYtTime((percent / 100) * dur);
-}
-// Fires once on release (range input's `onchange`) — commits the seek.
-export function ytSeekCommit(percent) {
-    if (ytPlayer && ytPlayer.seekTo && ytPlayer.getDuration) {
-        let dur = ytPlayer.getDuration() || 0;
-        ytPlayer.seekTo((percent / 100) * dur, true);
-    }
-    ytSeeking = false;
-}
-
 export function ytToggleLoop() {
     ytLoopEnabled = !ytLoopEnabled;
     document.getElementById("yt-loop-btn").innerText = `🔁 Loop: ${ytLoopEnabled ? "On" : "Off"}`;
@@ -301,8 +253,6 @@ export function ytClosePlayer() {
         } catch (e) { /* non-fatal — we're tearing it down anyway */ }
         ytPlayer = null;
     }
-    stopYtProgressLoop();
-    ytSeeking = false;
     ytIsPlaying = false;
     ytPendingVideoId = null;
     ytCurrentId = null;
@@ -315,12 +265,6 @@ export function ytClosePlayer() {
     if (input) { input.style.display = ""; input.value = ""; }
     let nowPlaying = document.getElementById("yt-now-playing");
     if (nowPlaying) nowPlaying.style.display = "none";
-    let seekEl = document.getElementById("yt-seek");
-    if (seekEl) seekEl.value = 0;
-    let curEl = document.getElementById("yt-current-time");
-    if (curEl) curEl.textContent = "0:00";
-    let durEl = document.getElementById("yt-duration-time");
-    if (durEl) durEl.textContent = "0:00";
     let playBtn = document.getElementById("yt-playpause-btn");
     if (playBtn) playBtn.innerText = "▶ Play";
     let loopBtn = document.getElementById("yt-loop-btn");

@@ -16,7 +16,7 @@ import { formatDateDDMMYY, getTodayKey, dateKeyFromWall } from './utils.js';
 import { getDB, saveDB, initDay, ensureDayShape } from './storage.js';
 // Forward reference — ui.js lands in a later step. Only called inside
 // function bodies, safe once the full module graph is wired in main.js.
-import { showToast } from './ui.js';
+import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
 import { renderHeatmap } from './charts.js';
 import { getWeekOffset, mondayForOffset } from './week-nav.js';
 
@@ -61,6 +61,9 @@ export function openQuestionsModal(dateKey) {
     document.getElementById("questions-modal-date").innerText = formatDateDDMMYY(dateKey);
     document.getElementById("questions-count-input").value = day.questionsSolved > 0 ? day.questionsSolved : "";
     document.getElementById("questions-modal").style.display = "flex";
+    // BUG FIX: same missing scroll-lock as the other modals — see
+    // lockBodyScroll()'s callers elsewhere for the pattern.
+    lockBodyScroll();
     setTimeout(() => { let inp = document.getElementById("questions-count-input"); if (inp) inp.focus(); }, 50);
 }
 
@@ -72,6 +75,7 @@ export function openTodayQuestionsModal() { openQuestionsModal(getTodayKey()); }
 
 export function closeQuestionsModal() {
     document.getElementById("questions-modal").style.display = "none";
+    unlockBodyScroll();
     activeQuestionsDateKey = null;
     // Fire (and clear) any chain callback exactly once, however this modal
     // ended — Save, Back, or Delete all funnel through here. Cleared before

@@ -107,12 +107,7 @@
             </div>
             <div class="yt-history-panel" id="yt-history-panel"></div>
             <div class="yt-player-wrap" id="yt-player-wrap" style="display:none;">
-                <div id="yt-player"></div>
-                <div class="yt-progress-row">
-                    <span class="yt-time" id="yt-current-time">0:00</span>
-                    <input type="range" id="yt-seek" aria-label="Seek" min="0" max="100" value="0" step="0.1" oninput="ytSeekPreview(this.value)" onchange="ytSeekCommit(this.value)">
-                    <span class="yt-time" id="yt-duration-time">0:00</span>
-                </div>
+                <div class="yt-player-shrink"><div id="yt-player"></div></div>
                 <div class="yt-controls">
                     <button onclick="ytTogglePlay()" id="yt-playpause-btn">▶ Play</button>
                     <button onclick="ytCycleSpeed()" id="yt-speed-btn">⏩ Speed: 1x</button>

@@ -2,7 +2,7 @@ import { formatDateDDMMYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWa
 import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getNotifSettings } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
-import { showToast } from './ui.js';
+import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
 // Refreshes the missed-break time inputs' min/max the instant a wake time is
 // saved, so History's "Add Missed Break" reflects it immediately without
 // requiring the user to touch the history date picker first.
@@ -238,9 +238,17 @@ export function saveSleepLog() {
 // CASE 2 above).
 export function openAttendanceReminderModal() {
     document.getElementById("attendance-reminder-modal").style.display = "flex";
+    // BUG FIX: this whole modal chain (attendance → morning todo → evening
+    // attendance → tomorrow's Planner) never locked background scroll —
+    // see lockBodyScroll()'s callers elsewhere for the pattern. Each open
+    // below takes the shared lock and its matching close releases it;
+    // since a close here immediately opens the next modal in the chain
+    // synchronously, the lock/unlock overlaps with no visible gap.
+    lockBodyScroll();
 }
 export function closeAttendanceReminderModal() {
     document.getElementById("attendance-reminder-modal").style.display = "none";
+    unlockBodyScroll();
     openMorningTodoReminderModal();
 }
 
@@ -253,9 +261,11 @@ export function closeAttendanceReminderModal() {
 // doesn't open anything itself, it's only a nudge.
 export function openMorningTodoReminderModal() {
     document.getElementById("morning-todo-reminder-modal").style.display = "flex";
+    lockBodyScroll();
 }
 export function closeMorningTodoReminderModal() {
     document.getElementById("morning-todo-reminder-modal").style.display = "none";
+    unlockBodyScroll();
 }
 
 // Fires at night once the "questions solved" step for the day is done (see
@@ -270,9 +280,11 @@ export function closeMorningTodoReminderModal() {
 export function openEveningAttendanceReminderModal() {
     if (!getNotifSettings().smRadioReminders) { openTomorrowPlanner(); return; }
     document.getElementById("evening-attendance-modal").style.display = "flex";
+    lockBodyScroll();
 }
 export function closeEveningAttendanceReminderModal() {
     document.getElementById("evening-attendance-modal").style.display = "none";
+    unlockBodyScroll();
     openTomorrowPlanner();
 }
 function openTomorrowPlanner() {
