@@ -31,6 +31,13 @@ body.panel-open { padding-left: 440px; }
    dead zone: the sidebar and the main content now switch to mobile layout
    at the exact same width, together. */
 @media (max-width: 850px) {
+    /* How much smaller the mobile dashboard renders by default (see the
+       .main-wrapper rule further down this block for the mechanism).
+       0.62 measured directly against this file's actual current content —
+       re-check it (temporarily set to 1 and look for the widest overflowing
+       element) if cards/sections are added or substantially resized later,
+       since it's a snapshot of today's content width, not a physical law. */
+    :root { --mobile-scale: 0.75; }
     body { padding-left: 64px; }
     body.panel-open { padding-left: 64px; }
     .sidebar { width: 48px; }
@@ -391,12 +398,23 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     /* Reports row: switched from flex-basis+min-width (which could still
        overflow on narrower phones once min-width's floor exceeded the
        actual available half-column) to a real 2-column grid. minmax(0,1fr)
-       guarantees each column is always exactly half the row minus gap —
-       button labels wrap within that fixed width instead of ever pushing
-       the row wider than its card. Desktop's single-row .btn-row-fit is
-       untouched above 850px. */
+       guarantees each column TRACK is always exactly half the row minus
+       gap — but the buttons themselves (.btn-compact, components.css)
+       still carry white-space:nowrap, and a grid ITEM's own default
+       min-width is "auto" (= its content's un-wrapped min-content size),
+       not 0, regardless of what the track's minmax() says. Neither of
+       those was overridden here, so a label like "Download Monthly
+       Report" simply refused to wrap and forced its column — and via that,
+       the grid, .main-wrapper, and the whole page's horizontal scroll
+       width — out to fit it, ~800px+ on a 392px phone. That's the actual,
+       measured cause of the reported "app is zoomed in / needs pinching
+       out to see everything": one row far down the page silently forcing
+       the ENTIRE page wider than any phone screen, not a zoom-level
+       problem at all. white-space:normal + min-width:0 here is what
+       actually makes "wrap within a fixed width" (the comment above's
+       original intent) happen. */
     .btn-row-fit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-    .btn-row-fit .btn { flex: initial; width: 100%; box-sizing: border-box; padding: 10px 8px; font-size: 12px; line-height: 1.3; }
+    .btn-row-fit .btn { flex: initial; width: 100%; min-width: 0; box-sizing: border-box; padding: 10px 8px; font-size: 12px; line-height: 1.3; white-space: normal; text-align: center; }
 
     /* Total Study / Total Break: bumped again from 13.5px — still visible
        unused width to the right of "Total Break: 0h 0m 0s" at that size.
@@ -437,17 +455,59 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
 
     /* ===== "Zoomed out" default density =====
        Requested repeatedly: the mobile dashboard should look like a
-       deliberately denser view by default, not require the person to
-       pinch-zoom out themselves to see more per screen. `zoom` (supported
-       in Chromium- and WebKit-based browsers, including Brave/Chrome on
-       Android, and in Firefox since 2024) uniformly shrinks everything
-       inside main-wrapper — text, spacing, every fixed px value — exactly
-       like an actual pinch-zoom-out would, without the blurriness or
-       tap-hit-testing issues transform:scale() has for this. Scoped to
-       .main-wrapper only, not body/.sidebar, so the drawer keeps the
-       sizing already tuned above. */
-    .main-wrapper { zoom: 0.85; }
+       deliberately denser view by default (matching what a manual
+       pinch-out gesture produces), not require the person to do that
+       themselves every time the app loads.
+
+       A previous version of this rule used `zoom`, reasoning it was the
+       one CSS mechanism that shrinks layout uniformly (text, spacing,
+       every px value) the way an actual pinch-out does. Tested directly
+       (rendering this page in a real browser engine at zoom:0.6 vs
+       zoom:0.85 and comparing screenshots) that reasoning turned out to
+       be wrong in practice: `zoom` produced IDENTICAL rendered output at
+       every value tried — the property was accepted (getComputedStyle
+       reported it back correctly) but never actually changed what got
+       painted. That silent no-op — not the specific number chosen — is
+       almost certainly why the app still looked "zoomed in" no matter
+       what value was tried before.
+
+       transform:scale(), tested the same way, DID visibly shrink
+       everything as expected — it's the standards-track, universally-
+       supported mechanism for this (zoom is a much older, inconsistently
+       implemented property). Its one real cost: transform is paint-only,
+       so the browser still reserves the element's pre-scale footprint in
+       the page's layout/scroll area, leaving dead space below and to the
+       right unless something else corrects for it. The two rules below
+       are exactly that correction — sized in %, off the actual
+       containing-block width main-wrapper already gets (not a hardcoded
+       px guess), so it's automatically correct at any padding/sidebar
+       width this stylesheet uses. See the matching JS in index.html for
+       the (small, unavoidable) vertical half of the same correction —
+       transform doesn't shrink scrollHeight either, and unlike the
+       horizontal side there's no way to express "this element's height
+       should be its own scaled scrollHeight" in CSS alone.
+
+       Selector is `body .main-wrapper`, not plain `.main-wrapper`: this
+       file has several other mobile-scoped `.main-wrapper { width: ... }`
+       rules elsewhere (padding tweaks at a few breakpoints, and one that
+       resets width:100% for the drawer-open state) at equal specificity
+       to a plain `.main-wrapper` selector — whichever is physically
+       LATEST in the file would silently win the cascade and clobber this
+       rule's width, which is exactly what was happening here (confirmed
+       by literally setting this width to 9999px and watching the
+       computed style stay unchanged). Adding the `body` ancestor gives
+       this rule higher specificity than any of those, so it wins
+       regardless of where in the file they sit — including ones added
+       later — without needing to hunt down and reorder every one of them
+       by hand. */
+    body .main-wrapper {
+        flex: 0 0 auto;
+        width: calc(100% / var(--mobile-scale));
+        transform: scale(var(--mobile-scale));
+        transform-origin: top left;
+    }
 }
+
 
 /* Extra pass for genuinely small phones (~480px and under): the header's
    three countdown chips (150px min-width each) don't comfortably fit
