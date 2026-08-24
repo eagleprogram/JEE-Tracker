@@ -768,42 +768,5 @@
         <button class="btn btn-stop" onclick="stopAlarmLoop()" style="font-size: 18px; padding: 14px 20px; width: 100%; border-radius: 10px;">STOP ALARM</button>
     </div>
 </div>
-<script>
-// ===== Mobile dashboard scale — height half of the fix =====
-// css/base.css's mobile .main-wrapper rule shrinks the whole dashboard with
-// transform:scale(var(--mobile-scale)) — verified (by rendering this page
-// and comparing screenshots at different values) to actually work, unlike
-// the CSS `zoom` property this used to use, which silently painted
-// identically at every value tried despite reporting the change back via
-// getComputedStyle. transform is paint-only, though: the browser still
-// reserves .main-wrapper's full PRE-scale height in the page's scrollable
-// area, leaving blank dead space below the visually-shrunk content unless
-// something corrects for it. That correction is the one thing CSS alone
-// can't express ("this element's reserved height should equal its own
-// scaled scrollHeight" isn't expressible without JS), so this script's only
-// job is keeping margin-bottom in sync with that gap — it never touches
-// zoom, viewport scale, or any element's actual size/position, and it does
-// nothing at all above the 850px breakpoint (desktop keeps its normal,
-// unmodified height).
-(function () {
-    function syncMobileScaleHeight() {
-        var mw = document.querySelector(".main-wrapper");
-        if (!mw) return;
-        if (window.innerWidth > 850) { mw.style.marginBottom = ""; return; }
-        var scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--mobile-scale")) || 1;
-        var naturalHeight = mw.scrollHeight; // layout height, unaffected by mw's own transform
-        var phantom = naturalHeight * (1 - scale);
-        mw.style.marginBottom = phantom > 0 ? "-" + phantom.toFixed(1) + "px" : "";
-    }
-    if (document.querySelector(".main-wrapper")) {
-        var ro = new ResizeObserver(syncMobileScaleHeight);
-        ro.observe(document.querySelector(".main-wrapper"));
-    }
-    window.addEventListener("resize", syncMobileScaleHeight);
-    window.addEventListener("orientationchange", function () { setTimeout(syncMobileScaleHeight, 300); });
-    document.addEventListener("DOMContentLoaded", syncMobileScaleHeight);
-    window.addEventListener("load", syncMobileScaleHeight);
-})();
-</script>
 </body>
 </html>
