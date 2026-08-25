@@ -145,7 +145,7 @@ function questionRingColor(count) {
     return null;                             // no data logged yet
 }
 
-function questionRingSVG(count) {
+function questionRingSVG(count, clickable) {
     // Ring bumped up from the old r=24/cx,cy=30/viewBox 60x60 — kept the
     // same stroke-to-radius ratio (strokeW/r) so the ring doesn't look
     // proportionally thinner or thicker, just slightly bigger overall.
@@ -163,7 +163,11 @@ function questionRingSVG(count) {
     let arc = color ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" transform="rotate(90 ${cx} ${cy})"/>` : "";
     let label = count > 0 ? count : "0";
     let textColor = color || "var(--muted)";
-    return `<svg width="100%" height="72" viewBox="0 0 68 68" style="max-width:68px;">
+    // Feature request: the number itself is only clickable (cursor:pointer +
+    // opens the edit popup) for yesterday/today — see renderQuestionsWidget()
+    // below for which days pass clickable=true. Older days render identically
+    // but without the pointer cursor and without a click handler.
+    return `<svg width="100%" height="72" viewBox="0 0 68 68" style="max-width:68px; ${clickable ? 'cursor:pointer;' : ''}">
         ${track}${arc}
         <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="800" fill="${textColor}">${label}</text>
     </svg>`;
@@ -177,6 +181,10 @@ export function renderQuestionsWidget() {
     // comment on renderGarden() in charts.js.
     let monday = mondayForOffset(getWeekOffset("questions"));
     let todayKey = getTodayKey();
+    // Feature request: clicking the number should open the edit popup, but
+    // only for yesterday/today — editing older logged days from this widget
+    // isn't the intent (History → Delete Study Log is the place for that).
+    let yesterdayKey = (() => { let d = new Date(todayKey + "T00:00:00"); d.setDate(d.getDate() - 1); return dateKeyFromWall(d.getTime()); })();
     const dowLabels = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
     let html = "";
     for (let i = 0; i < 7; i++) {
@@ -184,7 +192,9 @@ export function renderQuestionsWidget() {
         let key = dateKeyFromWall(d.getTime());
         let isToday = key === todayKey;
         let count = db[key]?.questionsSolved || 0;
-        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"><div class="dow-label">${dowLabels[i]}</div>${questionRingSVG(count)}</div>`;
+        let clickable = (key === todayKey || key === yesterdayKey);
+        let onclick = clickable ? ` onclick="openQuestionsModal('${key}')"` : "";
+        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"${onclick}><div class="dow-label">${dowLabels[i]}</div>${questionRingSVG(count, clickable)}</div>`;
     }
     cont.innerHTML = html;
 }

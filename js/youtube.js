@@ -1,5 +1,5 @@
 import { escapeHtml } from './utils.js';
-import { getYtHistory, saveYtHistory, setRawFlag, YT_HISTORY_MAX_ENTRIES } from './storage.js';
+import { getYtHistory, saveYtHistory, getRawFlag, setRawFlag, clearRawFlag, YT_HISTORY_MAX_ENTRIES } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast } from './ui.js';
@@ -20,11 +20,64 @@ let ytCurrentId = null;
 // drag on our own slider.
 let ytVolumeSyncInterval = null;
 let ytVolumeDragging = false;
+// Throttle counter for the position autosave inside startYtVolumeSync()'s
+// existing 1s poll — see saveYtPosition() above.
+let ytPositionSaveTick = 0;
 // Cycled by ytCycleSpeed() below — 1x sits in the middle so the common
 // "slightly faster" bump (1.25x/1.5x) is one tap away either direction from
 // the default, same spirit as the Loop toggle being one tap.
 const YT_SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 let ytPlaybackRate = 1;
+
+// Feature request: remember playback position per video (keyed by video
+// id, not URL — the same video reloaded from a different pasted link still
+// resumes) so refreshing the tab or leaving and coming back via History
+// picks up where it left off, instead of always restarting from 0:00.
+// Saved periodically while playing (see startYtVolumeSync()'s poll below,
+// which already runs once a second) and flushed immediately on pause/close/
+// tab-hide so a refresh right after doesn't lose more than ~1s of progress.
+function ytPositionKey(id) { return `jee_yt_position_${id}`; }
+function saveYtPosition(id, seconds) {
+    if (!id || !(seconds > 0)) return;
+    setRawFlag(ytPositionKey(id), String(Math.floor(seconds)));
+}
+function getYtPosition(id) {
+    let raw = getRawFlag(ytPositionKey(id));
+    let n = raw ? parseInt(raw, 10) : 0;
+    return isNaN(n) ? 0 : n;
+}
+function clearYtPosition(id) { clearRawFlag(ytPositionKey(id)); }
+
+// Small inline icons (feather-icons-style, currentColor stroke/fill) for
+// the control buttons below — replaces the old emoji (▶/⏸/⏩/🔁), which
+// rendered at inconsistent sizes/baselines across platforms. Sized and
+// aligned via .yt-ctrl-icon in components.css.
+const YT_ICON_PLAY = `<svg viewBox="0 0 24 24" fill="currentColor" class="yt-ctrl-icon"><path d="M8 5v14l11-7z"/></svg>`;
+const YT_ICON_PAUSE = `<svg viewBox="0 0 24 24" fill="currentColor" class="yt-ctrl-icon"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
+const YT_ICON_SPEED = `<svg viewBox="0 0 24 24" fill="currentColor" class="yt-ctrl-icon"><path d="M2 5v14l8-7z"/><path d="M12 5v14l8-7z"/></svg>`;
+const YT_ICON_LOOP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="yt-ctrl-icon"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`;
+
+// Feature request: flush the current position the instant the tab is
+// hidden (backgrounded, switching apps, or about to be closed/refreshed) —
+// the periodic autosave in startYtVolumeSync() below only runs every ~5s,
+// so this catches the gap right up to the moment of a refresh that a purely
+// periodic save could miss. Registered once at module load — youtube.js
+// itself is only ever imported/evaluated once.
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden && ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
+        try { saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime()); } catch (e) { /* player mid-teardown — nothing to save */ }
+    }
+});
+
+// Updates both the icon and label for the Play/Pause button — used by
+// onStateChange (real play/pause events) and ytClosePlayer() (resetting
+// back to the "Play" state when the player is torn down).
+function setPlayPauseUI(isPlaying) {
+    let icon = document.getElementById("yt-playpause-icon");
+    let label = document.getElementById("yt-playpause-label");
+    if (icon) icon.innerHTML = isPlaying ? YT_ICON_PAUSE : YT_ICON_PLAY;
+    if (label) label.textContent = isPlaying ? "Pause" : "Play";
+}
 
 export function extractYouTubeId(url) {
     try {
@@ -58,7 +111,20 @@ window.onYouTubeIframeAPIReady = function() {
 };
 
 export function createOrLoadYTPlayer(id) {
-    if (ytPlayer && ytPlayer.loadVideoById) { ytPlayer.loadVideoById(id); return; }
+    if (ytPlayer && ytPlayer.loadVideoById) {
+        // BUG FIX: loading a second video into an already-open player used
+        // to leave the PREVIOUS video's speed sitting in ytPlaybackRate and
+        // on the Speed button — YouTube itself resets a freshly loaded
+        // video to 1x, but our own state/label never followed, so the old
+        // rate (e.g. 1.75x) looked like it was carrying over. Reset both
+        // right here, before the new video even starts.
+        ytPlaybackRate = 1;
+        let speedBtn = document.getElementById("yt-speed-label");
+        if (speedBtn) speedBtn.innerText = "Speed: 1x";
+        ytPlayer.loadVideoById(id);
+        if (ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(1);
+        return;
+    }
     let container = document.getElementById('yt-player');
     if (!container) return;
     bindVolumeSliderDragTracking();
@@ -91,13 +157,27 @@ export function createOrLoadYTPlayer(id) {
                 // loadVideoById branch resets YouTube's own rate to 1x, but
                 // our button/state should stay consistent with what's shown).
                 if (ytPlaybackRate !== 1) e.target.setPlaybackRate(ytPlaybackRate);
+                // Feature request: resume from wherever this video was last
+                // left off (refresh, tab close, or just re-loading it from
+                // History) instead of always starting at 0:00.
+                let savedPos = getYtPosition(id);
+                if (savedPos > 3) e.target.seekTo(savedPos, true);
                 startYtVolumeSync();
             },
             onStateChange: (e) => {
                 if (ytLoopEnabled && e.data === YT.PlayerState.ENDED) { ytPlayer.seekTo(0); ytPlayer.playVideo(); }
                 ytIsPlaying = (e.data === YT.PlayerState.PLAYING);
-                let btn = document.getElementById("yt-playpause-btn");
-                if (btn) btn.innerText = ytIsPlaying ? "⏸ Pause" : "▶ Play";
+                setPlayPauseUI(ytIsPlaying);
+                // Flush the position immediately on every pause (in addition
+                // to the periodic save while playing — see
+                // startYtVolumeSync()'s poll) so pausing right before closing
+                // the tab doesn't lose anything.
+                if (e.data === YT.PlayerState.PAUSED && ytPlayer.getCurrentTime) {
+                    saveYtPosition(id, ytPlayer.getCurrentTime());
+                }
+                // A video that finished shouldn't resume 2 seconds from the
+                // end next time — start it fresh instead.
+                if (e.data === YT.PlayerState.ENDED) clearYtPosition(id);
             },
             onError: (e) => {
                 let reasons = { 2: "Invalid video link.", 5: "Can't play in embedded player.", 100: "Video not found.", 101: "Embedding disabled.", 150: "Embedding disabled." };
@@ -111,6 +191,12 @@ export function loadYoutubeLink() {
     let url = document.getElementById("yt-link-input").value.trim();
     let id = extractYouTubeId(url);
     if (!id) { alert("Invalid YouTube link."); return; }
+    // Flush the outgoing video's position before switching away from it —
+    // otherwise pasting a new link mid-playback would lose whatever wasn't
+    // already caught by the periodic save (see startYtVolumeSync()'s poll).
+    if (ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
+        saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime());
+    }
     setRawFlag("jee_yt_last_link", url);
     addToYtHistory(id, url);
     document.getElementById("yt-player-wrap").style.display = "block";
@@ -139,6 +225,20 @@ function setNowPlayingLabel(id, title) {
     label.textContent = `▶ Now Playing: ${title || id}`;
     label.style.display = "block";
     input.style.display = "none";
+}
+
+// Feature request: clicking the (now dimmer, see .yt-now-playing in
+// components.css) "Now Playing" label swaps it back for the paste-a-link
+// input, without closing/destroying the current player — the video keeps
+// playing behind it until a new link is actually submitted via Load.
+export function ytEditNowPlaying() {
+    let label = document.getElementById("yt-now-playing");
+    let input = document.getElementById("yt-link-input");
+    if (!label || !input) return;
+    label.style.display = "none";
+    input.style.display = "";
+    input.value = "";
+    input.focus();
 }
 
 // Moved here from storage.js — storage.js now only exposes plain
@@ -231,7 +331,15 @@ export function ytTogglePlay() {
     if (ytIsPlaying) { ytPlayer.pauseVideo(); } else { ytPlayer.playVideo(); }
 }
 
-export function ytSetVolume(v) { if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(v); }
+export function ytSetVolume(v) {
+    if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(v);
+    // Feature request: "clicking the blue ball" (the slider thumb) should
+    // preview the sound %. oninput fires on both a click and a drag, so
+    // this covers either — bindVolumeSliderDragTracking() below hides it
+    // again a moment after the interaction ends.
+    let preview = document.getElementById("yt-volume-preview");
+    if (preview) { preview.textContent = `${v}%`; preview.classList.add("visible"); }
+}
 
 // Marks our slider as "being dragged" so the poll below doesn't yank the
 // handle mid-gesture. Bound once per slider element (dataset flag guards
@@ -241,19 +349,38 @@ function bindVolumeSliderDragTracking() {
     let slider = document.getElementById("yt-volume");
     if (!slider || slider.dataset.dragTrackingBound) return;
     slider.dataset.dragTrackingBound = "1";
-    slider.addEventListener("pointerdown", () => { ytVolumeDragging = true; });
-    let release = () => { ytVolumeDragging = false; };
+    let preview = document.getElementById("yt-volume-preview");
+    slider.addEventListener("pointerdown", () => {
+        ytVolumeDragging = true;
+        if (preview) { preview.textContent = `${slider.value}%`; preview.classList.add("visible"); }
+    });
+    let release = () => {
+        ytVolumeDragging = false;
+        if (preview) setTimeout(() => preview.classList.remove("visible"), 500);
+    };
     slider.addEventListener("pointerup", release);
     slider.addEventListener("pointercancel", release);
 }
 function startYtVolumeSync() {
     stopYtVolumeSync();
+    ytPositionSaveTick = 0;
     ytVolumeSyncInterval = setInterval(() => {
-        if (!ytPlayer || !ytPlayer.getVolume || ytVolumeDragging) return;
-        let slider = document.getElementById("yt-volume");
-        if (!slider || document.activeElement === slider) return;
-        let live = Math.round(ytPlayer.getVolume());
-        if (String(live) !== slider.value) slider.value = live;
+        if (ytPlayer && ytPlayer.getVolume && !ytVolumeDragging) {
+            let slider = document.getElementById("yt-volume");
+            if (slider && document.activeElement !== slider) {
+                let live = Math.round(ytPlayer.getVolume());
+                if (String(live) !== slider.value) slider.value = live;
+            }
+        }
+        // Position autosave (feature request) — every 5th tick of this
+        // already-running 1s poll (~5s), only while actually playing.
+        // Paused/ended flushes happen immediately elsewhere (onStateChange,
+        // loadYoutubeLink(), ytClosePlayer(), the visibilitychange listener
+        // above) — this just covers steady, uninterrupted playback.
+        ytPositionSaveTick++;
+        if (ytIsPlaying && ytPositionSaveTick % 5 === 0 && ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
+            saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime());
+        }
     }, 1000);
 }
 function stopYtVolumeSync() {
@@ -262,7 +389,10 @@ function stopYtVolumeSync() {
 
 export function ytToggleLoop() {
     ytLoopEnabled = !ytLoopEnabled;
-    document.getElementById("yt-loop-btn").innerText = `🔁 Loop: ${ytLoopEnabled ? "On" : "Off"}`;
+    let label = document.getElementById("yt-loop-label");
+    if (label) label.textContent = `Loop: ${ytLoopEnabled ? "On" : "Off"}`;
+    let btn = document.getElementById("yt-loop-btn");
+    if (btn) btn.classList.toggle("yt-ctrl-active", ytLoopEnabled);
 }
 
 // Cycles forward through YT_SPEED_STEPS, wrapping back to the start after
@@ -273,8 +403,8 @@ export function ytCycleSpeed() {
     let idx = YT_SPEED_STEPS.indexOf(ytPlaybackRate);
     ytPlaybackRate = YT_SPEED_STEPS[(idx + 1) % YT_SPEED_STEPS.length];
     if (ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(ytPlaybackRate);
-    let btn = document.getElementById("yt-speed-btn");
-    if (btn) btn.innerText = `⏩ Speed: ${ytPlaybackRate}x`;
+    let label = document.getElementById("yt-speed-label");
+    if (label) label.textContent = `Speed: ${ytPlaybackRate}x`;
 }
 
 // Fully shuts the player down: stops playback, tears down the YT.Player
@@ -284,6 +414,11 @@ export function ytCycleSpeed() {
 // never loaded" rather than just pausing/hiding.
 export function ytClosePlayer() {
     if (ytPlayer) {
+        // Flush the final position before tearing down — closing (unlike a
+        // video actually ENDING) should still resume from here next time.
+        if (ytCurrentId && ytPlayer.getCurrentTime) {
+            try { saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime()); } catch (e) { /* non-fatal */ }
+        }
         try {
             if (ytPlayer.stopVideo) ytPlayer.stopVideo();
             if (ytPlayer.destroy) ytPlayer.destroy();
@@ -304,10 +439,11 @@ export function ytClosePlayer() {
     if (input) { input.style.display = ""; input.value = ""; }
     let nowPlaying = document.getElementById("yt-now-playing");
     if (nowPlaying) nowPlaying.style.display = "none";
-    let playBtn = document.getElementById("yt-playpause-btn");
-    if (playBtn) playBtn.innerText = "▶ Play";
+    setPlayPauseUI(false);
+    let loopLabel = document.getElementById("yt-loop-label");
+    if (loopLabel) loopLabel.textContent = "Loop: Off";
     let loopBtn = document.getElementById("yt-loop-btn");
-    if (loopBtn) loopBtn.innerText = "🔁 Loop: Off";
-    let speedBtn = document.getElementById("yt-speed-btn");
-    if (speedBtn) speedBtn.innerText = "⏩ Speed: 1x";
+    if (loopBtn) loopBtn.classList.remove("yt-ctrl-active");
+    let speedLabel = document.getElementById("yt-speed-label");
+    if (speedLabel) speedLabel.textContent = "Speed: 1x";
 }

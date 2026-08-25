@@ -276,12 +276,18 @@ export function openAttendanceReminderModal() {
 // channel themselves. Opened in a new tab (not a same-tab redirect) so this
 // single-page app itself never navigates away.
 const EVERYDAY_360R_CHANNEL_URL = "https://www.youtube.com/@Everyday360R/posts";
+// Feature request: the next reminder in the chain used to open the instant
+// the new tab did — visually jarring (a second popup appearing right on top
+// of the tab-switch animation) and gave no time to actually look at the new
+// tab before the app grabbed focus back. This small pause is silent (no
+// toast) — just a clean beat before the next modal in the chain appears.
+const POST_REDIRECT_CHAIN_DELAY_MS = 1500;
 
 export function closeAttendanceReminderModal() {
     document.getElementById("attendance-reminder-modal").style.display = "none";
     unlockBodyScroll();
     window.open(EVERYDAY_360R_CHANNEL_URL, "_blank", "noopener");
-    openMorningTodoReminderModal();
+    setTimeout(openMorningTodoReminderModal, POST_REDIRECT_CHAIN_DELAY_MS);
 }
 
 // Fires right after the morning attendance reminder is dismissed (see
@@ -318,7 +324,7 @@ export function closeEveningAttendanceReminderModal() {
     document.getElementById("evening-attendance-modal").style.display = "none";
     unlockBodyScroll();
     window.open(EVERYDAY_360R_CHANNEL_URL, "_blank", "noopener");
-    openTomorrowPlanner();
+    setTimeout(openTomorrowPlanner, POST_REDIRECT_CHAIN_DELAY_MS);
 }
 function openTomorrowPlanner() {
     // BUG FIX: normally opens tomorrow's Planner. But if it's currently the

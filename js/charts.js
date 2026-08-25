@@ -185,21 +185,17 @@ export function renderHeatmap() {
 
 // ---------------- TREND CHART ----------------
 export function renderTrendChart() {
-    let db = getDB(); let today = new Date(); today.setHours(0,0,0,0);
+    let db = getDB();
     let offset = getWeekOffset("trend");
     let days = [];
-    if (offset === 0) {
-        // ORIGINAL BEHAVIOR, unchanged: trailing 7 calendar days ending
-        // today (not Monday-aligned) — exactly what this chart always
-        // showed before the week-nav control existed.
-        for (let i = 6; i >= 0; i--) { let d = new Date(today); d.setDate(today.getDate() - i); days.push(dateKeyFromWall(d.getTime())); }
-    } else {
-        // Past week selected via the shared week-nav control: show that
-        // Monday-Sunday week instead, so it lines up with the Garden and
-        // Question Practice widgets for the same week.
-        let monday = mondayForOffset(offset);
-        for (let i = 0; i < 7; i++) { let d = new Date(monday); d.setDate(monday.getDate() + i); days.push(dateKeyFromWall(d.getTime())); }
-    }
+    // BUG FIX: offset===0 used to be a special case (trailing 7 calendar
+    // days ending today, not Monday-aligned) — inconsistent with the
+    // Garden/Question Practice widgets, which both always show the
+    // Monday-Sunday week for the current offset. Now this always uses the
+    // same mondayForOffset() alignment those do, so all three widgets'
+    // "This Week"/‹ › controls move in lockstep and show the same days.
+    let monday = mondayForOffset(offset);
+    for (let i = 0; i < 7; i++) { let d = new Date(monday); d.setDate(monday.getDate() + i); days.push(dateKeyFromWall(d.getTime())); }
     let subjects = Object.keys(blankDay().subjects); let width = 1200, height = 400, padding = 60;
     // Fixed floor of 10h (the daily study goal) instead of 0.5h — a 0.5h
     // ceiling made every gridline within a hair of 0 and the chart looked
@@ -233,5 +229,5 @@ export function renderTrendChart() {
         legend += `<div style="display:flex; align-items:center; gap:6px; font-size:13px;"><span style="width:14px;height:14px;border-radius:3px;background:${SUBJECT_COLORS[subj]};display:inline-block;"></span>${subj}</div>`;
     });
     legend += `</div>`;
-    document.getElementById("trend-chart-container").innerHTML = anyData ? (svg + legend) : "<div class='small-note'>No study data logged in the last 7 days yet.</div>";
+    document.getElementById("trend-chart-container").innerHTML = anyData ? (svg + legend) : "<div class='small-note'>No study data logged this week yet.</div>";
 }

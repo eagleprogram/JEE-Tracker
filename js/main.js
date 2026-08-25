@@ -10,6 +10,7 @@ import { getLastBackupAt, markBackupDone, resetAllData } from './storage.js';
 import {
     openSubjectModal, cancelSubjectModal, confirmStartStudy,
     pauseStudy, resumeStudy, takeBreak, confirmBreakReasonModal, cancelBreakReasonModal,
+    handleBreakReasonInputKeydown, handleBreakReasonCheckboxKeydown,
     changeSubjectMidSession, endDay,
     setCurrentDayKey, getPersistedDayKey, tryRestoreActiveSession, startAutosave,
     updateUIState, updateLiveSummary, flushAndRestartSegment
@@ -62,7 +63,7 @@ import {
 import {
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
-    ytClosePlayer, ytCycleSpeed
+    ytClosePlayer, ytCycleSpeed, ytEditNowPlaying
 } from './youtube.js';
 
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
@@ -123,6 +124,7 @@ Object.assign(window, {
     // timer.js
     openSubjectModal, cancelSubjectModal, confirmStartStudy,
     pauseStudy, resumeStudy, takeBreak, confirmBreakReasonModal, cancelBreakReasonModal,
+    handleBreakReasonInputKeydown, handleBreakReasonCheckboxKeydown,
     changeSubjectMidSession, endDay,
     updateLiveSummary, flushAndRestartSegment,
     // ui.js
@@ -162,7 +164,7 @@ Object.assign(window, {
     // youtube.js
     loadYoutubeLink, toggleYtHistory, loadFromYtHistory, ytTogglePlay,
     ytSetVolume, ytToggleLoop, deleteYtHistoryEntry, toggleYtHistoryStar,
-    ytClosePlayer, ytCycleSpeed,
+    ytClosePlayer, ytCycleSpeed, ytEditNowPlaying,
     // reports.js
     downloadDayLog, shareDayLog, sendReportViaEmail, downloadReport, shareReport,
     // backup.js

@@ -473,6 +473,11 @@ export function endBreakAlarmSuppression() {
 // large-break suppression comment above.
 export function notify(title, body, persistent = true, priority = 5, bypassSuppression = false) {
     if (breakSuppressionActive && !bypassSuppression) {
+        // Dedupe by title: a long large break (e.g. a multi-hour dinner)
+        // could otherwise queue up several identical "Water break" pings
+        // by the time it ends. Keep only the latest one per title — still
+        // rings once on release, just not repeatedly back-to-back.
+        suppressedAlarms = suppressedAlarms.filter(a => a.title !== title);
         suppressedAlarms.push({ title, body, persistent, priority });
         return;
     }

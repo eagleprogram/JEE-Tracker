@@ -100,7 +100,10 @@
         <div class="card" style="padding: 12px;">
             <h4 style="margin:0 0 10px 0;">🎵 Study Music (YouTube)</h4>
             <input type="text" id="yt-link-input" aria-label="Paste a YouTube link" placeholder="Paste a YouTube link...">
-            <div class="yt-now-playing" id="yt-now-playing" style="display:none;"></div>
+            <!-- Feature request: clicking this label re-shows the link input
+                 (see ytEditNowPlaying() in youtube.js) so a new link can be
+                 pasted without closing the current player first. -->
+            <div class="yt-now-playing" id="yt-now-playing" style="display:none;" onclick="ytEditNowPlaying()" title="Click to paste a new video link" role="button" tabindex="0"></div>
             <div style="display:flex; gap:6px; margin-top:6px;">
                 <button class="btn btn-start btn-small" style="flex:1;" onclick="loadYoutubeLink()">Load</button>
                 <button class="btn btn-break btn-small" style="flex:1;" onclick="toggleYtHistory()">🕘 History</button>
@@ -109,14 +112,15 @@
             <div class="yt-player-wrap" id="yt-player-wrap" style="display:none;">
                 <div class="yt-player-shrink"><div id="yt-player"></div></div>
                 <div class="yt-controls">
-                    <button onclick="ytTogglePlay()" id="yt-playpause-btn">▶ Play</button>
-                    <button onclick="ytCycleSpeed()" id="yt-speed-btn">⏩ Speed: 1x</button>
-                    <button onclick="ytToggleLoop()" id="yt-loop-btn">🔁 Loop: Off</button>
-                    <button class="yt-close-btn" onclick="ytClosePlayer()" title="Close player" aria-label="Close player">Close</button>
+                    <button class="yt-ctrl-btn" onclick="ytTogglePlay()" id="yt-playpause-btn"><span id="yt-playpause-icon" class="yt-ctrl-icon-wrap"><svg viewBox="0 0 24 24" fill="currentColor" class="yt-ctrl-icon"><path d="M8 5v14l11-7z"/></svg></span><span id="yt-playpause-label" class="yt-ctrl-label">Play</span></button>
+                    <button class="yt-ctrl-btn" onclick="ytCycleSpeed()" id="yt-speed-btn"><span class="yt-ctrl-icon-wrap"><svg viewBox="0 0 24 24" fill="currentColor" class="yt-ctrl-icon"><path d="M2 5v14l8-7z"/><path d="M12 5v14l8-7z"/></svg></span><span id="yt-speed-label" class="yt-ctrl-label">Speed: 1x</span></button>
+                    <button class="yt-ctrl-btn" onclick="ytToggleLoop()" id="yt-loop-btn"><span class="yt-ctrl-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="yt-ctrl-icon"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span><span id="yt-loop-label" class="yt-ctrl-label">Loop: Off</span></button>
+                    <button class="yt-ctrl-btn yt-close-btn" onclick="ytClosePlayer()" title="Close player" aria-label="Close player">Close</button>
                 </div>
                 <div class="yt-controls">
                     <span style="font-size:11px; color:var(--muted);">🔊</span>
-                    <input type="range" class="yt-volume-slider" id="yt-volume" aria-label="Volume" min="0" max="100" value="70" oninput="ytSetVolume(this.value)">
+                    <input type="range" class="yt-volume-slider" id="yt-volume" aria-label="Volume" min="0" max="100" value="80" oninput="ytSetVolume(this.value)">
+                    <span id="yt-volume-preview" class="yt-volume-preview">80%</span>
                 </div>
             </div>
         </div>
@@ -523,12 +527,12 @@
             </div>
         </div>
         <div class="garden-row" id="questions-row"></div>
-        <div class="goal-note q-goal-note"><strong class="goal-note-emphasis">Tip:</strong> Auto-prompted after each sleep log, log or update it anytime above.</div>
+        <div class="goal-note q-goal-note"><strong class="goal-note-emphasis">Tip:</strong> Auto-prompted after each sleep log, update or log it anytime above.</div>
     </div>
 
     <div class="card" style="margin-top:20px;">
         <div class="title-with-nav" style="margin-bottom:8px;">
-            <h3 style="margin:0;">📈 Weekly Subject Trend (last 7 days)</h3>
+            <h3 style="margin:0;">📈 Weekly Subject Trend</h3>
             <div class="week-nav" id="trend-week-nav">
                 <button class="week-nav-btn" id="trend-week-prev" onclick="shiftViewWeek('trend', -1)" aria-label="Previous week">‹</button>
                 <span class="week-nav-label" id="trend-week-label">This Week</span>
@@ -650,11 +654,11 @@
      see looksLikeLargeBreak() in timer.js. -->
 <div class="modal" id="break-reason-modal">
     <div class="modal-content">
-        <h3 style="margin-top:0;">Break Reason</h3>
-        <input type="text" id="break-reason-input" aria-label="Break reason" placeholder="e.g. Lunch, Walk, Phone" style="width:100%;">
+        <h3 style="margin-top:0; text-align:center;">Break</h3>
+        <input type="text" id="break-reason-input" aria-label="Break reason" placeholder="e.g. Lunch, Walk, Phone" style="width:100%;" onkeydown="handleBreakReasonInputKeydown(event)">
         <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
-            <input type="checkbox" id="break-reason-large-toggle" style="width:auto; margin:0;">
-            <label for="break-reason-large-toggle" style="font-size:12px; color:var(--muted); margin:0;">This is a long break (meal/sleep) — mute alarms until I end it</label>
+            <input type="checkbox" id="break-reason-large-toggle" class="break-reason-checkbox" onkeydown="handleBreakReasonCheckboxKeydown(event)">
+            <label for="break-reason-large-toggle" style="font-size:12px; color:var(--muted); margin:0;">Long break — mute alarms until the break ends</label>
         </div>
         <div style="margin-top:15px; display:flex; justify-content:flex-end; gap:12px; align-items:center;">
             <button class="btn btn-start" onclick="confirmBreakReasonModal()">Start Break</button>
@@ -701,7 +705,7 @@
 <div class="modal" id="evening-attendance-modal">
     <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
         <h3 style="margin-top:0;">📻 Reminder</h3>
-        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark in the Everyday 360R YouTube channel whether you completed today's tasks and 360R/440R!</p>
+        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark in the Everyday 360R YouTube channel<br>whether you completed today's tasks and 360R/440R!</p>
         <button class="btn btn-start" style="width:100%;" onclick="closeEveningAttendanceReminderModal()">Got it</button>
     </div>
 </div>

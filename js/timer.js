@@ -17,12 +17,12 @@ import { enterZenMode, exitZenMode, lockBodyScroll, unlockBodyScroll } from './u
 // only called inside function bodies below, never at module-eval time).
 // Starts the water-break reminder the moment a study session actually
 // begins; it keeps running until the night's sleep log is saved (see
-// stopWaterReminder() in sleep.js), and now also the moment a break ends
-// (see confirmStartStudy() below) — there's no point nudging water while
-// on a break (see stopWaterReminder()'s new call in confirmBreakReasonModal()
-// below). beginBreakAlarmSuppression()/endBreakAlarmSuppression() mute (and
-// later release) every non-critical reminder during a large/meal-type break.
-import { startWaterReminder, stopWaterReminder, beginBreakAlarmSuppression, endBreakAlarmSuppression } from './notifications.js';
+// stopWaterReminder() in sleep.js) — including through breaks now (see
+// confirmBreakReasonModal() below), since it's no longer force-stopped on
+// break start. beginBreakAlarmSuppression()/endBreakAlarmSuppression() mute
+// (and later release) every non-critical reminder — water included — during
+// a large/meal-type break.
+import { startWaterReminder, beginBreakAlarmSuppression, endBreakAlarmSuppression } from './notifications.js';
 
 // ----------------- TIMER ENGINE -----------------
 let timerState = "IDLE";
@@ -501,12 +501,39 @@ let breakModalPreviousState = null;
 // checkbox in index.html for the manual override, and
 // beginBreakAlarmSuppression()/endBreakAlarmSuppression() in notifications.js
 // for what "large" actually does (mutes every non-critical reminder until
-// the break ends). Matched case-insensitively, substring — "Late dinner
-// with family" still matches "dinner".
+// the break ends). Matched word-by-word, tolerant of small typos (a letter
+// swapped/dropped/added) via Levenshtein distance — "brekfast" or "diner"
+// still count, not just exact spelling.
 const LARGE_BREAK_KEYWORDS = ["dinner", "breakfast", "lunch", "sleep", "nap"];
+
+// Plain Levenshtein edit distance — small inputs only (single words), so
+// no need for anything fancier than the textbook O(m*n) DP table.
+function levenshteinDistance(a, b) {
+    let m = a.length, n = b.length;
+    let dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+        }
+    }
+    return dp[m][n];
+}
 function looksLikeLargeBreak(reason) {
-    let r = (reason || "").toLowerCase();
-    return LARGE_BREAK_KEYWORDS.some(k => r.includes(k));
+    let words = (reason || "").toLowerCase().match(/[a-z]+/g) || [];
+    for (let w of words) {
+        for (let k of LARGE_BREAK_KEYWORDS) {
+            if (w === k) return true;
+            // Typo tolerance: 1 edit for short keywords (nap), 2 for longer
+            // ones (breakfast) — loose enough to catch a swapped/missing
+            // letter, tight enough that unrelated short words ("map",
+            // "cap") don't accidentally match "nap".
+            let maxDist = k.length <= 4 ? 1 : 2;
+            if (Math.abs(w.length - k.length) <= maxDist && levenshteinDistance(w, k) <= maxDist) return true;
+        }
+    }
+    return false;
 }
 
 export function takeBreak() {
@@ -531,6 +558,25 @@ export function takeBreak() {
     setTimeout(() => { let inp = document.getElementById("break-reason-input"); if (inp) inp.focus(); }, 50);
 }
 
+// Feature request: Enter in the text field moves focus to the checkbox
+// (instead of doing nothing/submitting a nonexistent form); Enter on the
+// checkbox checks it first, then a second Enter actually starts the break —
+// a fully keyboard-driven path through the whole modal, no mouse needed.
+export function handleBreakReasonInputKeydown(e) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    let box = document.getElementById("break-reason-large-toggle");
+    if (box) box.focus();
+}
+export function handleBreakReasonCheckboxKeydown(e) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    let box = document.getElementById("break-reason-large-toggle");
+    if (!box) return;
+    if (!box.checked) { box.checked = true; return; }
+    confirmBreakReasonModal();
+}
+
 // "Start Break" in the modal — equivalent to the old prompt()'s OK path.
 // An empty field still starts the break with the same "Short Break"
 // default the old prompt() used.
@@ -549,10 +595,14 @@ export function confirmBreakReasonModal() {
     sessionBreakSec = 0;
     timerState = "BREAK"; currentSegmentId++; startSegment();
     updateUIState(); tick();
-    // No point nudging for water while on a break (see stopWaterReminder()
-    // below) — it starts back up on its own the moment study resumes (see
-    // startWaterReminder() in confirmStartStudy()/resumeStudy()).
-    stopWaterReminder();
+    // Feature request (refined): the water reminder keeps running through
+    // the break now, same as every other reminder — it's no longer force-
+    // stopped here. If this break isn't "large", it still pings on its
+    // normal schedule (matches a short break rarely being long enough to
+    // matter). If it IS large, its notify() call (priority 6, no bypass)
+    // gets captured by the SAME suppression queue as everything else and
+    // only actually rings once Resume Study/End Session is clicked — see
+    // beginBreakAlarmSuppression() in notifications.js.
     // Large/meal-type break: mute every non-critical reminder until this
     // break actually ends (see the endBreakAlarmSuppression() calls in
     // confirmStartStudy()/endDay() below). Break-overrun still rings

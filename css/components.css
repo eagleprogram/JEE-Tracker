@@ -305,6 +305,39 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
 }
+/* Break-reason modal's "long break" checkbox — same dark/sunken look and
+   colors as the settings checkboxes above (feature request: match the
+   Notifications settings checkbox exactly), just sized down to sit flush
+   with its 12px info text instead of the settings rows' larger 18px. */
+.break-reason-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s, border-color 0.15s;
+}
+.break-reason-checkbox:hover { border-color: var(--primary); }
+.break-reason-checkbox:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+.break-reason-checkbox:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0px;
+    width: 4px;
+    height: 7px;
+    border: solid var(--bg);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
 .settings-sub { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 /* These were previously left with only width/padding set — with no
    background/border/color of their own, they fell back to the browser's
@@ -544,9 +577,12 @@ button.del:hover { color: #fca5a5; }
 /* "▶ Now Playing: <title>" — replaces the raw pasted link once a video is
    loaded (see setNowPlayingLabel() in youtube.js); the link input itself is
    hidden while this is showing. Dimmed white — not the full-brightness
-   var(--text), which read as too stark for a label that's just there for
-   reference — but still white rather than var(--muted)'s gray-blue. */
-.yt-now-playing { margin-top: 6px; padding: 6px 8px; font-size: 12px; color: rgba(241, 245, 249, 0.72); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* BUG FIX (feature request): further dimmed from 0.72 opacity — still
+   readable, but no longer competing for attention with the rest of the
+   card. Also now clickable (see ytEditNowPlaying() in youtube.js) — swaps
+   back to the paste-a-link input without touching the current player. */
+.yt-now-playing { margin-top: 6px; padding: 6px 8px; font-size: 12px; color: rgba(241, 245, 249, 0.45); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.yt-now-playing:hover { color: rgba(241, 245, 249, 0.65); border-color: var(--primary); }
 /* Renders the YouTube iframe larger than this box, then scales the whole
    thing back down — see createOrLoadYTPlayer()'s comment in youtube.js for
    why this (rather than a narrower iframe alone) is what actually changes
@@ -557,7 +593,23 @@ button.del:hover { color: #fca5a5; }
 .yt-player-shrink { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #000; }
 .yt-player-shrink #yt-player, .yt-player-shrink iframe { position: absolute; top: 0; left: 0; width: 160%; height: 160%; transform: scale(0.625); transform-origin: top left; border: 0; }
 .yt-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
-.yt-controls button { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+/* BUG FIX (feature request): Pause/Speed/Loop used to be plain buttons with
+   an emoji glued into the text string (e.g. "⏸ Pause") — emoji render at
+   inconsistent sizes/baselines across platforms, which is exactly what
+   made the icon look small and sitting low next to its label. Rebuilt as
+   icon+label pairs (real inline SVGs, sized/aligned via flex below) so
+   every button's icon lines up with its text the same way regardless of
+   OS/browser. Slightly larger padding/font than before too — the previous
+   size was reported as too cramped to reliably tap. */
+.yt-controls button, .yt-ctrl-btn { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13.5px; }
+.yt-ctrl-btn { display: inline-flex; align-items: center; gap: 6px; line-height: 1; }
+.yt-ctrl-icon-wrap { display: inline-flex; align-items: center; }
+.yt-ctrl-icon { width: 15px; height: 15px; display: block; }
+.yt-ctrl-label { display: inline-block; }
+.yt-ctrl-btn:hover { border-color: var(--primary); }
+/* Loop, once toggled on, gets the same "active" tint the rest of the app
+   uses for an engaged toggle, instead of looking identical to Off. */
+.yt-ctrl-btn.yt-ctrl-active { background: rgba(var(--tint-emerald), 0.15); border-color: rgb(var(--tint-emerald)); color: rgb(var(--tint-emerald)); }
 /* Small red "close player" button — sits after Loop in the same row.
    Rose-tinted (matches Stop/Delete elsewhere) so it visually reads as the
    "shut this down" action, distinct from the neutral Play/Loop buttons.
@@ -574,6 +626,12 @@ button.del:hover { color: #fca5a5; }
 .yt-volume-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--primary); margin-top: -4.5px; }
 .yt-volume-slider::-moz-range-track { height: 4px; border-radius: 2px; background: var(--border); }
 .yt-volume-slider::-moz-range-thumb { width: 13px; height: 13px; border: none; border-radius: 50%; background: var(--primary); }
+/* Feature request: a live "N%" readout that only shows up while the volume
+   thumb is actually being interacted with (see bindVolumeSliderDragTracking()/
+   ytSetVolume() in youtube.js) — hidden the rest of the time so it doesn't
+   just sit there as visual clutter. */
+.yt-volume-preview { font-size: 11px; color: var(--primary); font-weight: 700; min-width: 30px; text-align: right; opacity: 0; transition: opacity 0.15s; }
+.yt-volume-preview.visible { opacity: 1; }
 /* scrollbar-width/color + the ::-webkit-scrollbar rules below match the
    thin track used by #todo-list and .sidebar — without them this panel
    fell back to the browser's default (much thicker) scrollbar, which is
@@ -583,12 +641,16 @@ button.del:hover { color: #fca5a5; }
 .yt-history-panel::-webkit-scrollbar { width: 6px; }
 .yt-history-panel::-webkit-scrollbar-track { background: var(--card); }
 .yt-history-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-/* background now lives on the base rule (matching .todo-item's constant
-   var(--bg) fill) instead of only appearing on :hover, so each entry reads
-   as a distinct row at rest, the same way To-Do items already do. */
-.yt-history-item { display: flex; gap: 8px; align-items: center; padding: 5px; border-radius: 6px; cursor: pointer; background: var(--bg); margin-top: 6px; }
+/* BUG FIX (feature request): background used to switch to the lighter
+   var(--card) on :hover, which — combined with the list re-rendering and
+   the cursor happening to still be resting over a row right after a click —
+   made whichever entry the user had just interacted with look permanently
+   highlighted rather than just hovered. Every row now keeps the exact same
+   background at all times; hovering is shown with an outline/border
+   instead, which can't get "stuck" looking like a persistent highlight. */
+.yt-history-item { display: flex; gap: 8px; align-items: center; padding: 5px; border-radius: 6px; cursor: pointer; background: var(--bg); border: 1px solid transparent; margin-top: 6px; }
 .yt-history-item:first-child { margin-top: 0; }
-.yt-history-item:hover { background: var(--card); }
+.yt-history-item:hover { background: var(--bg); border-color: var(--primary); }
 .yt-history-item img { width: 64px; height: 36px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
 .yt-history-item .yt-history-label { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .yt-star-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; flex-shrink: 0; width: 16px; text-align: center; }
