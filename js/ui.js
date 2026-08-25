@@ -76,11 +76,32 @@ export function forceMobileZoomReflow() {
 // also reassigns that same `src` once more a few seconds later — cheap,
 // and invisible to the user, but covers it even if something else still
 // slowed that first attempt down.
+//
+// BUG FIX (persistent mobile-only failure, survived the fix above): the
+// Holiday Reference card lives inside the Planner sidebar panel
+// (#panel-planner), which is display:none until the user actually opens
+// the sidebar (see openSidebarPanel()) — the panel is closed by default on
+// every fresh load. The old code above still assigned `src` on window
+// `load` unconditionally, meaning on a cold load the iframe was almost
+// always given a heavy Google Calendar embed to render INSIDE A HIDDEN,
+// ZERO-SIZE CONTAINER. A constrained mobile renderer choking on that (grey
+// box / crashed-tab icon) while a desktop's extra headroom usually papers
+// over the same problem lines up exactly with what was reported — mobile:
+// broken essentially every time; desktop: rare. Fixed by only actually
+// assigning `src` once the frame is genuinely visible (offsetParent isn't
+// null once its ancestor panel is display:flex) — called from window
+// `load` as before (covers the rare case the panel is somehow already
+// open) AND from openSidebarPanel() every time the Planner panel is
+// opened, guarded so it only ever loads once.
+let holidayFrameLoaded = false;
 export function initHolidayReference() {
+    if (holidayFrameLoaded) return;
     let frame = document.getElementById("holiday-iframe");
     if (!frame) return;
+    if (frame.offsetParent === null) return; // still hidden behind a closed panel — wait
     let src = frame.dataset.src;
     if (!src) return;
+    holidayFrameLoaded = true;
     frame.src = src;
     setTimeout(() => { frame.src = src; }, 3000);
 }
@@ -513,6 +534,11 @@ export function openSidebarPanel(name) {
     if (activeSidebarPanel === name) { closeSidebar(); return; }
     sidebar.classList.add("expanded"); document.body.classList.add("panel-open"); activeSidebarPanel = name;
     planner.style.display = (name === "planner") ? "flex" : "none";
+    // Now that the Planner panel is actually visible, the Holiday Reference
+    // iframe can safely load — see initHolidayReference()'s own comment
+    // above for why loading it while hidden was breaking it on mobile.
+    // No-ops after the first successful load.
+    if (name === "planner") initHolidayReference();
     mocktest.style.display = (name === "mocktest") ? "flex" : "none";
     syllabus.style.display = (name === "syllabus") ? "flex" : "none";
     mistakes.style.display = (name === "mistakes") ? "flex" : "none";

@@ -150,8 +150,14 @@
             </div>
 
             <div style="margin-top:12px;">
+                <!-- BUG FIX: these labels used to carry for="notif-XXX", which
+                     makes clicking the LABEL TEXT toggle the checkbox too (default
+                     browser behavior for label+for). Per feature request, that's
+                     no longer wanted — the checkbox/box itself is now the only
+                     click target that toggles a setting. `for` intentionally
+                     removed from every checkbox-row label below. -->
                 <div class="settings-row">
-                    <label for="notif-breakOverrun">Break overrun alert</label>
+                    <label>Break overrun alert</label>
                     <input type="checkbox" id="notif-breakOverrun" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -160,7 +166,7 @@
                     <span style="font-size:12px; color:var(--muted);">min on break</span>
                 </div>
                 <div class="settings-row">
-                    <label for="notif-plannerReminder">Planner task reminder (2hr window, remind every 30min)</label>
+                    <label>Planner task reminder (2hr window, remind every 30min)</label>
                     <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -168,7 +174,7 @@
                     <input type="time" id="notif-plannerReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label for="notif-revisionReminder">Revision reminder (once/day)</label>
+                    <label>Revision reminder (once/day)</label>
                     <input type="checkbox" id="notif-revisionReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -176,7 +182,7 @@
                     <input type="time" id="notif-revisionReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label for="notif-sleepReminder">Sleep reminder (30-min window, remind every 5min)</label>
+                    <label>Sleep reminder (30-min window, remind every 10min)</label>
                     <input type="checkbox" id="notif-sleepReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -184,7 +190,7 @@
                     <input type="time" id="notif-sleepReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label for="notif-parentLogReminder">Send daily log to parent (once/day)</label>
+                    <label>Send daily log to parent (once/day)</label>
                     <input type="checkbox" id="notif-parentLogReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -192,19 +198,19 @@
                     <input type="time" id="notif-parentLogReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label for="notif-backupReminder">Export local backup reminder (every 2 days)</label>
+                    <label>Export local backup reminder (every 2 days)</label>
                     <input type="checkbox" id="notif-backupReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label for="notif-smRadioReminders">SM Radio Reminders (attendance, morning &amp; night)</label>
+                    <label>Everyday 360R Reminders (attendance - morning &amp; night)</label>
                     <input type="checkbox" id="notif-smRadioReminders" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label for="notif-examMilestones">Exam milestone pings</label>
+                    <label>Exam milestone pings</label>
                     <input type="checkbox" id="notif-examMilestones" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label for="notif-waterBreakReminder">Water break reminder (while studying)</label>
+                    <label>Water break reminder (while studying)</label>
                     <input type="checkbox" id="notif-waterBreakReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -213,7 +219,7 @@
                     <span style="font-size:12px; color:var(--muted);">min</span>
                 </div>
                 <div class="settings-row">
-                    <label for="notif-idleNudge">Idle nudge ("still there?")</label>
+                    <label>Idle nudge ("still there?")</label>
                     <input type="checkbox" id="notif-idleNudge" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -568,9 +574,9 @@
         <div class="btn-row-nowrap" style="margin-top:10px;">
             <button class="btn btn-stop btn-compact history-delete-btn" onclick="deleteStudyLog()"><svg class="trash-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2"></path><path d="M6.5 7l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7"></path><path d="M10 10.5v6"></path><path d="M14 10.5v6"></path></svg><span>Delete Study Log</span></button>
             <button class="btn btn-stop btn-compact history-delete-btn" onclick="deleteBreakLog()"><svg class="trash-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2"></path><path d="M6.5 7l.8 12.1a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7"></path><path d="M10 10.5v6"></path><path d="M14 10.5v6"></path></svg><span>Delete Break Log</span></button>
-            <button class="btn btn-report-download btn-compact" onclick="downloadDayLog()">Download Daily Log</button>
-            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('daily', false)">Email Daily Log</button>
-            <button class="btn btn-report-share btn-compact" onclick="shareDayLog()">📤 Share Daily Log</button>
+            <button class="btn btn-report-download btn-compact" onclick="downloadDayLog()">Download Daily Report</button>
+            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('daily', false)">Email Daily Report</button>
+            <button class="btn btn-report-share btn-compact" onclick="shareDayLog()">📤 Share Daily Report</button>
         </div>
             <div class="grid-2 grid-2-top" style="margin-top:15px;">
         <div>
@@ -635,6 +641,28 @@
     </div>
 </div>
 
+<!-- BUG FIX / ENHANCEMENT: replaces the old window.prompt() for the break
+     reason (see takeBreak() in timer.js) — a native prompt can't hold a
+     checkbox, so there was no way to explicitly flag a break as a
+     large/meal-type one whose alarms should stay muted until it ends.
+     "This is a long break" is also auto-checked-equivalent by keyword
+     detection (dinner/breakfast/lunch/sleep/nap) even if left unticked —
+     see looksLikeLargeBreak() in timer.js. -->
+<div class="modal" id="break-reason-modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">Break Reason</h3>
+        <input type="text" id="break-reason-input" aria-label="Break reason" placeholder="e.g. Lunch, Walk, Phone" style="width:100%;">
+        <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="break-reason-large-toggle" style="width:auto; margin:0;">
+            <label for="break-reason-large-toggle" style="font-size:12px; color:var(--muted); margin:0;">This is a long break (meal/sleep) — mute alarms until I end it</label>
+        </div>
+        <div style="margin-top:15px; display:flex; justify-content:flex-end; gap:12px; align-items:center;">
+            <button class="btn btn-start" onclick="confirmBreakReasonModal()">Start Break</button>
+            <button class="btn btn-stop btn-small" onclick="cancelBreakReasonModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- Wake-up reminder: fires after a wake time is logged (see saveSleepLog()
      in sleep.js) instead of the old "questions solved" popup, which never
      made sense to ask about right after waking up. Just an acknowledgment —
@@ -645,7 +673,7 @@
 <div class="modal" id="attendance-reminder-modal">
     <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
         <h3 style="margin-top:0;">📻 Reminder</h3>
-        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark your attendance in the SM Radio YouTube channel!</p>
+        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark your attendance in the Everyday 360R YouTube channel!</p>
         <button class="btn btn-start" style="width:100%;" onclick="closeAttendanceReminderModal()">Got it</button>
     </div>
 </div>
@@ -665,7 +693,7 @@
 <!-- End-of-day reminder: fires after the "questions solved" step is done
      for a bedtime save (see maybeAskQuestionsSolved(sleepDate,
      openEveningAttendanceReminderModal) in sleep.js's CASE 1/3). Reminds
-     the user to mark in SM Radio whether they completed today's tasks and
+     the user to mark in the Everyday 360R channel whether they completed today's tasks and
      360R/440R. Acknowledging it opens tomorrow's Planner (see
      closeEveningAttendanceReminderModal() in sleep.js) — the single daily
      planning touchpoint. Skippable via the "Evening Attendance Reminder"
@@ -673,7 +701,7 @@
 <div class="modal" id="evening-attendance-modal">
     <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
         <h3 style="margin-top:0;">📻 Reminder</h3>
-        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark in the SM Radio YouTube channel whether you completed today's tasks and 360R/440R!</p>
+        <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark in the Everyday 360R YouTube channel whether you completed today's tasks and 360R/440R!</p>
         <button class="btn btn-start" style="width:100%;" onclick="closeEveningAttendanceReminderModal()">Got it</button>
     </div>
 </div>

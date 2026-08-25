@@ -108,6 +108,21 @@ export function dateKeyFromWall(ms) {
 // local-calendar-date logic the rest of the app already uses.
 export function getTodayKey() { return dateKeyFromWall(Date.now()); }
 
+// BUG FIX (feature request): a bedtime logged in the wee hours — e.g. 1:00
+// AM — is really closing out the study day that was already running
+// (yesterday, by feel), not opening a fresh one at literal calendar
+// midnight. Everything else in the app rolls over at exact midnight
+// (getTodayKey() above), which is correct for the timer/DB/logs — this
+// helper is ONLY for the sleep-log quick-entry flow in sleep.js, which
+// needs to know "does right-now still count as last night?" before
+// deciding which day the questions-solved popup and tomorrow's Planner
+// should target. 4:00 AM was chosen as the cutoff: before it, still
+// "last night"; at/after it, a genuinely new day has started.
+const DAY_ROLLOVER_CUTOFF_HOUR = 4;
+export function isBeforeDayCutoff(date = new Date()) {
+    return date.getHours() < DAY_ROLLOVER_CUTOFF_HOUR;
+}
+
 export function mondayKeyFor(d) {
     let dt = new Date(d);
     let dow = dt.getDay();

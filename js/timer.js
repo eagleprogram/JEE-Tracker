@@ -17,8 +17,12 @@ import { enterZenMode, exitZenMode, lockBodyScroll, unlockBodyScroll } from './u
 // only called inside function bodies below, never at module-eval time).
 // Starts the water-break reminder the moment a study session actually
 // begins; it keeps running until the night's sleep log is saved (see
-// stopWaterReminder() in sleep.js).
-import { startWaterReminder } from './notifications.js';
+// stopWaterReminder() in sleep.js), and now also the moment a break ends
+// (see confirmStartStudy() below) — there's no point nudging water while
+// on a break (see stopWaterReminder()'s new call in confirmBreakReasonModal()
+// below). beginBreakAlarmSuppression()/endBreakAlarmSuppression() mute (and
+// later release) every non-critical reminder during a large/meal-type break.
+import { startWaterReminder, stopWaterReminder, beginBreakAlarmSuppression, endBreakAlarmSuppression } from './notifications.js';
 
 // ----------------- TIMER ENGINE -----------------
 let timerState = "IDLE";
@@ -80,6 +84,10 @@ let currentDayKey = null;
 let carryMs = 0;
 let activeSubject = "Physics";
 let activeBreakReason = "Break";
+// Whether the CURRENT break is a "large" one (meal/sleep-type — auto-
+// detected by keyword, or explicitly checked) whose alarms are being
+// muted until it ends — see takeBreak()/confirmBreakReasonModal() below.
+let activeBreakIsLarge = false;
 // Cache for updateLiveSummaryFast() (used by the tick() hot loop) — see
 // that function for why. Refreshed on segment start/commit, and self-heals
 // on the next frame if a midnight rollover makes it stale in the meantime.
@@ -443,6 +451,10 @@ export function confirmStartStudy() {
     // than STUDYING), so guarding on that exact state is a safe, purely
     // defensive no-op for every real transition already in use.
     if (timerState === "STUDYING") return;
+    // Captured before timerState changes below — needed to know whether
+    // this is genuinely "Resume Study after a break" (the moment a large
+    // break's muted alarms should come back) vs a fresh IDLE start.
+    let wasOnBreak = (timerState === "BREAK");
     activeSubject = document.getElementById("modal-subject-select").value;
     document.getElementById("subject-modal").style.display = "none";
     unlockBodyScroll(); // release the modal's own lock — enterZenMode() below takes its own
@@ -453,6 +465,11 @@ export function confirmStartStudy() {
     // whether or not the user touched the dedicated zen toggle themselves.
     enterZenMode();
     startWaterReminder();
+    // Feature request: "Resume Study" is one of the two ways a break
+    // actually ends (the other is End Session — see endDay() below) — release
+    // anything a large/meal-type break was muting the instant this happens.
+    if (wasOnBreak && activeBreakIsLarge) endBreakAlarmSuppression();
+    activeBreakIsLarge = false;
 }
 
 export function pauseStudy() { commitActiveSegment(); cancelAnimationFrame(animFrame); timerState = "PAUSED"; clearActiveSession(); updateUIState(); }
@@ -471,36 +488,60 @@ export function resumeStudy() {
     startWaterReminder();
 }
 
+// Captured by takeBreak() below, read by confirmBreakReasonModal()/
+// cancelBreakReasonModal() once the user actually responds — a real modal
+// is asynchronous (unlike the old window.prompt(), which blocked JS
+// execution until dismissed), so this can't just be a local variable
+// inside takeBreak() anymore; it has to survive until the next click.
+let breakModalPreviousState = null;
+
+// Feature request: auto-detect a "large" (meal/sleep-type) break from
+// whatever the user types as the reason, so breakfast/lunch/dinner/a nap
+// don't need the explicit checkbox every time — see the break-reason-modal
+// checkbox in index.html for the manual override, and
+// beginBreakAlarmSuppression()/endBreakAlarmSuppression() in notifications.js
+// for what "large" actually does (mutes every non-critical reminder until
+// the break ends). Matched case-insensitively, substring — "Late dinner
+// with family" still matches "dinner".
+const LARGE_BREAK_KEYWORDS = ["dinner", "breakfast", "lunch", "sleep", "nap"];
+function looksLikeLargeBreak(reason) {
+    let r = (reason || "").toLowerCase();
+    return LARGE_BREAK_KEYWORDS.some(k => r.includes(k));
+}
+
 export function takeBreak() {
     // takeBreak() is reachable directly from IDLE (the Break button stays
     // visible there — see index.html), so a fresh break needs the same
     // cross-tab check as a fresh Start. Coming from STUDYING/PAUSED, this
     // tab already owns the session, so no check needed there.
     if (timerState === "IDLE" && blockedByOtherTab()) return;
-    // Captured before commitActiveSegment()/the prompt can change anything,
+    // Captured before commitActiveSegment()/the modal can change anything,
     // so a Cancel below knows exactly what state to resume.
-    let previousState = timerState;
+    breakModalPreviousState = timerState;
     commitActiveSegment(); cancelAnimationFrame(animFrame);
-    let reason = prompt("Break Reason (e.g. Lunch, Walk, Phone):");
-    // BUG FIX: prompt() returns null ONLY when the user hits Cancel/Esc —
-    // OK with an empty field returns "" instead, which is falsy too but
-    // means something different (use the default reason, still start the
-    // break). The old `if (!reason || ...)` treated both the same way, so
-    // clicking Cancel silently fell into the "use default reason" branch
-    // and started the break anyway instead of aborting, which is exactly
-    // what was reported. Checking specifically for null separates "user
-    // cancelled" from "user left it blank and hit OK". On Cancel from
-    // STUDYING, the segment was already committed and its tick loop
-    // stopped just above — restart both so the study session keeps running
-    // exactly as if Break had never been clicked. From PAUSED/IDLE nothing
-    // was ticking yet (commitActiveSegment() is a no-op in those states),
-    // so there's nothing to restart — just bail out with state unchanged.
-    if (reason === null) {
-        if (previousState === "STUDYING") { startSegment(); tick(); }
-        return;
-    }
-    if (!reason.trim()) reason = "Short Break";
-    activeBreakReason = reason;
+    // BUG FIX / ENHANCEMENT: this used to be a plain window.prompt() for the
+    // break reason — a native prompt can't hold a checkbox, so there was no
+    // way to explicitly mark a break as a large/meal-type one. Replaced with
+    // a real modal (break-reason-modal in index.html) carrying the same text
+    // field plus a "This is a long break" checkbox.
+    document.getElementById("break-reason-input").value = "";
+    document.getElementById("break-reason-large-toggle").checked = false;
+    document.getElementById("break-reason-modal").style.display = "flex";
+    lockBodyScroll();
+    setTimeout(() => { let inp = document.getElementById("break-reason-input"); if (inp) inp.focus(); }, 50);
+}
+
+// "Start Break" in the modal — equivalent to the old prompt()'s OK path.
+// An empty field still starts the break with the same "Short Break"
+// default the old prompt() used.
+export function confirmBreakReasonModal() {
+    let reason = document.getElementById("break-reason-input").value;
+    let manualLargeToggle = document.getElementById("break-reason-large-toggle").checked;
+    document.getElementById("break-reason-modal").style.display = "none";
+    unlockBodyScroll();
+    if (!reason || !reason.trim()) reason = "Short Break";
+    activeBreakReason = reason.trim();
+    activeBreakIsLarge = manualLargeToggle || looksLikeLargeBreak(activeBreakReason);
     // Fresh break (as opposed to the same break resuming after an autosave/
     // tab-hide restart, which goes through flushAndRestartSegment() instead
     // and never calls takeBreak() again) — reset the break session total so
@@ -508,6 +549,15 @@ export function takeBreak() {
     sessionBreakSec = 0;
     timerState = "BREAK"; currentSegmentId++; startSegment();
     updateUIState(); tick();
+    // No point nudging for water while on a break (see stopWaterReminder()
+    // below) — it starts back up on its own the moment study resumes (see
+    // startWaterReminder() in confirmStartStudy()/resumeStudy()).
+    stopWaterReminder();
+    // Large/meal-type break: mute every non-critical reminder until this
+    // break actually ends (see the endBreakAlarmSuppression() calls in
+    // confirmStartStudy()/endDay() below). Break-overrun still rings
+    // through regardless — see notify()'s bypassSuppression in notifications.js.
+    if (activeBreakIsLarge) beginBreakAlarmSuppression();
     // Break now drops into Zen Mode exactly like a fresh study start
     // (confirmStartStudy()/resumeStudy() above do the same thing). The zen
     // visuals in components.css key off body.zen-mode only, not timerState,
@@ -516,11 +566,31 @@ export function takeBreak() {
     enterZenMode();
 }
 
+// "Cancel" in the break-reason modal — equivalent to the old prompt()'s
+// Cancel/Esc path. On Cancel from STUDYING, the segment was already
+// committed and its tick loop stopped in takeBreak() above; restart both
+// so the study session keeps running exactly as if Break had never been
+// clicked. From PAUSED/IDLE nothing was ticking yet (commitActiveSegment()
+// is a no-op in those states), so there's nothing to restart — just leave
+// state unchanged.
+export function cancelBreakReasonModal() {
+    document.getElementById("break-reason-modal").style.display = "none";
+    unlockBodyScroll();
+    if (breakModalPreviousState === "STUDYING") { startSegment(); tick(); }
+    breakModalPreviousState = null;
+}
+
 export function changeSubjectMidSession() { activeSubject = document.getElementById("switch-subject-select").value; updateLiveSummary(); }
 
 export function endDay() {
+    // Captured before timerState changes below — same "did a break just
+    // end" check as confirmStartStudy() above; End Session is the other of
+    // the two ways a break can end.
+    let wasOnBreak = (timerState === "BREAK");
     commitActiveSegment(); cancelAnimationFrame(animFrame);
     timerState = "IDLE"; segmentElapsedMs = 0; sessionStudySec = 0; sessionBreakSec = 0; carryMs = 0; clearActiveSession();
+    if (wasOnBreak && activeBreakIsLarge) endBreakAlarmSuppression();
+    activeBreakIsLarge = false;
     // BUG FIX: release this tab's session lock immediately instead of
     // waiting up to LOCK_HEARTBEAT_MS (3s) for the next heartbeat tick to
     // notice timerState is now IDLE. Without this, a second tab opened in

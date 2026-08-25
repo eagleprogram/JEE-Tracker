@@ -9,7 +9,8 @@ import { getLastBackupAt, markBackupDone, resetAllData } from './storage.js';
 
 import {
     openSubjectModal, cancelSubjectModal, confirmStartStudy,
-    pauseStudy, resumeStudy, takeBreak, changeSubjectMidSession, endDay,
+    pauseStudy, resumeStudy, takeBreak, confirmBreakReasonModal, cancelBreakReasonModal,
+    changeSubjectMidSession, endDay,
     setCurrentDayKey, getPersistedDayKey, tryRestoreActiveSession, startAutosave,
     updateUIState, updateLiveSummary, flushAndRestartSegment
 } from './timer.js';
@@ -121,7 +122,8 @@ Object.assign(window, {
     resetAllData,
     // timer.js
     openSubjectModal, cancelSubjectModal, confirmStartStudy,
-    pauseStudy, resumeStudy, takeBreak, changeSubjectMidSession, endDay,
+    pauseStudy, resumeStudy, takeBreak, confirmBreakReasonModal, cancelBreakReasonModal,
+    changeSubjectMidSession, endDay,
     updateLiveSummary, flushAndRestartSegment,
     // ui.js
     showToast, closeSidebar, openSidebarPanel, checkDayRollover,

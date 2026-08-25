@@ -1,4 +1,4 @@
-import { formatDateDDMMYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWall, getTodayKey } from './utils.js';
+import { formatDateDDMMYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWall, getTodayKey, isBeforeDayCutoff } from './utils.js';
 import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getNotifSettings } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
@@ -28,6 +28,23 @@ import { stopWaterReminder } from './notifications.js';
 // standalone completed entry the first time it runs, so this helper and the
 // 'wake' pending path only exist to handle that one-time cleanup.
 function pendingType(pending) { return pending ? (pending.type || 'sleep') : null; }
+
+// BUG FIX (feature request): logging a bedtime in the wee hours (e.g. 1:00
+// AM) used to attribute it to literal calendar "today" — so the
+// questions-solved popup asked about the wrong day (the one that had just
+// started, not the one whose study session was actually ending), and
+// openTomorrowPlanner() below skipped an extra day ahead. This returns the
+// day whose study is really being "closed out" by a bedtime logged right
+// now: yesterday if it's still the wee hours (see isBeforeDayCutoff() in
+// utils.js), otherwise today as before.
+function effectiveClosingDayKey() {
+    if (isBeforeDayCutoff()) {
+        let d = new Date(getTodayKey() + "T00:00:00");
+        d.setDate(d.getDate() - 1);
+        return dateKeyFromWall(d.getTime());
+    }
+    return getTodayKey();
+}
 
 function expectedWakeDateFor(sleepDate, sleepTime) {
     let [sh] = sleepTime.split(':').map(Number);
@@ -119,12 +136,18 @@ export function saveSleepLog() {
         renderSleepLog();
         renderSleepPendingBanner();
         showToast("Bedtime logged — log your wake time to complete it.");
-        // Bedtime logged = today's study day is effectively "closed out" —
-        // this is the natural moment to ask how many questions were solved
-        // today, then chain into the night's Questions Solved → Attendance
-        // → (Tomorrow's) Planner flow. No-ops straight to the attendance
-        // step if today was already asked (see the function).
-        maybeAskQuestionsSolved(sleepDate, openEveningAttendanceReminderModal);
+        // Bedtime logged = a study day is effectively "closed out" — this is
+        // the natural moment to ask how many questions were solved, then
+        // chain into the night's Questions Solved → Attendance → (Tomorrow's)
+        // Planner flow. No-ops straight to the attendance step if that day
+        // was already asked (see the function).
+        // BUG FIX: pass effectiveClosingDayKey(), not the literal `sleepDate`
+        // above — a bedtime logged before the 4 AM cutoff (e.g. 1:00 AM) is
+        // closing out YESTERDAY's study, not asking about the day that just
+        // started at midnight. sleepDate itself stays untouched (still
+        // today) — it's only the internal sleep-log storage key, unrelated
+        // to which day's study this popup should ask about.
+        maybeAskQuestionsSolved(effectiveClosingDayKey(), openEveningAttendanceReminderModal);
         // Going to sleep is the "sleep log saved" moment the water-break
         // reminder is scoped to stop at — no point nudging someone to drink
         // water while they're asleep.
@@ -221,8 +244,9 @@ export function saveSleepLog() {
         renderSleepPendingBanner();
         showToast("Sleep log saved.");
         // Same night chain as CASE 1 above — Questions Solved → Attendance
-        // → Tomorrow's Planner.
-        maybeAskQuestionsSolved(sleepDate, openEveningAttendanceReminderModal);
+        // → Tomorrow's Planner. Same effectiveClosingDayKey() fix as CASE 1
+        // (sleepDate itself stays the literal storage key, untouched).
+        maybeAskQuestionsSolved(effectiveClosingDayKey(), openEveningAttendanceReminderModal);
         // Both times entered together still represents a completed sleep
         // log for the night (same as CASE 1's bedtime-only save) — stop the
         // water reminder here too.
@@ -246,9 +270,17 @@ export function openAttendanceReminderModal() {
     // synchronously, the lock/unlock overlaps with no visible gap.
     lockBodyScroll();
 }
+// The YouTube channel formerly "SM Radio" was renamed to "Everyday 360R" —
+// both attendance "Got it" buttons now redirect here (new tab) so marking
+// attendance is one tap away instead of requiring the user to go find the
+// channel themselves. Opened in a new tab (not a same-tab redirect) so this
+// single-page app itself never navigates away.
+const EVERYDAY_360R_CHANNEL_URL = "https://www.youtube.com/@Everyday360R/posts";
+
 export function closeAttendanceReminderModal() {
     document.getElementById("attendance-reminder-modal").style.display = "none";
     unlockBodyScroll();
+    window.open(EVERYDAY_360R_CHANNEL_URL, "_blank", "noopener");
     openMorningTodoReminderModal();
 }
 
@@ -285,9 +317,18 @@ export function openEveningAttendanceReminderModal() {
 export function closeEveningAttendanceReminderModal() {
     document.getElementById("evening-attendance-modal").style.display = "none";
     unlockBodyScroll();
+    window.open(EVERYDAY_360R_CHANNEL_URL, "_blank", "noopener");
     openTomorrowPlanner();
 }
 function openTomorrowPlanner() {
+    // BUG FIX: normally opens tomorrow's Planner. But if it's currently the
+    // wee hours (before the 4 AM cutoff — see isBeforeDayCutoff() in
+    // utils.js), the calendar day that already started (today) is the day
+    // actually about to be lived, not the one after it — plan for TODAY
+    // instead of skipping an extra day ahead. (E.g. logging bedtime at
+    // 1:00 AM on the 25th: the Planner that matters is the 25th's, not the
+    // 26th's.)
+    if (isBeforeDayCutoff()) { openPlannerModal(getTodayKey()); return; }
     let d = new Date(getTodayKey() + "T00:00:00");
     d.setDate(d.getDate() + 1);
     openPlannerModal(dateKeyFromWall(d.getTime()));

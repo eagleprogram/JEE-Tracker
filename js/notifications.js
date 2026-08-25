@@ -235,7 +235,7 @@ function enqueueAlarm(title, body, priority) {
 //    and rings again 5 minutes later — repeating this cycle until the user
 //    does hit Stop, at which point stopAlarmLoop() below cancels the
 //    pending re-ring (see alarmRelaunchTimer there).
-const ALARM_AUTO_SILENCE_MS = 2 * 60 * 1000;
+const ALARM_AUTO_SILENCE_MS = 1 * 60 * 1000;
 const ALARM_RERING_DELAY_MS = 5 * 60 * 1000;
 let alarmAutoSilenceTimer = null;
 let alarmRelaunchTimer = null;
@@ -428,10 +428,54 @@ function maybeNudgeForOsNotifications() {
     showToast("Tip: tap 'Enable Notifications' in Settings so alarms can still reach you when this tab isn't in front.");
 }
 
+// ----------------- LARGE-BREAK ALARM SUPPRESSION -----------------
+// Feature request: during a meal/sleep-type break (breakfast, lunch,
+// dinner, nap...) the user isn't at the device to acknowledge anything, so
+// every non-critical reminder due during that window should stay silent
+// and land all at once the moment the break actually ends — see
+// takeBreak()/confirmBreakReasonModal() in timer.js for how a break gets
+// flagged "large" (keyword match on the typed reason, or the explicit
+// checkbox) and where beginBreakAlarmSuppression()/
+// endBreakAlarmSuppression() below get called from.
+// EXPLICITLY EXCLUDED: the break-overrun check-in (priority 6) — that one
+// exists specifically to catch a break that's run long, so it has to keep
+// working even while everything else is muted. Callers that must bypass
+// suppression (only checkBreakOverrun() below) pass bypassSuppression=true.
+let breakSuppressionActive = false;
+let suppressedAlarms = []; // { title, body, persistent, priority }
+
+export function beginBreakAlarmSuppression() {
+    breakSuppressionActive = true;
+}
+
+// Releases everything that piled up during the break. The most urgent one
+// rings right away (via notify()); the rest ride the SAME alarm queue
+// used for "two reminders due at once" (see enqueueAlarm()/
+// advanceAlarmQueue() above) — most important first, each one starting
+// only after the previous is dismissed, with the existing 15s breather
+// gap in between. Toasts/OS notifications for every released reason fire
+// immediately (same as if none of them had ever been suppressed) — only
+// the loud modal+sound is sequenced one at a time.
+export function endBreakAlarmSuppression() {
+    if (!breakSuppressionActive) return;
+    breakSuppressionActive = false;
+    if (suppressedAlarms.length === 0) return;
+    let queued = suppressedAlarms;
+    suppressedAlarms = [];
+    queued.sort((a, b) => a.priority - b.priority);
+    queued.forEach(a => notify(a.title, a.body, a.persistent, a.priority, true));
+}
+
 // priority: lower number = more urgent = rings first when two reminders are
 // queued up at once (see the alarm-queue comment above). Each call site
 // below passes its own ranking; unset defaults to 5 (mid-priority).
-export function notify(title, body, persistent = true, priority = 5) {
+// bypassSuppression: only checkBreakOverrun() passes true — see the
+// large-break suppression comment above.
+export function notify(title, body, persistent = true, priority = 5, bypassSuppression = false) {
+    if (breakSuppressionActive && !bypassSuppression) {
+        suppressedAlarms.push({ title, body, persistent, priority });
+        return;
+    }
     showToast(body ? `${title} — ${body}` : title);
     fireOsNotification(title, body, persistent);
     if (persistent) { ringPersistentAlarm(title, body, priority); } else { playAlarmSound(); }
@@ -445,7 +489,7 @@ export function checkBreakOverrun(s) {
     let elapsed = getSegmentElapsedMs();
     let thresholdMs = (s.breakThresholdMin || 45) * 60 * 1000;
     if (elapsed >= thresholdMs && (!lastBreakNotifyAt || Date.now() - lastBreakNotifyAt >= 10 * 60 * 1000)) {
-        notify("Break check-in", `You've been on break ${Math.floor(elapsed/60000)}+ min — come back?`, true, 6);
+        notify("Break check-in", `You've been on break ${Math.floor(elapsed/60000)}+ min — come back?`, true, 6, true);
         lastBreakNotifyAt = Date.now();
     }
 }
@@ -586,15 +630,16 @@ export function runNotificationChecks() {
         }
     }
 
-    // Sleep reminder: user-configurable start time (default 10:30 PM), 30-min window, every 5 min
+    // Sleep reminder: user-configurable start time (default 10:30 PM), 30-min window, every 10 min
+    // (was every 5 min — widened per feature request so it pings less often).
     if (s.sleepReminder) {
         let [sh, sm] = (s.sleepReminderStartTime || "22:30").split(":").map(n => parseInt(n, 10));
         let sleepStartMin = sh * 60 + sm;
         let sleepEndMin = sleepStartMin + 30;
-        if (minOfDay >= sleepStartMin && minOfDay <= sleepEndMin && (minOfDay - sleepStartMin) % 5 === 0) {
+        if (minOfDay >= sleepStartMin && minOfDay <= sleepEndMin && (minOfDay - sleepStartMin) % 10 === 0) {
             let lastKey = "jee_sleep_reminder_last_" + getTodayKey();
             let last = parseInt(getRawFlag(lastKey) || "0", 10);
-            if (Date.now() - last > 5 * 60 * 1000) {
+            if (Date.now() - last > 10 * 60 * 1000) {
                 notify("Wind down", `Past ${s.sleepReminderStartTime} - start winding down!`, true, 5);
                 setRawFlag(lastKey, String(Date.now()));
             }
