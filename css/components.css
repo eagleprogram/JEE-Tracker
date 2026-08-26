@@ -583,25 +583,24 @@ button.del:hover { color: #fca5a5; }
    back to the paste-a-link input without touching the current player. */
 .yt-now-playing { margin-top: 6px; padding: 6px 8px; font-size: 12px; color: rgba(241, 245, 249, 0.45); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .yt-now-playing:hover { color: rgba(241, 245, 249, 0.65); border-color: var(--primary); }
-/* Renders the YouTube iframe larger than this box, then scales the whole
-   thing back down — see createOrLoadYTPlayer()'s comment in youtube.js for
-   why this (rather than a narrower iframe alone) is what actually changes
-   the native control bar's on-screen button size, while keeping every
-   native feature (captions, quality, fullscreen) intact. 160%/0.625 is a
-   middle ground: the very first (unshrunk, 100%/no-scale) render had
-   oversized buttons; 200%/0.5 swung the other way and made them too tiny. */
+/* BUG FIX (feature request): reverted the oversample-and-shrink trick
+   (rendering the iframe at 160% then scaling the whole thing down to
+   62.5%) — that was shrinking YouTube's OWN native control-bar buttons
+   (play/pause, captions, settings, volume — the ones baked into the
+   YouTube player itself), which is exactly what was reported as "buttons
+   drastically reduced". A plain, unscaled iframe is the standard/default
+   size those buttons render at — this is that. (Our own Pause/Speed/Loop/
+   Close buttons below .yt-controls are separate DOM elements outside this
+   iframe entirely and are unaffected either way.) */
 .yt-player-shrink { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #000; }
-.yt-player-shrink #yt-player, .yt-player-shrink iframe { position: absolute; top: 0; left: 0; width: 160%; height: 160%; transform: scale(0.625); transform-origin: top left; border: 0; }
+.yt-player-shrink #yt-player, .yt-player-shrink iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
 .yt-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
-/* BUG FIX (feature request): Pause/Speed/Loop used to be plain buttons with
-   an emoji glued into the text string (e.g. "⏸ Pause") — emoji render at
-   inconsistent sizes/baselines across platforms, which is exactly what
-   made the icon look small and sitting low next to its label. Rebuilt as
-   icon+label pairs (real inline SVGs, sized/aligned via flex below) so
-   every button's icon lines up with its text the same way regardless of
-   OS/browser. Slightly larger padding/font than before too — the previous
-   size was reported as too cramped to reliably tap. */
-.yt-controls button, .yt-ctrl-btn { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13.5px; }
+/* BUG FIX: reverted the padding/font-size bump from last round — that was
+   meant to address "buttons too small", but the actual complaint was about
+   YouTube's OWN native control-bar buttons inside the iframe (see
+   .yt-player-shrink above), not these. These go back to their original
+   compact size; the icon-instead-of-emoji + alignment fix below stays. */
+.yt-controls button, .yt-ctrl-btn { background: var(--bg); border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
 .yt-ctrl-btn { display: inline-flex; align-items: center; gap: 6px; line-height: 1; }
 .yt-ctrl-icon-wrap { display: inline-flex; align-items: center; }
 .yt-ctrl-icon { width: 15px; height: 15px; display: block; }

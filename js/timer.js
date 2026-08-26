@@ -536,6 +536,40 @@ function looksLikeLargeBreak(reason) {
     return false;
 }
 
+// Feature request: don't just silently DETECT a typo'd keyword at submit
+// time — visibly rewrite it to the correct spelling in the input itself
+// (e.g. "LNCH" → "lunch"), and check the long-break box live, right as the
+// correction happens, instead of only reflecting it once the break has
+// already started. Splits on whitespace so only the mistyped WORD gets
+// replaced, not the whole field. Called on every "did the user just finish
+// typing something" moment (Enter, blur, and defensively again right
+// before the break actually starts) rather than on every keystroke — a
+// live-as-you-type version would fight a still half-typed word (e.g.
+// correcting "lun" into an unrelated keyword before "lunch" is finished).
+function autoCorrectBreakReasonInput() {
+    let input = document.getElementById("break-reason-input");
+    let box = document.getElementById("break-reason-large-toggle");
+    if (!input) return;
+    let tokens = input.value.split(/(\s+)/); // keeps whitespace runs as their own tokens for reassembly
+    let rewritten = false, isLarge = false;
+    for (let i = 0; i < tokens.length; i++) {
+        let raw = tokens[i];
+        if (!/[a-zA-Z]/.test(raw)) continue; // whitespace-only token — nothing to check
+        let lower = raw.toLowerCase();
+        for (let k of LARGE_BREAK_KEYWORDS) {
+            if (lower === k) { isLarge = true; break; }
+            let maxDist = k.length <= 4 ? 1 : 2;
+            if (Math.abs(lower.length - k.length) <= maxDist && levenshteinDistance(lower, k) <= maxDist) {
+                tokens[i] = k; // rewrite in place to the canonical spelling
+                rewritten = true; isLarge = true;
+                break;
+            }
+        }
+    }
+    if (rewritten) input.value = tokens.join("");
+    if (isLarge && box) box.checked = true;
+}
+
 export function takeBreak() {
     // takeBreak() is reachable directly from IDLE (the Break button stays
     // visible there — see index.html), so a fresh break needs the same
@@ -562,11 +596,21 @@ export function takeBreak() {
 // (instead of doing nothing/submitting a nonexistent form); Enter on the
 // checkbox checks it first, then a second Enter actually starts the break —
 // a fully keyboard-driven path through the whole modal, no mouse needed.
+// Also runs the typo auto-correct (see autoCorrectBreakReasonInput() above)
+// right as the user finishes typing (Enter) — same trigger point as
+// handleBreakReasonInputBlur() below for the mouse-driven path.
 export function handleBreakReasonInputKeydown(e) {
     if (e.key !== "Enter") return;
     e.preventDefault();
+    autoCorrectBreakReasonInput();
     let box = document.getElementById("break-reason-large-toggle");
     if (box) box.focus();
+}
+// Covers the mouse-driven path (typing, then clicking "Start Break" or the
+// checkbox directly without ever pressing Enter) — blur fires the instant
+// focus leaves the text field either way.
+export function handleBreakReasonInputBlur() {
+    autoCorrectBreakReasonInput();
 }
 export function handleBreakReasonCheckboxKeydown(e) {
     if (e.key !== "Enter") return;
@@ -581,6 +625,10 @@ export function handleBreakReasonCheckboxKeydown(e) {
 // An empty field still starts the break with the same "Short Break"
 // default the old prompt() used.
 export function confirmBreakReasonModal() {
+    // Defensive re-run — Enter/blur above already cover typing then Enter
+    // or typing then clicking elsewhere, but this catches any path that
+    // somehow reaches here without either firing first.
+    autoCorrectBreakReasonInput();
     let reason = document.getElementById("break-reason-input").value;
     let manualLargeToggle = document.getElementById("break-reason-large-toggle").checked;
     document.getElementById("break-reason-modal").style.display = "none";

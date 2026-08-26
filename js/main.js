@@ -10,7 +10,7 @@ import { getLastBackupAt, markBackupDone, resetAllData } from './storage.js';
 import {
     openSubjectModal, cancelSubjectModal, confirmStartStudy,
     pauseStudy, resumeStudy, takeBreak, confirmBreakReasonModal, cancelBreakReasonModal,
-    handleBreakReasonInputKeydown, handleBreakReasonCheckboxKeydown,
+    handleBreakReasonInputKeydown, handleBreakReasonCheckboxKeydown, handleBreakReasonInputBlur,
     changeSubjectMidSession, endDay,
     setCurrentDayKey, getPersistedDayKey, tryRestoreActiveSession, startAutosave,
     updateUIState, updateLiveSummary, flushAndRestartSegment
@@ -124,7 +124,7 @@ Object.assign(window, {
     // timer.js
     openSubjectModal, cancelSubjectModal, confirmStartStudy,
     pauseStudy, resumeStudy, takeBreak, confirmBreakReasonModal, cancelBreakReasonModal,
-    handleBreakReasonInputKeydown, handleBreakReasonCheckboxKeydown,
+    handleBreakReasonInputKeydown, handleBreakReasonCheckboxKeydown, handleBreakReasonInputBlur,
     changeSubjectMidSession, endDay,
     updateLiveSummary, flushAndRestartSegment,
     // ui.js

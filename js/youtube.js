@@ -111,6 +111,20 @@ window.onYouTubeIframeAPIReady = function() {
 };
 
 export function createOrLoadYTPlayer(id) {
+    // BUG FIX: resume-position (and pause/end position-saving) previously
+    // only worked for whichever video the player was ORIGINALLY constructed
+    // with — the onReady/onStateChange callbacks below are bound once, at
+    // construction, so a closure over the `id` parameter stays stuck on
+    // that first video forever. Every subsequent video switch went through
+    // loadVideoById() instead (the branch just below) reusing those SAME
+    // stale callbacks — so a pause on video B was silently saving position
+    // under video A's key, and video A never got its own onReady to resume
+    // from in the first place. Fixed by reading the shared, always-current
+    // ytCurrentId module variable inside the callbacks instead of the
+    // captured `id` parameter — ytCurrentId is updated by loadYoutubeLink()
+    // before this function is ever called, fresh construction or reuse
+    // alike, so the callbacks always know which video is ACTUALLY loaded
+    // right now.
     if (ytPlayer && ytPlayer.loadVideoById) {
         // BUG FIX: loading a second video into an already-open player used
         // to leave the PREVIOUS video's speed sitting in ytPlaybackRate and
@@ -121,7 +135,15 @@ export function createOrLoadYTPlayer(id) {
         ytPlaybackRate = 1;
         let speedBtn = document.getElementById("yt-speed-label");
         if (speedBtn) speedBtn.innerText = "Speed: 1x";
-        ytPlayer.loadVideoById(id);
+        // BUG FIX: loadVideoById() does NOT fire onReady (that only fires
+        // once, at player construction) — so the resume-position seekTo()
+        // that used to live only in onReady below never ran for any video
+        // loaded after the very first one. loadVideoById's own second
+        // argument (startSeconds) is the actual fix: it resumes exactly
+        // where a previous session (or the last time this same video was
+        // loaded) left off, the same way the `start` playerVar does for a
+        // brand new player below.
+        ytPlayer.loadVideoById(id, getYtPosition(id));
         if (ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(1);
         return;
     }
@@ -129,25 +151,14 @@ export function createOrLoadYTPlayer(id) {
     if (!container) return;
     bindVolumeSliderDragTracking();
     ytPlayer = new YT.Player('yt-player', {
-        // Fills whatever box #yt-player sits in — that box is intentionally
-        // rendered larger than the visible player and then CSS-scaled back
-        // down (see .yt-player-shrink in components.css). YouTube lays out
-        // its native control bar's buttons at roughly a fixed pixel size
-        // regardless of how narrow the iframe is asked to be — that's what
-        // made them look oversized on a player this narrow. Giving the
-        // iframe extra room to lay those buttons out in, then shrinking the
-        // whole rendered result (video and controls together) back down
-        // with one CSS transform, is what actually makes the buttons appear
-        // smaller on screen — a plain narrower iframe alone doesn't, since
-        // the buttons don't shrink with it below their own minimum.
         height: '100%', width: '100%', videoId: id,
         host: 'https://www.youtube-nocookie.com',
-        // Back to YouTube's normal control bar — controls:0 (an earlier
-        // attempt at the same "buttons too big" complaint) hid captions,
-        // quality/settings, and fullscreen along with everything else,
-        // which wasn't the ask; only the size was. The .yt-player-shrink
-        // wrapper above is what actually addresses the size.
-        playerVars: { rel: 0, origin: window.location.origin },
+        // `start`: feature request — resume from wherever this exact video
+        // was last left off (refresh, tab close, or re-loading it from
+        // History), for the initial player-construction case. The
+        // loadVideoById(id, startSeconds) call above covers every load
+        // after this first one.
+        playerVars: { rel: 0, origin: window.location.origin, start: Math.floor(getYtPosition(id)) },
         events: {
             onReady: (e) => {
                 e.target.setVolume(parseInt(document.getElementById("yt-volume").value));
@@ -157,9 +168,9 @@ export function createOrLoadYTPlayer(id) {
                 // loadVideoById branch resets YouTube's own rate to 1x, but
                 // our button/state should stay consistent with what's shown).
                 if (ytPlaybackRate !== 1) e.target.setPlaybackRate(ytPlaybackRate);
-                // Feature request: resume from wherever this video was last
-                // left off (refresh, tab close, or just re-loading it from
-                // History) instead of always starting at 0:00.
+                // Safety-net re-seek in case the `start` playerVar above
+                // wasn't honored exactly (a known occasional quirk) —
+                // harmless no-op if it already landed in the right place.
                 let savedPos = getYtPosition(id);
                 if (savedPos > 3) e.target.seekTo(savedPos, true);
                 startYtVolumeSync();
@@ -171,13 +182,18 @@ export function createOrLoadYTPlayer(id) {
                 // Flush the position immediately on every pause (in addition
                 // to the periodic save while playing — see
                 // startYtVolumeSync()'s poll) so pausing right before closing
-                // the tab doesn't lose anything.
+                // the tab doesn't lose anything. ytCurrentId, not the
+                // closed-over `id` — see this function's opening comment.
                 if (e.data === YT.PlayerState.PAUSED && ytPlayer.getCurrentTime) {
-                    saveYtPosition(id, ytPlayer.getCurrentTime());
+                    saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime());
                 }
-                // A video that finished shouldn't resume 2 seconds from the
-                // end next time — start it fresh instead.
-                if (e.data === YT.PlayerState.ENDED) clearYtPosition(id);
+                // Feature request: a video that's been watched all the way
+                // through starts fresh from 0:00 next time, not 2 seconds
+                // from the end — clear its saved position instead of
+                // resuming near the very end. If loop is on, the seekTo(0)
+                // above already restarts it immediately; either way, the
+                // saved position for this "completed" watch shouldn't stick.
+                if (e.data === YT.PlayerState.ENDED) clearYtPosition(ytCurrentId);
             },
             onError: (e) => {
                 let reasons = { 2: "Invalid video link.", 5: "Can't play in embedded player.", 100: "Video not found.", 101: "Embedding disabled.", 150: "Embedding disabled." };
@@ -222,6 +238,7 @@ function setNowPlayingLabel(id, title) {
     let label = document.getElementById("yt-now-playing");
     let input = document.getElementById("yt-link-input");
     if (!label || !input) return;
+    ytEditingNowPlaying = false;
     label.textContent = `▶ Now Playing: ${title || id}`;
     label.style.display = "block";
     input.style.display = "none";
@@ -231,15 +248,40 @@ function setNowPlayingLabel(id, title) {
 // components.css) "Now Playing" label swaps it back for the paste-a-link
 // input, without closing/destroying the current player — the video keeps
 // playing behind it until a new link is actually submitted via Load.
+let ytEditingNowPlaying = false;
 export function ytEditNowPlaying() {
     let label = document.getElementById("yt-now-playing");
     let input = document.getElementById("yt-link-input");
     if (!label || !input) return;
+    ytEditingNowPlaying = true;
     label.style.display = "none";
     input.style.display = "";
     input.value = "";
     input.focus();
 }
+
+// Feature request: if the user opens the paste-a-link input (via
+// ytEditNowPlaying() above) and then clicks anywhere ELSE — the sidebar,
+// History, anything — without actually submitting a new link, revert back
+// to showing the Now Playing label instead of leaving an empty input
+// sitting there. loadYoutubeLink() itself already clears ytEditingNowPlaying
+// once a link IS submitted (via setNowPlayingLabel()), so this only fires
+// for the "changed their mind" case. Registered once at module load, same
+// pattern as the visibilitychange listener above.
+document.addEventListener("click", (e) => {
+    if (!ytEditingNowPlaying) return;
+    let input = document.getElementById("yt-link-input");
+    let loadBtn = document.getElementById("yt-load-btn");
+    if (!input) return;
+    if (input.contains(e.target) || (loadBtn && loadBtn.contains(e.target))) return;
+    // Nothing to revert TO if no video has ever actually been loaded yet —
+    // leave the input as-is in that case.
+    if (!ytCurrentId) return;
+    ytEditingNowPlaying = false;
+    input.style.display = "none";
+    let label = document.getElementById("yt-now-playing");
+    if (label) label.style.display = "block";
+});
 
 // Moved here from storage.js — storage.js now only exposes plain
 // getYtHistory/saveYtHistory, and this module (the only caller) owns the
