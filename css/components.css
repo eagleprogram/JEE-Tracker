@@ -332,7 +332,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    brightness with no middle ground. --muted-bright is a single fixed color
    (opacity:1, no compounding) pitched between --text and --muted, so it's
    reliably readable but still clearly quieter than the setting's name. */
-.settings-row-note { color: var(--primary); font-weight: 400; }
+.settings-row-note { color: var(--muted); font-weight: 400; }
 /* Custom checkbox — same dark "sunken" look as the number/time inputs
    above (var(--bg) fill, var(--border) outline) instead of the browser's
    default grey/blue control, so it matches the rest of the settings UI. */
