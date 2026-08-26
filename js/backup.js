@@ -19,7 +19,17 @@ import { initToday } from './storage.js';
 // NOTIF_DEFAULTS is duplicated here (matches the pattern already used in
 // notifications.js) so importDataJSON can merge a partial/old backup's
 // notifSettings the same way getNotifSettings() does on read.
-const NOTIF_DEFAULTS = { enabled: false, breakOverrun: true, breakThresholdMin: 45, plannerReminder: true, examMilestones: true, idleNudge: true, idleThresholdMin: 30, revisionReminder: true, sleepReminder: true, parentLogReminder: true };
+// BUG FIX: this copy had drifted out of sync with the canonical list in
+// storage.js's NOTIF_DEFAULTS — it was missing backupReminder,
+// waterBreakReminder/waterBreakFrequencyMin, and smRadioReminders entirely
+// (so importing an old/partial backup file that also lacked those keys left
+// them `undefined` in what got saved — only bailed out by storage.js's OWN
+// separate default-merge on the next read), and it had breakOverrun/
+// examMilestones/idleNudge hardcoded to `true` here vs. `false` in the
+// canonical list. Now a straight copy of storage.js's NOTIF_DEFAULTS so an
+// imported backup's missing settings resolve to the exact same defaults a
+// brand-new install gets.
+const NOTIF_DEFAULTS = { enabled: false, breakOverrun: false, breakThresholdMin: 45, plannerReminder: true, plannerReminderStartTime: "20:00", examMilestones: false, idleNudge: false, idleThresholdMin: 30, revisionReminder: true, revisionReminderTime: "21:00", sleepReminder: false, sleepReminderStartTime: "22:30", parentLogReminder: true, parentLogReminderTime: "22:30", backupReminder: true, waterBreakReminder: true, waterBreakFrequencyMin: 30, smRadioReminders: false };
 
 export async function exportDataJSON() {
     let mockTests = await getAllMockTests();

@@ -8,6 +8,11 @@
     --danger: #ef4444;
     --text: #f1f5f9;
     --muted: #64748b;
+    /* Sits between --text and --muted — for parenthetical/secondary text
+       that needs to read clearly (unlike --muted at low opacity, which can
+       go nearly invisible) while still staying visibly dimmer than the
+       heading/label text next to it. */
+    --muted-bright: #9aa7bd;
     /* Solid single-tone accent for the "JEE 2027" title — a cool
        periwinkle-blue that reads as one unified color against the deep
        navy --bg, distinct from --primary (used everywhere on buttons/

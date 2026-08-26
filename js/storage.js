@@ -8,7 +8,10 @@ const SYLLABUS_KEY = "jee_syllabus_progress";
 // higher-frequency/more-personal ones OFF (break overrun, Everyday 360R,
 // water break) so a fresh install isn't immediately noisy. Anyone can
 // still flip any of these on/off per-user in Settings → Notifications.
-const NOTIF_DEFAULTS = { enabled: false, breakOverrun: false, breakThresholdMin: 45, plannerReminder: true, plannerReminderStartTime: "20:00", examMilestones: true, idleNudge: true, idleThresholdMin: 30, revisionReminder: true, revisionReminderTime: "21:00", sleepReminder: true, sleepReminderStartTime: "22:30", parentLogReminder: true, parentLogReminderTime: "22:30", backupReminder: true, waterBreakReminder: false, waterBreakFrequencyMin: 30, smRadioReminders: false };
+// Only Planner, Revision, Send-to-parent, Local backup & Water break are ON
+// by default — everything else (break-overrun, sleep, Everyday 360R, exam
+// milestones, idle nudge) starts OFF; the user opts in themselves if wanted.
+const NOTIF_DEFAULTS = { enabled: false, breakOverrun: false, breakThresholdMin: 45, plannerReminder: true, plannerReminderStartTime: "20:00", examMilestones: false, idleNudge: false, idleThresholdMin: 30, revisionReminder: true, revisionReminderTime: "21:00", sleepReminder: false, sleepReminderStartTime: "22:30", parentLogReminder: true, parentLogReminderTime: "22:30", backupReminder: true, waterBreakReminder: true, waterBreakFrequencyMin: 30, smRadioReminders: false };
 const YT_HISTORY_KEY = "jee_yt_history";
 const YT_HISTORY_MAX = 20;
 export const MOCK_DB_NAME = "jee_mocktest_db";

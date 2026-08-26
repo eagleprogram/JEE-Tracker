@@ -159,9 +159,15 @@
                      browser behavior for label+for). Per feature request, that's
                      no longer wanted — the checkbox/box itself is now the only
                      click target that toggles a setting. `for` intentionally
-                     removed from every checkbox-row label below. -->
+                     removed from every checkbox-row label below.
+                     Setting NAMES below are Title Case (every word capitalized —
+                     "Water Break Reminder", not "Water break reminder"); the
+                     parenthetical notes after them stay in normal sentence case
+                     on purpose (see .settings-row-note comment in components.css)
+                     so the technical detail reads as a quieter aside next to the
+                     setting's actual name. -->
                 <div class="settings-row">
-                    <label>Break overrun alert</label>
+                    <label>Break Overrun Alert</label>
                     <input type="checkbox" id="notif-breakOverrun" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -170,7 +176,7 @@
                     <span style="font-size:12px; color:var(--muted);">min on break</span>
                 </div>
                 <div class="settings-row">
-                    <label>Planner task reminder <span class="settings-row-note">(2hr window, remind every 30min)</span></label>
+                    <label>Planner Task Reminder <span class="settings-row-note">(2hr window, remind every 30min)</span></label>
                     <input type="checkbox" id="notif-plannerReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -178,7 +184,7 @@
                     <input type="time" id="notif-plannerReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Revision reminder <span class="settings-row-note">(once/day)</span></label>
+                    <label>Revision Reminder <span class="settings-row-note">(once/day)</span></label>
                     <input type="checkbox" id="notif-revisionReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -186,7 +192,7 @@
                     <input type="time" id="notif-revisionReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Sleep reminder <span class="settings-row-note">(30-min window, remind every 10min)</span></label>
+                    <label>Sleep Reminder <span class="settings-row-note">(30-min window, remind every 10min)</span></label>
                     <input type="checkbox" id="notif-sleepReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -194,7 +200,7 @@
                     <input type="time" id="notif-sleepReminderStartTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Send daily log to parent <span class="settings-row-note">(once/day)</span></label>
+                    <label>Send Daily Log To Parent <span class="settings-row-note">(once/day)</span></label>
                     <input type="checkbox" id="notif-parentLogReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -202,7 +208,7 @@
                     <input type="time" id="notif-parentLogReminderTime" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Export local backup reminder <span class="settings-row-note">(every 2 days)</span></label>
+                    <label>Export Local Backup Reminder <span class="settings-row-note">(every 2 days)</span></label>
                     <input type="checkbox" id="notif-backupReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
@@ -210,11 +216,11 @@
                     <input type="checkbox" id="notif-smRadioReminders" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Exam milestone pings</label>
+                    <label>Exam Milestone Pings</label>
                     <input type="checkbox" id="notif-examMilestones" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-row">
-                    <label>Water break reminder <span class="settings-row-note">(while studying)</span></label>
+                    <label>Water Break Reminder <span class="settings-row-note">(while studying)</span></label>
                     <input type="checkbox" id="notif-waterBreakReminder" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">
@@ -223,7 +229,7 @@
                     <span style="font-size:12px; color:var(--muted);">min</span>
                 </div>
                 <div class="settings-row">
-                    <label>Idle nudge <span class="settings-row-note">("still there?")</span></label>
+                    <label>Idle Nudge <span class="settings-row-note">("still there?")</span></label>
                     <input type="checkbox" id="notif-idleNudge" onchange="saveNotifSettingsFromUI()">
                 </div>
                 <div class="settings-sub">

@@ -244,11 +244,37 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; }
 .badge-studying { background: rgba(16, 185, 129, 0.2); color: var(--success); }
 .badge-paused { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-.badge-break { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+/* BUG FIX: "ON BREAK: <reason>" used the user's typed break reason verbatim.
+   A long reason — especially one with no spaces for word-break to latch
+   onto — rendered as a single unbroken line that ran straight off the card
+   and under the absolutely-positioned Zen Mode circle in the top-right
+   corner (which doesn't reserve layout space, since it's position:absolute).
+   max-width + box-sizing caps the badge at the card's own width so it can
+   never overflow horizontally; overflow-wrap:anywhere lets it wrap even
+   mid-word when there's no natural break point; the extra right padding
+   keeps the last few characters of a full-width line from sitting directly
+   under the Zen Mode button. */
+.badge-break {
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    padding-right: 56px;
+}
 .badge-idle { background: rgba(100, 116, 139, 0.2); color: var(--muted); }
 
 /* ===== Misc shared rows/lists ===== */
-.stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 14px; }
+/* gap:10px (added) guarantees breathing room between the text side and the
+   duration/delete side even when justify-content:space-between has nothing
+   left to distribute — e.g. once a long wrapped break name already fills
+   most of the row's width, space-between alone can't manufacture a gap out
+   of a width that's already spoken for. align-items:flex-start (also added)
+   keeps the duration+delete anchored to the FIRST line of a multi-line
+   wrapped name instead of drifting to the row's vertical center, which is
+   what made it look glued to the name's last line with no gap above it. */
+.stat-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 14px; }
 /* BUG FIX: a break's `reason` is freeform user-typed text (the "Forgot to
    log a break?" field) with no length limit and no guaranteed whitespace —
    a long string with no spaces (a pasted URL, a run-on word) has nothing
@@ -262,7 +288,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    side gets the opposite treatment — flex-shrink:0 + white-space:nowrap —
    so the duration/delete button always keeps its natural single-line size
    regardless of how long the text side gets. */
-.stat-row-text { min-width: 0; overflow-wrap: anywhere; word-break: break-word; display: flex; align-items: baseline; gap: 6px; }
+.stat-row-text { min-width: 0; overflow-wrap: anywhere; word-break: break-word; display: flex; align-items: baseline; gap: 8px; }
 /* Hanging indent for the break name: the "[HH:MM AM]" time stays a
    non-wrapping flex item and the name is its own flex item next to it, so
    a long name wraps within its own column — the 2nd/3rd line lands under
@@ -288,8 +314,14 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 /* The "(2hr window, remind every 30min)"-style parenthetical after a
    notification's name — kept in normal sentence case (not force-capitalized
    word-by-word), just visually de-emphasized so the setting's actual name
-   is what stands out and the technical detail reads as a quiet aside. */
-.settings-row-note { color: var(--muted); opacity: 0.7; font-weight: 400; }
+   is what stands out and the technical detail reads as a quiet aside.
+   BUG FIX: var(--muted) at opacity:0.7 compounded two dimming steps into
+   one — depending on the surrounding background it read as either barely
+   legible or, once nudged up, suddenly too close to the label's own
+   brightness with no middle ground. --muted-bright is a single fixed color
+   (opacity:1, no compounding) pitched between --text and --muted, so it's
+   reliably readable but still clearly quieter than the setting's name. */
+.settings-row-note { color: var(--muted-bright); font-weight: 400; }
 /* Custom checkbox — same dark "sunken" look as the number/time inputs
    above (var(--bg) fill, var(--border) outline) instead of the browser's
    default grey/blue control, so it matches the rest of the settings UI. */
