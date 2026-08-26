@@ -29,7 +29,7 @@ import { initToday } from './storage.js';
 // canonical list. Now a straight copy of storage.js's NOTIF_DEFAULTS so an
 // imported backup's missing settings resolve to the exact same defaults a
 // brand-new install gets.
-const NOTIF_DEFAULTS = { enabled: false, breakOverrun: false, breakThresholdMin: 45, plannerReminder: true, plannerReminderStartTime: "20:00", examMilestones: false, idleNudge: false, idleThresholdMin: 30, revisionReminder: true, revisionReminderTime: "21:00", sleepReminder: false, sleepReminderStartTime: "22:30", parentLogReminder: true, parentLogReminderTime: "22:30", backupReminder: true, waterBreakReminder: true, waterBreakFrequencyMin: 30, smRadioReminders: false };
+const NOTIF_DEFAULTS = { enabled: false, breakOverrun: false, breakThresholdMin: 45, plannerReminder: true, plannerReminderStartTime: "20:00", examMilestones: true, idleNudge: false, idleThresholdMin: 30, revisionReminder: true, revisionReminderTime: "21:00", sleepReminder: false, sleepReminderStartTime: "22:30", parentLogReminder: true, parentLogReminderTime: "22:30", backupReminder: true, waterBreakReminder: true, waterBreakFrequencyMin: 30, smRadioReminders: false };
 
 export async function exportDataJSON() {
     let mockTests = await getAllMockTests();

@@ -60,7 +60,7 @@ const NOTIF_DEFAULTS = {
     plannerReminder: true, plannerReminderStartTime: "20:00",
     examMilestones: true,
     revisionReminder: true, revisionReminderTime: "21:00",
-    sleepReminder: true, sleepReminderStartTime: "22:30",
+    sleepReminder: false, sleepReminderStartTime: "22:30",
     parentLogReminder: true, parentLogReminderTime: "22:30",
     backupReminder: true
 };

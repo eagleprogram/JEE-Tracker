@@ -146,8 +146,17 @@
         </div>
 
         <div class="card" style="padding: 12px;">
-            <h4 style="margin:0 0 6px 0;">🔔 Notifications</h4>
-            <div id="notif-permission-status" class="small-note" style="margin-bottom: 12px;"></div>
+            <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                <h4 style="margin:0;">🔔 Notifications</h4>
+                <!-- BUG FIX: this status line used to sit on its own row below
+                     the title (.small-note, dim and easy to miss). Moved onto
+                     the title's own row, right beside it — and given
+                     --muted-bright (see components.css/.settings-row-note)
+                     instead of .small-note's var(--muted) so it's readable,
+                     while still deliberately dimmer than the bold title text
+                     next to it. -->
+                <span id="notif-permission-status" style="font-size:12px; color:var(--muted-bright); font-weight:400;"></span>
+            </div>
             <div style="display:flex; gap:6px; margin-bottom:8px;">
                 <button class="btn btn-start btn-small" style="flex:1;" onclick="enableNotifications()">Enable Notifications</button>
                 <button class="btn btn-pause btn-small" style="flex:1;" onclick="saveNotifSettingsFromUI()">Save Settings</button>
@@ -241,7 +250,7 @@
             </div>
 
             <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
-                <div style="font-size:13px; font-weight:700; margin-bottom:4px;">📴 Background Alerts (even when the app is fully closed)</div>
+                <div style="font-size:13px; font-weight:700; margin-bottom:4px;">📴 Background Alerts (When App Is Closed)</div>
                 <div id="push-permission-status" class="small-note" style="margin-bottom:8px;"></div>
                 <div style="display:flex; gap:6px;">
                     <button class="btn btn-start btn-small" style="flex:1;" onclick="enableBackgroundPush()">Enable</button>
