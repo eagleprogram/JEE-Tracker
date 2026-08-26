@@ -83,7 +83,7 @@ export function updateNotifPermissionStatus() {
     let el = document.getElementById("notif-permission-status");
     if (!("Notification" in window)) { el.innerText = "Not supported."; return; }
     let s = getNotifSettings();
-    if (Notification.permission === "granted" && s.enabled) el.innerText = "✅ OS notifications enabled.";
+    if (Notification.permission === "granted" && s.enabled) el.innerText = "(OS notifications enabled ✅)";
     else if (Notification.permission === "denied") el.innerText = "⛔ Blocked — enable in browser settings.";
     else el.innerText = "Toasts always work in-tab. Click below for OS pop-ups too.";
 }
