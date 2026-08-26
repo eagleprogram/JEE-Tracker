@@ -254,26 +254,25 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    mid-word when there's no natural break point; the extra right padding
    keeps the last few characters of a full-width line from sitting directly
    under the Zen Mode button. */
-/* BUG FIX (round 2): the round-1 fix (max-width/overflow-wrap below) wasn't
-   enough on its own — .badge-break still inherited display:inline-block
-   from .badge, and an inline-block box's width is "shrink-to-fit" computed
-   from the UNWRAPPED content first; browsers are inconsistent about letting
-   overflow-wrap:anywhere shrink that shrink-to-fit calculation for a long
-   unbroken run of characters, so it could still size itself past the card
-   and get clipped/overlapped by the Zen Mode button instead of wrapping.
-   display:block + width:100% removes the guesswork entirely — a block box
-   is simply as wide as its container, full stop, so wrapping is computed
-   against a fixed, known width every time regardless of content. */
+/* BUG FIX (round 3): round 2's display:block + width:100% did stop long
+   names from sliding under the Zen Mode button, but it also made the pill
+   span the FULL card width on every break, short or long — so it always
+   ran flush up against the Zen Mode button instead of ending with a gap
+   right after the last letter like it used to. width:fit-content (instead
+   of 100%) restores that shrink-to-content look for normal names; the
+   max-width — sized to actually clear the 34px Zen Mode circle plus its
+   14px inset, not just an arbitrary padding number — is what still forces
+   long names to wrap instead of overflowing, so both cases are fixed at
+   once without reintroducing round 1's overflow bug. */
 .badge-break {
     display: block;
-    width: 100%;
+    width: fit-content;
+    max-width: calc(100% - 56px);
     background: rgba(139, 92, 246, 0.2);
     color: #a78bfa;
-    max-width: 100%;
     box-sizing: border-box;
     overflow-wrap: anywhere;
     word-break: break-word;
-    padding-right: 56px;
 }
 .badge-idle { background: rgba(100, 116, 139, 0.2); color: var(--muted); }
 
@@ -333,7 +332,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    brightness with no middle ground. --muted-bright is a single fixed color
    (opacity:1, no compounding) pitched between --text and --muted, so it's
    reliably readable but still clearly quieter than the setting's name. */
-.settings-row-note { color: var(--muted-bright); font-weight: 400; }
+.settings-row-note { color: var(--primary); font-weight: 400; }
 /* Custom checkbox — same dark "sunken" look as the number/time inputs
    above (var(--bg) fill, var(--border) outline) instead of the browser's
    default grey/blue control, so it matches the rest of the settings UI. */
