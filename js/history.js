@@ -65,7 +65,7 @@ export function loadHistoryData() {
 
     let bHtml = "";
     if (!day.breaks || day.breaks.length === 0) bHtml = "<em>No break logs recorded.</em>";
-    else { day.breaks.forEach((b) => { bHtml += `<div class="stat-row"><span class="stat-row-text"><strong>[${formatTime12Hour(b.time)}]</strong> ${escapeHtml(b.reason)}</span><span class="stat-row-actions"><span style="color:#a78bfa;">${formatReadable(b.duration)}</span><button class="del" onclick="deleteBreakEntry('${dt}','${b.id}')">✕</button></span></div>`; }); }
+    else { day.breaks.forEach((b) => { bHtml += `<div class="stat-row"><span class="stat-row-text"><strong class="stat-row-time">[${formatTime12Hour(b.time)}]</strong><span class="stat-row-name">${escapeHtml(b.reason)}</span></span><span class="stat-row-actions"><span style="color:#a78bfa;">${formatReadable(b.duration)}</span><button class="del" onclick="deleteBreakEntry('${dt}','${b.id}')">✕</button></span></div>`; }); }
     document.getElementById("history-break-list").innerHTML = bHtml;
 
     // Sort sessions: earliest to latest

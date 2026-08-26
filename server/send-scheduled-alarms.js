@@ -2,7 +2,7 @@
 // JEE Tracker — Scheduled Push Alarm Sender
 // ----------------------------------------------------------------------------
 // Runs every ~5 minutes via ../.github/workflows/scheduled-alarms.yml (a free
-// GitHub Actions cron job — see ../PUSH_SETUP.md for one-time setup).
+// GitHub Actions cron job).
 //
 // WHY THIS EXISTS: js/notifications.js's alarm loop only runs inside an open
 // browser tab (see the "HONEST LIMIT" comment there). To reach a device with
@@ -35,13 +35,13 @@ const admin = require("firebase-admin");
 // ----------------- INIT -----------------
 // FIREBASE_SERVICE_ACCOUNT_JSON must be the *entire* contents of the service
 // account JSON key file (Firebase Console > Project Settings > Service
-// Accounts > Generate new private key), stored as a GitHub Actions secret —
-// see ../PUSH_SETUP.md. This key can read/write your whole Firestore
-// database, so it must NEVER be committed to the repo — only ever passed in
-// as a secret environment variable.
+// Accounts > Generate new private key), stored as a GitHub Actions secret.
+// This key can read/write your whole Firestore database, so it must NEVER
+// be committed to the repo — only ever passed in as a secret environment
+// variable.
 const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 if (!svcJson) {
-    console.error("FIREBASE_SERVICE_ACCOUNT_JSON is not set. See PUSH_SETUP.md.");
+    console.error("FIREBASE_SERVICE_ACCOUNT_JSON is not set.");
     process.exit(1);
 }
 let serviceAccount;

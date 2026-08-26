@@ -145,7 +145,7 @@ function questionRingColor(count) {
     return null;                             // no data logged yet
 }
 
-function questionRingSVG(count, clickable) {
+function questionRingSVG(count, clickable, key) {
     // Ring bumped up from the old r=24/cx,cy=30/viewBox 60x60 — kept the
     // same stroke-to-radius ratio (strokeW/r) so the ring doesn't look
     // proportionally thinner or thicker, just slightly bigger overall.
@@ -159,17 +159,32 @@ function questionRingSVG(count, clickable) {
     // rendered at a thinner stroke width and reduced opacity, matching the
     // subtle, classic dashed-circle look of the reference design (as opposed
     // to the old bold, fully-opaque round-dot track).
-    let track = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="2.5" stroke-linecap="butt" stroke-dasharray="4 3.5" stroke-opacity="0.55"/>`;
-    let arc = color ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" transform="rotate(90 ${cx} ${cy})"/>` : "";
+    // pointer-events="none" on track/arc/text: none of these should ever
+    // capture the click themselves — only the dedicated "hit" circle below
+    // does, so the clickable area is the true circular disc, not whichever
+    // painted shape happens to be on top at a given pixel.
+    let track = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="2.5" stroke-linecap="butt" stroke-dasharray="4 3.5" stroke-opacity="0.55" pointer-events="none"/>`;
+    let arc = color ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" transform="rotate(90 ${cx} ${cy})" pointer-events="none"/>` : "";
     let label = count > 0 ? count : "0";
     let textColor = color || "var(--muted)";
     // Feature request: the number itself is only clickable (cursor:pointer +
     // opens the edit popup) for yesterday/today — see renderQuestionsWidget()
     // below for which days pass clickable=true. Older days render identically
     // but without the pointer cursor and without a click handler.
-    return `<svg width="100%" height="72" viewBox="0 0 68 68" style="max-width:68px; ${clickable ? 'cursor:pointer;' : ''}">
+    //
+    // Hit target: a real <circle> (fill="transparent", not "none", so SVG
+    // hit-testing treats the whole disc as painted) sized exactly to the
+    // ring (r=27 around the same center). Because it's a genuine circular
+    // shape — not a div/rect — clicks land only within or on the outline of
+    // the ring itself; the corners of the surrounding square SVG viewport
+    // no longer register as a click.
+    let hit = clickable
+        ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="transparent" style="cursor:pointer;" onclick="openQuestionsModal('${key}')"/>`
+        : "";
+    return `<svg width="100%" height="72" viewBox="0 0 68 68" style="max-width:68px;">
         ${track}${arc}
-        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="800" fill="${textColor}">${label}</text>
+        <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="800" fill="${textColor}" pointer-events="none">${label}</text>
+        ${hit}
     </svg>`;
 }
 
@@ -193,8 +208,11 @@ export function renderQuestionsWidget() {
         let isToday = key === todayKey;
         let count = db[key]?.questionsSolved || 0;
         let clickable = (key === todayKey || key === yesterdayKey);
-        let onclick = clickable ? ` onclick="openQuestionsModal('${key}')"` : "";
-        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"${onclick}><div class="dow-label">${dowLabels[i]}</div>${questionRingSVG(count, clickable)}</div>`;
+        // The onclick used to live on this whole div (so any click inside
+        // its square footprint — including the empty corners around the
+        // circle — opened the modal). It now lives only on the circular
+        // "hit" shape inside the SVG itself; see questionRingSVG().
+        html += `<div class="garden-plot ${isToday ? 'is-today' : ''}"><div class="dow-label">${dowLabels[i]}</div>${questionRingSVG(count, clickable, key)}</div>`;
     }
     cont.innerHTML = html;
 }

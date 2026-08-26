@@ -18,7 +18,7 @@ For multi-device users, Firebase Firestore provides effortless, cross-device syn
 - **Chapter-Wise Mistakes:** Dedicated mistakes log tied to individual syllabus chapters.
 - **Offline-First PWA:** Service worker caching enables full functionality without an internet connection, including the question-practice tracker module.
 - **Cross-Device Cloud Sync:** Securely syncs all data (study logs, planner, sleep, syllabus, and question-practice counts) across devices using Firebase Auth and Firestore.
-- **Background Push Reminders:** Optional second delivery channel (Firebase Cloud Messaging + a free GitHub Actions cron job) that delivers reminders/alarms even when the browser is fully closed — see [`PUSH_SETUP.md`](./PUSH_SETUP.md) for the one-time setup.
+- **Background Push Reminders:** Optional second delivery channel (Firebase Cloud Messaging + a free GitHub Actions cron job) that delivers reminders/alarms even when the browser is fully closed.
 
 ---
 
@@ -40,7 +40,6 @@ JEE-Tracker/
 ├── index.html                       — page shell, all markup
 ├── manifest.json                    — PWA manifest
 ├── sw.js                            — service worker (offline app-shell caching + background push display)
-├── PUSH_SETUP.md                    — one-time setup guide for background push notifications
 ├── .github/
 │   └── workflows/
 │       └── scheduled-alarms.yml     — GitHub Actions cron (every 5 min) that runs the push scheduler
@@ -63,18 +62,18 @@ JEE-Tracker/
     ├── push-notifications.js — registers the device for background push (FCM token + VAPID key)
     ├── planner.js            — to-do list + calendar
     ├── history.js            — logs, per-entry delete
-    ├── sleep.js               — sleep/wake log
-    ├── questions.js           — daily question count prompt + weekly question-practice ring
-    ├── syllabus.js             — chapter-by-chapter syllabus tracker
-    ├── mocktest.js              — mock test scores + mistake tags
-    ├── mistakes.js               — chapter-wise mistakes tracker
-    ├── youtube.js                 — study-music player + history
-    ├── charts.js                   — garden, heatmap, streak, trend
-    ├── reports.js                   — share/download/email reports
-    ├── backup.js                     — export/import JSON
-    ├── firebase-sync.js               — auth + cloud sync
-    ├── ui.js                           — sidebar, toasts, countdown
-    └── main.js                         — entry point, wires it all
+    ├── sleep.js              — sleep/wake log
+    ├── questions.js          — daily question count prompt + weekly question-practice ring
+    ├── syllabus.js           — chapter-by-chapter syllabus tracker
+    ├── mocktest.js           — mock test scores + mistake tags
+    ├── mistakes.js           — chapter-wise mistakes tracker
+    ├── youtube.js            — study-music player + history
+    ├── charts.js             — garden, heatmap, streak, trend
+    ├── reports.js            — share/download/email reports
+    ├── backup.js             — export/import JSON
+    ├── firebase-sync.js      — auth + cloud sync
+    ├── ui.js                 — sidebar, toasts, countdown
+    └── main.js               — entry point, wires it all
 ```
 
 The account/guest "person" icon is no longer a separate PNG (`icon-user.png` was removed) — it's now an inline SVG data URI used directly as a CSS mask in `components.css`, so it can be recolored with a plain CSS variable and doesn't need its own file.
@@ -88,7 +87,7 @@ In-tab reminders work out of the box and need no configuration. For reminders th
 3. `.github/workflows/scheduled-alarms.yml` runs that script every 5 minutes for free via GitHub Actions — no server to host or pay for.
 4. `sw.js` receives the push in the background and shows the same alarm notification (sound/vibrate/"Stop Alarm") it already shows in-tab.
 
-Break-overrun and idle-nudge reminders remain tab-only, since they depend on live timer state that isn't synced to Firestore in real time. Every other reminder type (revision, parent log, sleep, planner tasks, exam milestones, backup) is covered. Full one-time setup steps (VAPID key, Firebase service-account secret) are in [`PUSH_SETUP.md`](./PUSH_SETUP.md).
+Break-overrun and idle-nudge reminders remain tab-only, since they depend on live timer state that isn't synced to Firestore in real time. Every other reminder type (revision, parent log, sleep, planner tasks, exam milestones, backup) is covered.
 
 ## Known Bugs Fixed in This Rebuild
 

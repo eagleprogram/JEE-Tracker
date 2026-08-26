@@ -262,17 +262,34 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
    side gets the opposite treatment — flex-shrink:0 + white-space:nowrap —
    so the duration/delete button always keeps its natural single-line size
    regardless of how long the text side gets. */
-.stat-row-text { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.stat-row-text { min-width: 0; overflow-wrap: anywhere; word-break: break-word; display: flex; align-items: baseline; gap: 6px; }
+/* Hanging indent for the break name: the "[HH:MM AM]" time stays a
+   non-wrapping flex item and the name is its own flex item next to it, so
+   a long name wraps within its own column — the 2nd/3rd line lands under
+   the first letter of the name, not back under the time stamp. */
+.stat-row-time { flex-shrink: 0; white-space: nowrap; }
+.stat-row-name { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .stat-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; white-space: nowrap; }
 /* margin: 6px 0 (not just margin-top) so items get breathing room both
    above AND below — previously only margin-top was set, so the very last
    item in the scrollable #todo-list had nothing separating it from the
    container's bottom edge, and the first item's gap depended entirely on
    #todo-list's own top padding rather than the item itself. */
-.todo-item { display: flex; align-items: center; gap: 8px; background: var(--bg); padding: 8px; border-radius: 6px; margin: 6px 0; font-size: 13px; word-break: break-word; overflow-wrap: break-word; }
+.todo-item { display: flex; align-items: flex-start; gap: 8px; background: var(--bg); padding: 8px; border-radius: 6px; margin: 6px 0; font-size: 13px; }
+/* Hanging indent for to-do/task text, same idea as .stat-row-name above:
+   the priority dot and the text are separate flex items instead of both
+   living inside one inline span, so a wrapped 2nd line lands under the
+   first letter of the text instead of back under the colour dot. */
+.todo-item-body, .task-item .task-text { display: flex; align-items: flex-start; gap: 6px; min-width: 0; flex: 1; }
+.todo-text, .task-item .task-text .task-text-content { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .log-box { max-height: 200px; overflow-y: auto; background: var(--bg); border-radius: 8px; padding: 8px; }
 .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; }
 .settings-row label { flex: 1; }
+/* The "(2hr window, remind every 30min)"-style parenthetical after a
+   notification's name — kept in normal sentence case (not force-capitalized
+   word-by-word), just visually de-emphasized so the setting's actual name
+   is what stands out and the technical detail reads as a quiet aside. */
+.settings-row-note { color: var(--muted); opacity: 0.7; font-weight: 400; }
 /* Custom checkbox — same dark "sunken" look as the number/time inputs
    above (var(--bg) fill, var(--border) outline) instead of the browser's
    default grey/blue control, so it matches the rest of the settings UI. */
@@ -544,8 +561,7 @@ input[type="text"]:disabled, input[type="date"]:disabled { opacity: 0.5; cursor:
 #questions-count-input::-webkit-outer-spin-button {
     opacity: 1;
 }
-.task-item { display: flex; align-items: center; gap: 10px; background: var(--bg); padding: 12px; border-radius: 8px; margin-top: 8px; font-size: 15px; }
-.task-item .task-text { flex: 1; }
+.task-item { display: flex; align-items: flex-start; gap: 10px; background: var(--bg); padding: 12px; border-radius: 8px; margin-top: 8px; font-size: 15px; }
 .task-item .task-text .done { text-decoration: line-through; color: var(--muted); }
 .task-item button.del { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 18px; }
 /* Priority dot (🔴/🟡/🟢) for todo/task rows — kept in its own span in

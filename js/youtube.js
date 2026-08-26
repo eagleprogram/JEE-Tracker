@@ -200,20 +200,25 @@ export function createOrLoadYTPlayer(id) {
                 if (!ytCurrentIsShort && e.data === YT.PlayerState.PAUSED && ytPlayer.getCurrentTime) {
                     saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime());
                 }
-                // BUG FIX (feature request): this used to only restart from 0
-                // when the separate Loop button was manually toggled on — the
-                // actual ask is for EVERY video (music replayed many times,
-                // lecture rewatches) to loop back to the start the instant it
-                // finishes, unconditionally, not gated behind that toggle.
-                // Also clears its saved position first — a completed watch
-                // shouldn't leave a "resume near the very end" position
-                // sitting around for the NEXT time this video gets loaded
-                // fresh (the restart below is immediate/in-session, separate
-                // from that saved-for-later position).
+                // On end: always clear the saved resume position for this
+                // video first — a completed watch shouldn't leave a "resume
+                // near the very end" position sitting around for the NEXT
+                // time this exact video gets loaded (switch away and back,
+                // or reopen later), so it restarts from 0 then.
+                //
+                // Whether it replays RIGHT NOW (in this same session) is
+                // gated behind the Loop button (ytLoopEnabled) — that's the
+                // button's actual job. A previous fix made every video loop
+                // unconditionally, which silently ignored the Loop toggle
+                // entirely; that's reverted here. With Loop off (the
+                // default), the video just stops at the end, same as
+                // YouTube's own default behavior.
                 if (e.data === YT.PlayerState.ENDED) {
                     clearYtPosition(ytCurrentId);
-                    ytPlayer.seekTo(0);
-                    ytPlayer.playVideo();
+                    if (ytLoopEnabled) {
+                        ytPlayer.seekTo(0);
+                        ytPlayer.playVideo();
+                    }
                 }
             },
             onError: (e) => {

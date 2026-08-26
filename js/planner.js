@@ -70,7 +70,7 @@ export function renderSidebarTools() {
     // the emoji dot too — a strikethrough dash cutting across the colored
     // dot. The dot now sits in its own span that never gets line-through;
     // only the text span does.
-    order.forEach(i => { let t = tasks[i]; todoHtml += `<div class="todo-item"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${i})"><span style="flex:1;"><span class="priority-dot">${getPriorityEmoji(t.priority)}</span> <span style="${t.done?'text-decoration:line-through;color:var(--muted);':''}">${escapeHtml(t.text)}</span></span><button class="del" onclick="deleteTodo(${i})">✕</button></div>`; });
+    order.forEach(i => { let t = tasks[i]; todoHtml += `<div class="todo-item"><input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo(${i})"><span class="todo-item-body"><span class="priority-dot">${getPriorityEmoji(t.priority)}</span><span class="todo-text" style="${t.done?'text-decoration:line-through;color:var(--muted);':''}">${escapeHtml(t.text)}</span></span><button class="del" onclick="deleteTodo(${i})">✕</button></div>`; });
     document.getElementById("todo-list").innerHTML = todoHtml;
     let countBadge = document.getElementById("todo-count-badge");
     if (countBadge) countBadge.textContent = tasks.filter(t => !t.done).length;
@@ -270,7 +270,7 @@ export function renderPlannerTasks() {
     let order = sortTaskIndices(tasks, sortSelect ? sortSelect.value : "added");
     // Same fix as renderSidebarTools() above — dot isolated from the
     // line-through so the strike only crosses the task text, not the dot.
-    order.forEach(i => { let t = tasks[i]; html += `<div class="task-item"><input type="checkbox" ${t.done ? 'checked' : ''} onchange="togglePlannerTask(${i})"><span class="task-text"><span class="priority-dot">${getPriorityEmoji(t.priority)}</span> <span class="${t.done ? 'done' : ''}">${escapeHtml(t.text)}</span></span><button class="del" onclick="deletePlannerTask(${i})">✕</button></div>`; });
+    order.forEach(i => { let t = tasks[i]; html += `<div class="task-item"><input type="checkbox" ${t.done ? 'checked' : ''} onchange="togglePlannerTask(${i})"><span class="task-text"><span class="priority-dot">${getPriorityEmoji(t.priority)}</span><span class="task-text-content ${t.done ? 'done' : ''}">${escapeHtml(t.text)}</span></span><button class="del" onclick="deletePlannerTask(${i})">✕</button></div>`; });
     document.getElementById("planner-task-list").innerHTML = html;
 }
 

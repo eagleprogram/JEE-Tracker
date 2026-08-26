@@ -12,8 +12,7 @@
 // 9pm, send the revision reminder" and call FCM's send API on a schedule.
 // This static, backend-less site can't do that while nobody has it open. A
 // tiny scheduled Node script (server/send-scheduled-alarms.js), triggered
-// every 5 minutes by a free GitHub Actions cron job, is what does that half
-// — see PUSH_SETUP.md for the one-time setup (all free, no credit card).
+// every 5 minutes by a free GitHub Actions cron job, is what does that half.
 // This file is only the CLIENT half: getting this device's push token and
 // handing it to that script (via Firestore) so it knows where to deliver.
 //
@@ -23,7 +22,7 @@
 // exact timing (a few minutes' slip during high load is normal), and
 // auto-disables a repo's scheduled workflows after 60 days with no commits
 // to the repo at all (a `workflow_dispatch` run or any commit resets that
-// clock — see PUSH_SETUP.md). It is NOT a literal 100%-guaranteed pager —
+// clock). It is NOT a literal 100%-guaranteed pager —
 // nothing free and backend-less can promise that — but it closes the gap
 // for the one case pure client-side code genuinely cannot cover: the
 // browser fully closed.
@@ -65,7 +64,7 @@ function initMessagingIfNeeded() {
 export function updatePushPermissionStatusUI() {
     let el = document.getElementById("push-permission-status");
     if (!el) return;
-    if (!vapidConfigured()) { el.innerText = "Not set up yet — see PUSH_SETUP.md."; return; }
+    if (!vapidConfigured()) { el.innerText = "Not set up yet on this deployment."; return; }
     if (!("Notification" in window) || !("serviceWorker" in navigator)) { el.innerText = "Not supported on this browser."; return; }
     if (!getCurrentUser()) { el.innerText = "Sign in first to enable this."; return; }
     if (Notification.permission === "denied") { el.innerText = "⛔ Blocked — enable notifications in browser settings."; return; }
@@ -74,7 +73,7 @@ export function updatePushPermissionStatusUI() {
 }
 
 export async function enableBackgroundPush() {
-    if (!vapidConfigured()) { alert("Background push isn't configured yet on this deployment. See PUSH_SETUP.md — it's a free, one-time setup."); return; }
+    if (!vapidConfigured()) { alert("Background push isn't configured yet on this deployment."); return; }
     if (!getCurrentUser()) { alert("Sign in first — background alerts are saved to your account so the scheduled job knows where to send them."); return; }
     if (!("serviceWorker" in navigator) || !("Notification" in window)) { alert("Push notifications aren't supported on this browser."); return; }
     try {

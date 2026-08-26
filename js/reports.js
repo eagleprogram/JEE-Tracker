@@ -94,7 +94,7 @@ function buildShareCanvas(dt) {
     ctx.textAlign = "center";
     ctx.fillStyle = "#38bdf8";
     ctx.font = "bold 28px sans-serif";
-    ctx.fillText("🎯 JEE Study Log", width / 2, 52);
+    ctx.fillText("JEE Study Log", width / 2, 52);
     
     ctx.fillStyle = "#64748b";
     ctx.font = "16px sans-serif";
@@ -740,7 +740,7 @@ function getReportDayRange(type) {
 
 export function downloadReport(type) {
         let days = getReportDayRange(type);
-        let canvas = buildReportCanvas(days, type === 'weekly' ? '📊 Weekly Study Report' : '📊 Monthly Study Report');
+        let canvas = buildReportCanvas(days, type === 'weekly' ? 'Weekly Study Report' : 'Monthly Study Report');
         canvas.toBlob((blob) => { let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = `report-${type}-${getTodayKey()}.png`; a.click(); URL.revokeObjectURL(url); showToast(`${type} report downloaded.`); });
     }
 
@@ -779,7 +779,7 @@ function buildReportShareText(days, type) {
 export async function shareReport(type) {
         let days = getReportDayRange(type);
         let text = buildReportShareText(days, type);
-        let canvas = buildReportCanvas(days, type === 'weekly' ? '📊 Weekly Study Report' : '📊 Monthly Study Report');
+        let canvas = buildReportCanvas(days, type === 'weekly' ? 'Weekly Study Report' : 'Monthly Study Report');
         canvas.toBlob(async (blob) => {
             let file = new File([blob], `report-${type}-${getTodayKey()}.png`, { type: "image/png" });
             if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: type === 'weekly' ? "My Weekly Study Report" : "My Monthly Study Report", text }); return; } catch (e) { if (e.name === "AbortError") return; } }

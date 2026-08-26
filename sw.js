@@ -12,7 +12,7 @@ const CACHE_NAME = "jee-tracker-v2.6.0";
 // focused — the one channel that can still reach the user with the browser
 // fully closed (as far as the OS/platform allows at all — see the "HONEST
 // LIMIT" comment in js/push-notifications.js). Sent by the free scheduled
-// job in server/send-scheduled-alarms.js — see PUSH_SETUP.md for setup.
+// job in server/send-scheduled-alarms.js.
 //
 // A classic (non-module) service worker can't `import` js/firebase-sync.js,
 // so the Firebase compat SDK is loaded the same way that file loads it in
