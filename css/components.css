@@ -583,17 +583,19 @@ button.del:hover { color: #fca5a5; }
    back to the paste-a-link input without touching the current player. */
 .yt-now-playing { margin-top: 6px; padding: 6px 8px; font-size: 12px; color: rgba(241, 245, 249, 0.45); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .yt-now-playing:hover { color: rgba(241, 245, 249, 0.65); border-color: var(--primary); }
-/* BUG FIX (feature request): reverted the oversample-and-shrink trick
-   (rendering the iframe at 160% then scaling the whole thing down to
-   62.5%) — that was shrinking YouTube's OWN native control-bar buttons
-   (play/pause, captions, settings, volume — the ones baked into the
-   YouTube player itself), which is exactly what was reported as "buttons
-   drastically reduced". A plain, unscaled iframe is the standard/default
-   size those buttons render at — this is that. (Our own Pause/Speed/Loop/
-   Close buttons below .yt-controls are separate DOM elements outside this
-   iframe entirely and are unaffected either way.) */
+/* BUG FIX (feature request, round 2 of this tuning): un-scaled (100%,
+   round 1's fix) rendered YouTube's own native buttons too LARGE — going
+   back to 160%/0.625 would repeat the original "too small" complaint from
+   before that. 125%/0.8 is the middle ground between those two data
+   points: renders the iframe modestly larger than its box, then scales
+   the whole result back down by the inverse amount, landing the native
+   control bar closer to (but a little under) its unscaled size. If this
+   specific number still isn't quite right either way, it needs an actual
+   before/after screenshot to dial in further — screen/viewport width
+   changes where YouTube's own responsive control-bar breakpoints kick in,
+   so the "right" ratio isn't fully predictable from code alone. */
 .yt-player-shrink { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #000; }
-.yt-player-shrink #yt-player, .yt-player-shrink iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+.yt-player-shrink #yt-player, .yt-player-shrink iframe { position: absolute; top: 0; left: 0; width: 125%; height: 125%; transform: scale(0.8); transform-origin: top left; border: 0; }
 .yt-controls { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 /* BUG FIX: reverted the padding/font-size bump from last round — that was
    meant to address "buttons too small", but the actual complaint was about

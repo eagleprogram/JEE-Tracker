@@ -11,6 +11,18 @@ let ytIsPlaying = false;
 // title it just resolved still belongs to what's on screen before using it
 // to update the "Now Playing" label.
 let ytCurrentId = null;
+// Feature request: YouTube Shorts should never remember/resume a playback
+// position — always start from 0 whenever loaded, regardless of where the
+// user left off last time. Determined purely from the URL ("/shorts/" —
+// see isShortsUrl() below) at load time in loadYoutubeLink(), the single
+// choke point both a fresh paste AND loadFromYtHistory() route through
+// (history entries store their original URL and always re-submit it there).
+let ytCurrentIsShort = false;
+function isShortsUrl(url) { return /\/shorts\//.test(url || ""); }
+// Feature request: 0 for a Short (never resume it), otherwise whatever was
+// actually saved for this video — single choke point for every "where
+// should this video start from" read below.
+function resumePositionFor(id) { return ytCurrentIsShort ? 0 : getYtPosition(id); }
 // Volume sync: our slider pushes to the player on every drag (ytSetVolume,
 // wired inline below), but the native control bar's own volume slider is
 // inside the iframe — cross-origin, so we can't listen to it directly. This
@@ -64,7 +76,7 @@ const YT_ICON_LOOP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 // periodic save could miss. Registered once at module load — youtube.js
 // itself is only ever imported/evaluated once.
 document.addEventListener("visibilitychange", () => {
-    if (document.hidden && ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
+    if (!ytCurrentIsShort && document.hidden && ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
         try { saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime()); } catch (e) { /* player mid-teardown — nothing to save */ }
     }
 });
@@ -143,7 +155,7 @@ export function createOrLoadYTPlayer(id) {
         // where a previous session (or the last time this same video was
         // loaded) left off, the same way the `start` playerVar does for a
         // brand new player below.
-        ytPlayer.loadVideoById(id, getYtPosition(id));
+        ytPlayer.loadVideoById(id, resumePositionFor(id));
         if (ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(1);
         return;
     }
@@ -157,8 +169,9 @@ export function createOrLoadYTPlayer(id) {
         // was last left off (refresh, tab close, or re-loading it from
         // History), for the initial player-construction case. The
         // loadVideoById(id, startSeconds) call above covers every load
-        // after this first one.
-        playerVars: { rel: 0, origin: window.location.origin, start: Math.floor(getYtPosition(id)) },
+        // after this first one. Always 0 for a Short — see
+        // resumePositionFor()/ytCurrentIsShort above.
+        playerVars: { rel: 0, origin: window.location.origin, start: Math.floor(resumePositionFor(id)) },
         events: {
             onReady: (e) => {
                 e.target.setVolume(parseInt(document.getElementById("yt-volume").value));
@@ -171,12 +184,11 @@ export function createOrLoadYTPlayer(id) {
                 // Safety-net re-seek in case the `start` playerVar above
                 // wasn't honored exactly (a known occasional quirk) —
                 // harmless no-op if it already landed in the right place.
-                let savedPos = getYtPosition(id);
+                let savedPos = resumePositionFor(id);
                 if (savedPos > 3) e.target.seekTo(savedPos, true);
                 startYtVolumeSync();
             },
             onStateChange: (e) => {
-                if (ytLoopEnabled && e.data === YT.PlayerState.ENDED) { ytPlayer.seekTo(0); ytPlayer.playVideo(); }
                 ytIsPlaying = (e.data === YT.PlayerState.PLAYING);
                 setPlayPauseUI(ytIsPlaying);
                 // Flush the position immediately on every pause (in addition
@@ -184,16 +196,25 @@ export function createOrLoadYTPlayer(id) {
                 // startYtVolumeSync()'s poll) so pausing right before closing
                 // the tab doesn't lose anything. ytCurrentId, not the
                 // closed-over `id` — see this function's opening comment.
-                if (e.data === YT.PlayerState.PAUSED && ytPlayer.getCurrentTime) {
+                // Feature request: never for a Short — see ytCurrentIsShort.
+                if (!ytCurrentIsShort && e.data === YT.PlayerState.PAUSED && ytPlayer.getCurrentTime) {
                     saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime());
                 }
-                // Feature request: a video that's been watched all the way
-                // through starts fresh from 0:00 next time, not 2 seconds
-                // from the end — clear its saved position instead of
-                // resuming near the very end. If loop is on, the seekTo(0)
-                // above already restarts it immediately; either way, the
-                // saved position for this "completed" watch shouldn't stick.
-                if (e.data === YT.PlayerState.ENDED) clearYtPosition(ytCurrentId);
+                // BUG FIX (feature request): this used to only restart from 0
+                // when the separate Loop button was manually toggled on — the
+                // actual ask is for EVERY video (music replayed many times,
+                // lecture rewatches) to loop back to the start the instant it
+                // finishes, unconditionally, not gated behind that toggle.
+                // Also clears its saved position first — a completed watch
+                // shouldn't leave a "resume near the very end" position
+                // sitting around for the NEXT time this video gets loaded
+                // fresh (the restart below is immediate/in-session, separate
+                // from that saved-for-later position).
+                if (e.data === YT.PlayerState.ENDED) {
+                    clearYtPosition(ytCurrentId);
+                    ytPlayer.seekTo(0);
+                    ytPlayer.playVideo();
+                }
             },
             onError: (e) => {
                 let reasons = { 2: "Invalid video link.", 5: "Can't play in embedded player.", 100: "Video not found.", 101: "Embedding disabled.", 150: "Embedding disabled." };
@@ -210,7 +231,10 @@ export function loadYoutubeLink() {
     // Flush the outgoing video's position before switching away from it —
     // otherwise pasting a new link mid-playback would lose whatever wasn't
     // already caught by the periodic save (see startYtVolumeSync()'s poll).
-    if (ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
+    // Uses the OUTGOING video's Shorts status (ytCurrentIsShort hasn't been
+    // updated to the new video yet at this point) — correct either way,
+    // since a Short's position was never being saved in the first place.
+    if (!ytCurrentIsShort && ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
         saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime());
     }
     setRawFlag("jee_yt_last_link", url);
@@ -223,6 +247,7 @@ export function loadYoutubeLink() {
     // async) — show the video id as a placeholder and setNowPlayingLabel()
     // upgrades it to the real title the moment that request comes back.
     ytCurrentId = id;
+    ytCurrentIsShort = isShortsUrl(url);
     let existing = getYtHistory().find(v => v.id === id);
     setNowPlayingLabel(id, existing ? existing.title : null);
     if (!ytApiReady) { ytPendingVideoId = id; loadYTApiScript(); return; }
@@ -248,8 +273,16 @@ function setNowPlayingLabel(id, title) {
 // components.css) "Now Playing" label swaps it back for the paste-a-link
 // input, without closing/destroying the current player — the video keeps
 // playing behind it until a new link is actually submitted via Load.
+// BUG FIX: this click was reaching the document-level "click outside
+// closes it" listener below via normal event bubbling, on the SAME click
+// that opened it — since the label itself isn't the input or the Load
+// button, that listener was undoing this function's own work a split
+// second after it ran (label shown → input hidden again, immediately).
+// stopPropagation() here stops that same click from ever reaching the
+// document listener in the first place.
 let ytEditingNowPlaying = false;
-export function ytEditNowPlaying() {
+export function ytEditNowPlaying(e) {
+    if (e) e.stopPropagation();
     let label = document.getElementById("yt-now-playing");
     let input = document.getElementById("yt-link-input");
     if (!label || !input) return;
@@ -420,7 +453,7 @@ function startYtVolumeSync() {
         // loadYoutubeLink(), ytClosePlayer(), the visibilitychange listener
         // above) — this just covers steady, uninterrupted playback.
         ytPositionSaveTick++;
-        if (ytIsPlaying && ytPositionSaveTick % 5 === 0 && ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
+        if (!ytCurrentIsShort && ytIsPlaying && ytPositionSaveTick % 5 === 0 && ytPlayer && ytCurrentId && ytPlayer.getCurrentTime) {
             saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime());
         }
     }, 1000);
@@ -458,7 +491,8 @@ export function ytClosePlayer() {
     if (ytPlayer) {
         // Flush the final position before tearing down — closing (unlike a
         // video actually ENDING) should still resume from here next time.
-        if (ytCurrentId && ytPlayer.getCurrentTime) {
+        // Never for a Short — see ytCurrentIsShort.
+        if (!ytCurrentIsShort && ytCurrentId && ytPlayer.getCurrentTime) {
             try { saveYtPosition(ytCurrentId, ytPlayer.getCurrentTime()); } catch (e) { /* non-fatal */ }
         }
         try {
@@ -472,6 +506,7 @@ export function ytClosePlayer() {
     ytIsPlaying = false;
     ytPendingVideoId = null;
     ytCurrentId = null;
+    ytCurrentIsShort = false;
     ytLoopEnabled = false;
     ytPlaybackRate = 1;
     document.getElementById("yt-player-wrap").style.display = "none";

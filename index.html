@@ -103,7 +103,7 @@
             <!-- Feature request: clicking this label re-shows the link input
                  (see ytEditNowPlaying() in youtube.js) so a new link can be
                  pasted without closing the current player first. -->
-            <div class="yt-now-playing" id="yt-now-playing" style="display:none;" onclick="ytEditNowPlaying()" title="Click to paste a new video link" role="button" tabindex="0"></div>
+            <div class="yt-now-playing" id="yt-now-playing" style="display:none;" onclick="ytEditNowPlaying(event)" title="Click to paste a new video link" role="button" tabindex="0"></div>
             <div style="display:flex; gap:6px; margin-top:6px;">
                 <button class="btn btn-start btn-small" id="yt-load-btn" style="flex:1;" onclick="loadYoutubeLink()">Load</button>
                 <button class="btn btn-break btn-small" style="flex:1;" onclick="toggleYtHistory()">🕘 History</button>
@@ -675,7 +675,10 @@
      sleep.js). Skippable via the "Morning Attendance Reminder" toggle in
      Settings. -->
 <div class="modal" id="attendance-reminder-modal">
-    <div class="modal-content" style="text-align:center;" onclick="event.stopPropagation()">
+    <!-- BUG FIX: same 320px-is-too-narrow issue as the evening reminder
+         below — "Don't forget...channel!" was wrapping into an awkward
+         2-line split. Widened to match. -->
+    <div class="modal-content" style="text-align:center; width:360px;" onclick="event.stopPropagation()">
         <h3 style="margin-top:0;">📻 Reminder</h3>
         <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Don't forget to mark your attendance in the Everyday 360R YouTube channel!</p>
         <button class="btn btn-start" style="width:100%;" onclick="closeAttendanceReminderModal()">Got it</button>
