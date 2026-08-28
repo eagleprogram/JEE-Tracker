@@ -569,6 +569,24 @@ export function openSidebarPanel(name) {
     });
 }
 
+// ----------------- BACKUP/EXPORT ↔ REPORTS TAB SWITCH -----------------
+// Feature request: "Backup & Export" and "Weekly / Monthly Reports" used to
+// sit stacked in one card with just a divider line between them, which read
+// as a wall of buttons. Split into two tabs within the same card instead —
+// same simple show/hide + "active" class toggle used for the sidebar panels
+// above, just local to these two panes rather than the whole sidebar.
+export function switchExportReportsTab(tab) {
+    let exportPane = document.getElementById("export-tab-pane");
+    let reportsPane = document.getElementById("reports-tab-pane");
+    let exportBtn = document.getElementById("export-tab-btn");
+    let reportsBtn = document.getElementById("reports-tab-btn");
+    if (!exportPane || !reportsPane || !exportBtn || !reportsBtn) return;
+    exportPane.style.display = (tab === "export") ? "block" : "none";
+    reportsPane.style.display = (tab === "reports") ? "block" : "none";
+    exportBtn.classList.toggle("active", tab === "export");
+    reportsBtn.classList.toggle("active", tab === "reports");
+}
+
 // ----------------- DAY ROLLOVER -----------------
 // BUG FIX (deep sync/race fix): this used to be fully synchronous, so the
 // moment a day boundary was detected — most commonly right when the phone

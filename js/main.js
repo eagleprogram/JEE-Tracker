@@ -22,7 +22,7 @@ import {
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
     hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
     guestReminderSignInClicked, runBootSignInGate, forceMobileZoomReflow,
-    initHolidayReference
+    initHolidayReference, switchExportReportsTab
 } from './ui.js';
 
 import {
@@ -132,7 +132,7 @@ Object.assign(window, {
     renderQuoteOfDay, renderExamYearUI, setExamYear, tickCountdowns,
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
     hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
-    guestReminderSignInClicked,
+    guestReminderSignInClicked, switchExportReportsTab,
     // planner.js
     addTodo, toggleTodo, deleteTodo, calShiftMonth, renderSidebarTools,
     renderPlannerCalendar, openPlannerModal, closePlannerModal,

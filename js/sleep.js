@@ -355,7 +355,7 @@ export function renderSleepPendingBanner() {
     let text = (pType === 'wake')
         ? `⏳ Pending: woke at ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYY(pending.date)} — waiting for your bedtime.`
         : `⏳ Pending: slept ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYY(pending.date)} — waiting for wake time.`;
-    banner.innerHTML = `<span>${text}</span><button onclick="cancelPendingSleepLog()" title="Cancel this pending log" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0;">✕</button>`;
+    banner.innerHTML = `<span class="sleep-pending-text">${text}</span><button onclick="cancelPendingSleepLog()" title="Cancel this pending log" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0;">✕</button>`;
 }
 
 export function cancelPendingSleepLog() {

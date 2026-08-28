@@ -506,6 +506,19 @@ let breakModalPreviousState = null;
 // still count, not just exact spelling.
 const LARGE_BREAK_KEYWORDS = ["dinner", "breakfast", "lunch", "sleep", "nap"];
 
+// Feature request: everything that ISN'T study is logged as some kind of
+// break (bathing, a walk, tea, a phone call, the gym...), so typo-correct
+// these common ones too — same spelling-fix treatment as the large-break
+// keywords above, just without flipping the "long break" checkbox, since
+// these are normally short. Add more words here any time a new common
+// break name comes up.
+const COMMON_BREAK_KEYWORDS = ["bath", "bathroom", "washroom", "toilet", "walk", "water", "snack", "tea", "coffee", "gym", "exercise", "phone", "call", "rest", "shower", "prayer", "meditation"];
+
+// Every keyword eligible for spelling-correction — large-break keywords
+// still get the checkbox auto-checked (see isLarge below), common ones
+// just get their spelling fixed.
+const ALL_BREAK_KEYWORDS = LARGE_BREAK_KEYWORDS.concat(COMMON_BREAK_KEYWORDS);
+
 // Plain Levenshtein edit distance — small inputs only (single words), so
 // no need for anything fancier than the textbook O(m*n) DP table.
 function levenshteinDistance(a, b) {
@@ -536,6 +549,34 @@ function looksLikeLargeBreak(reason) {
     return false;
 }
 
+// BUG FIX: the per-word correction pass below only ever looked at ONE
+// token at a time, so a keyword typed as two separate words (e.g. "brek
+// fast" instead of "breakfast") never matched anything — neither "brek"
+// nor "fast" is close enough to a whole keyword by itself. This pass runs
+// first and looks at every adjacent word-pair joined together (ignoring
+// the space between them); if THAT combined string is a close match for a
+// keyword, it collapses the pair into the single canonical word. Runs in a
+// loop since splice() shifts indices — simplest correct way to handle more
+// than one split pair in the same input is to rescan from scratch after
+// each merge (break-reason text is a few words at most, so this is cheap).
+function mergeSplitBreakWords(tokens) {
+    for (let i = 0; i < tokens.length - 2; i++) {
+        let a = tokens[i], ws = tokens[i + 1], b = tokens[i + 2];
+        if (!/^[a-zA-Z]+$/.test(a) || !/^[a-zA-Z]+$/.test(b)) continue;
+        if (!/^\s+$/.test(ws || "")) continue; // only a single run of whitespace between them
+        let merged = (a + b).toLowerCase();
+        for (let k of ALL_BREAK_KEYWORDS) {
+            let maxDist = k.length <= 4 ? 1 : 2;
+            if (merged === k || (Math.abs(merged.length - k.length) <= maxDist && levenshteinDistance(merged, k) <= maxDist)) {
+                tokens[i] = k;
+                tokens.splice(i + 1, 2); // drop the whitespace token and the now-absorbed second word
+                return true; // caller reruns this on the updated tokens to catch any further splits
+            }
+        }
+    }
+    return false;
+}
+
 // Feature request: don't just silently DETECT a typo'd keyword at submit
 // time — visibly rewrite it to the correct spelling in the input itself
 // (e.g. "LNCH" → "lunch"), and check the long-break box live, right as the
@@ -552,16 +593,22 @@ function autoCorrectBreakReasonInput() {
     if (!input) return;
     let tokens = input.value.split(/(\s+)/); // keeps whitespace runs as their own tokens for reassembly
     let rewritten = false, isLarge = false;
+    // Pass 1: collapse any keyword that got typed as two separate words
+    // ("brek fast" -> "breakfast") before looking at single words at all.
+    while (mergeSplitBreakWords(tokens)) rewritten = true;
+    // Pass 2: per-word typo correction, same as before, now checked
+    // against every common break name (not just the "large" ones) — the
+    // long-break checkbox only gets auto-checked for an actual large-break
+    // keyword match, never for a plain common one like "walk" or "tea".
     for (let i = 0; i < tokens.length; i++) {
         let raw = tokens[i];
         if (!/[a-zA-Z]/.test(raw)) continue; // whitespace-only token — nothing to check
         let lower = raw.toLowerCase();
-        for (let k of LARGE_BREAK_KEYWORDS) {
-            if (lower === k) { isLarge = true; break; }
+        for (let k of ALL_BREAK_KEYWORDS) {
             let maxDist = k.length <= 4 ? 1 : 2;
-            if (Math.abs(lower.length - k.length) <= maxDist && levenshteinDistance(lower, k) <= maxDist) {
-                tokens[i] = k; // rewrite in place to the canonical spelling
-                rewritten = true; isLarge = true;
+            if (lower === k || (Math.abs(lower.length - k.length) <= maxDist && levenshteinDistance(lower, k) <= maxDist)) {
+                if (lower !== k) { tokens[i] = k; rewritten = true; } // rewrite in place to the canonical spelling
+                if (LARGE_BREAK_KEYWORDS.includes(k)) isLarge = true;
                 break;
             }
         }

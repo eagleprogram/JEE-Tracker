@@ -558,19 +558,21 @@
     </div>
 
     <div class="card" style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div>
-                <h3 style="margin:0 0 4px 0;">💾 Backup & Export</h3>
+        <div class="export-reports-tabs" role="tablist">
+            <button type="button" id="export-tab-btn" class="export-reports-tab-btn active" role="tab" aria-selected="true" onclick="switchExportReportsTab('export')">💾 Backup &amp; Export</button>
+            <button type="button" id="reports-tab-btn" class="export-reports-tab-btn" role="tab" aria-selected="false" onclick="switchExportReportsTab('reports')">📊 Reports</button>
+        </div>
+        <div id="export-tab-pane" style="display:block;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <div class="small-note" style="margin:0;">Exports your full history — independent of cloud sync.</div>
-            </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button class="btn btn-export" onclick="exportDataJSON()">Export Backup</button>
-                <input type="file" id="import-file-input" aria-label="Import backup file" accept="application/json" style="display:none;" onchange="importDataJSON(this.files[0]); this.value='';">
-                <button class="btn btn-export" onclick="document.getElementById('import-file-input').click()">Import Backup</button>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-export" onclick="exportDataJSON()">Export Backup</button>
+                    <input type="file" id="import-file-input" aria-label="Import backup file" accept="application/json" style="display:none;" onchange="importDataJSON(this.files[0]); this.value='';">
+                    <button class="btn btn-export" onclick="document.getElementById('import-file-input').click()">Import Backup</button>
+                </div>
             </div>
         </div>
-        <div style="border-top:1px solid var(--border); padding-top:10px;">
-            <h4 style="margin:0 0 4px 0;">📊 Weekly / Monthly Reports</h4>
+        <div id="reports-tab-pane" style="display:none;">
             <div class="btn-row-fit">
                 <button class="btn btn-report-download btn-compact" onclick="downloadReport('weekly')">Download Weekly Report</button>
                 <button class="btn btn-report-download btn-compact" onclick="downloadReport('monthly')">Download Monthly Report</button>

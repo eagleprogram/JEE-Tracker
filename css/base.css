@@ -474,7 +474,16 @@ html { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); color-sc
     margin-right: auto;
     box-sizing: border-box;
 }
-.quote-banner .quote-text { font-size: 24px; font-style: italic; line-height: 1.45; color: var(--text); }
+/* BUG FIX: a long quote used to wrap with the browser's default greedy
+   line-break algorithm, which packs each line as full as possible before
+   moving on — for a 2-line quote that usually means one very long line
+   followed by a short leftover ("orphan") line, exactly the lopsided look
+   reported. text-wrap:balance asks the browser to distribute the words
+   evenly across the lines it needs instead (same idea used for headline
+   balancing). Only applies to block-level text, so it's scoped to this
+   quote line; unsupported browsers (older Firefox/Safari) just silently
+   fall back to the old wrapping — no breakage, just no balancing there. */
+.quote-banner .quote-text { display: block; font-size: 24px; font-style: italic; line-height: 1.45; color: var(--text); text-wrap: balance; }
 .quote-banner .quote-author { display: block; margin-top: 10px; font-size: 16px; color: var(--primary); font-weight: 700; }
 @media (max-width: 850px) { .quote-banner .quote-text { font-size: 18px; } }
 
