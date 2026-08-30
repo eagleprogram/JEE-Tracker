@@ -1,5 +1,5 @@
 import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml, formatDateDDMMYY, generateId, stampTime12Hour } from './utils.js';
-import { getDB, saveDB, ensureDayShape, blankDay, getSleepLog } from './storage.js';
+import { getDB, saveDB, ensureDayShape, blankDay, getSleepLog, getSleepPending } from './storage.js';
 import { updateLiveSummary, resetOpenEntryRefs } from './timer.js';
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
 
@@ -10,6 +10,21 @@ import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
 // than the current time (a break can't be logged before it's happened).
 // Applied as native <input type="time"> min/max so the browser's own time
 // picker enforces it, not just a post-submit alert.
+// BUG FIX (cross-guard, feature request): finds the bedtime logged FOR this
+// date (i.e. an entry — completed or still-pending — whose sleepDate is
+// this date), if any. Used both here (as a max bound on missed-break
+// times) and in saveSleepLog() (as a min bound on a new bedtime being
+// logged) so the two can never silently overlap or contradict each other.
+function bedtimeLoggedFor(dt) {
+    let log = getSleepLog();
+    for (let key of Object.keys(log)) {
+        if (log[key].sleepDate === dt && log[key].sleepTime) return log[key].sleepTime;
+    }
+    let pending = getSleepPending();
+    if (pending && (pending.type || 'sleep') === 'sleep' && pending.date === dt) return pending.time;
+    return null;
+}
+
 export function applyMissedBreakTimeConstraints(dt) {
     let startEl = document.getElementById("missed-break-start");
     let endEl = document.getElementById("missed-break-end");
@@ -20,10 +35,25 @@ export function applyMissedBreakTimeConstraints(dt) {
         if (wakeTime) el.setAttribute("min", wakeTime); else el.removeAttribute("min");
     });
 
-    if (dt === getTodayKey()) {
+    // BUG FIX: a break could previously be logged for a time after the
+    // user had already logged going to sleep that same date (e.g. bedtime
+    // 11:00 PM, then a "missed break" added at 11:30 PM) — a real
+    // contradiction (you can't be on a break while already asleep). The
+    // logged bedtime (if any) now caps the break's end the same way "now"
+    // already caps it for today.
+    let bedtime = bedtimeLoggedFor(dt);
+    let today = dt === getTodayKey();
+    let maxCandidates = [];
+    if (today) {
         let now = new Date();
-        let nowHHMM = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
-        [startEl, endEl].forEach(el => el.setAttribute("max", nowHHMM));
+        maxCandidates.push(String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0"));
+    }
+    if (bedtime) maxCandidates.push(bedtime);
+    if (maxCandidates.length > 0) {
+        // Tightest (earliest) bound wins if both today's "now" and a logged
+        // bedtime apply.
+        let max = maxCandidates.reduce((a, b) => (timeToMinutes(b) < timeToMinutes(a) ? b : a));
+        [startEl, endEl].forEach(el => el.setAttribute("max", max));
     } else {
         [startEl, endEl].forEach(el => el.removeAttribute("max"));
     }
@@ -158,6 +188,16 @@ export function addMissedBreak() {
             return;
         }
     }
+    // BUG FIX (cross-guard, feature request): a break logged after the
+    // date's already-logged bedtime is a contradiction — you can't be on a
+    // break while asleep. Real guard version of the max= constraint applied
+    // above (same reasoning: the native picker's max doesn't stop a typed
+    // value).
+    let bedtime = bedtimeLoggedFor(dt);
+    if (bedtime && (timeToMinutes(start) > timeToMinutes(bedtime) || timeToMinutes(end) > timeToMinutes(bedtime))) {
+        alert(`Breaks can't be logged after your bedtime (${formatTime12Hour(bedtime)}) for this date.`);
+        return;
+    }
 
     let [sh, sm] = start.split(":").map(Number);
     let [eh, em] = end.split(":").map(Number);
@@ -197,6 +237,24 @@ export function addMissedBreak() {
     });
     if (overlap) {
         alert(`That overlaps an existing break — "${overlap.reason}" (${formatTime12Hour(overlap.time)}, ${formatReadable(overlap.duration)}). Adjust the time range or delete the existing entry first.`);
+        return;
+    }
+
+    // BUG FIX (cross-guard, feature request): the same overlap check above
+    // only ever compared a new missed break against OTHER breaks — nothing
+    // stopped it from being logged squarely on top of an already-logged
+    // STUDY session for the same day (e.g. studying 5:10-5:20 PM, then
+    // adding a break at 5:15 PM — the exact contradiction reported).
+    // day.studySessions entries are start-stamped the same way breaks are
+    // (see timer.js), so the identical [start, start+duration) overlap
+    // check applies here too.
+    let studyOverlap = (day.studySessions || []).find((s) => {
+        let existingStart = timeToMinutes(s.time);
+        let existingEnd = existingStart + Math.round(s.duration / 60);
+        return newStartMin < existingEnd && existingStart < newEndMin;
+    });
+    if (studyOverlap) {
+        alert(`That overlaps a logged study session — "${studyOverlap.subject}" (${formatTime12Hour(studyOverlap.time)}, ${formatReadable(studyOverlap.duration)}). Adjust the time range or delete/edit that session first.`);
         return;
     }
 

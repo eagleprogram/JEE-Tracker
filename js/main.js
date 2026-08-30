@@ -22,7 +22,7 @@ import {
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
     hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
     guestReminderSignInClicked, runBootSignInGate, forceMobileZoomReflow,
-    initHolidayReference, switchExportReportsTab
+    initHolidayReference
 } from './ui.js';
 
 import {
@@ -96,6 +96,8 @@ import {
     reregisterPushIfEnabled
 } from './push-notifications.js';
 
+import { connectAndSyncGoogleCalendar } from './google-calendar.js';
+
 // Week-nav: each of the Garden/Questions/Trend ‹ This Week › controls
 // calls this with its OWN key ("garden" | "questions" | "trend") — see
 // week-nav.js for the independent-per-widget offset state. Only the one
@@ -132,7 +134,7 @@ Object.assign(window, {
     renderQuoteOfDay, renderExamYearUI, setExamYear, tickCountdowns,
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
     hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
-    guestReminderSignInClicked, switchExportReportsTab,
+    guestReminderSignInClicked,
     // planner.js
     addTodo, toggleTodo, deleteTodo, calShiftMonth, renderSidebarTools,
     renderPlannerCalendar, openPlannerModal, closePlannerModal,
@@ -175,7 +177,9 @@ Object.assign(window, {
     // notifications.js
     enableNotifications, saveNotifSettingsFromUI, stopAlarmLoop,
     // push-notifications.js
-    enableBackgroundPush, disableBackgroundPush
+    enableBackgroundPush, disableBackgroundPush,
+    // google-calendar.js
+    connectAndSyncGoogleCalendar
 });
 
 // -----------------------------------------------------------------------

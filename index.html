@@ -138,11 +138,17 @@
         </div>
 
         <div class="card" style="padding: 12px;">
-            <h4 style="margin:0 0 6px 0;">Holiday Reference</h4>
-            <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">Read-only Indian holiday calendar.</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+                <h4 style="margin:0;">Holiday Reference</h4>
+                <button type="button" id="google-cal-connect-btn" title="Connect your Google account: pushes planner tasks to your Google Calendar and shows your events below" aria-label="Connect Google Calendar" style="background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:6px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;" onclick="connectAndSyncGoogleCalendar()">
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                </button>
+            </div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">Read-only Indian holiday calendar. Tap the Google icon to sync your planner tasks to your own Google Calendar — your events from there show up below too.</div>
             <iframe id="holiday-iframe"
                     data-src="https://calendar.google.com/calendar/embed?src=en.indian%23holiday%40group.v.calendar.google.com&ctz=Asia%2FKolkata"
                     style="border: 0; width:100%; height:260px; border-radius:6px;" frameborder="0" scrolling="no"></iframe>
+            <div id="google-calendar-events" style="margin-top:8px;"></div>
         </div>
 
         <div class="card" style="padding: 12px;">
@@ -558,31 +564,28 @@
     </div>
 
     <div class="card" style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
-        <div class="export-reports-tabs" role="tablist">
-            <button type="button" id="export-tab-btn" class="export-reports-tab-btn active" role="tab" aria-selected="true" onclick="switchExportReportsTab('export')">💾 Backup &amp; Export</button>
-            <button type="button" id="reports-tab-btn" class="export-reports-tab-btn" role="tab" aria-selected="false" onclick="switchExportReportsTab('reports')">📊 Reports</button>
-        </div>
-        <div id="export-tab-pane" style="display:block;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div class="small-note" style="margin:0;">Exports your full history — independent of cloud sync.</div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button class="btn btn-export" onclick="exportDataJSON()">Export Backup</button>
-                    <input type="file" id="import-file-input" aria-label="Import backup file" accept="application/json" style="display:none;" onchange="importDataJSON(this.files[0]); this.value='';">
-                    <button class="btn btn-export" onclick="document.getElementById('import-file-input').click()">Import Backup</button>
-                </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <h4 style="margin:0;">💾 Backup &amp; Export</h4>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-export" onclick="exportDataJSON()">Export Backup</button>
+                <input type="file" id="import-file-input" aria-label="Import backup file" accept="application/json" style="display:none;" onchange="importDataJSON(this.files[0]); this.value='';">
+                <button class="btn btn-export" onclick="document.getElementById('import-file-input').click()">Import Backup</button>
             </div>
         </div>
-        <div id="reports-tab-pane" style="display:none;">
-            <div class="btn-row-fit">
-                <button class="btn btn-report-download btn-compact" onclick="downloadReport('weekly')">Download Weekly Report</button>
-                <button class="btn btn-report-download btn-compact" onclick="downloadReport('monthly')">Download Monthly Report</button>
-                <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('weekly', false)">Email Weekly Report</button>
-                <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('monthly', false)">Email Monthly Report</button>
-                <button class="btn btn-report-share btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
-                <button class="btn btn-report-share btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
-            </div>
-            <div class="small-note" style="margin-top:4px; color:var(--warning);">Auto-sent Sundays &amp; month-end if signed in — or send manually above.</div>
+        <div class="small-note" style="margin:0;">Exports your full history — independent of cloud sync.</div>
+
+        <div style="border-top:1px solid var(--border); margin:4px 0 0 0;"></div>
+
+        <h4 style="margin:6px 0 0 0;">📊 Weekly / Monthly Reports</h4>
+        <div class="btn-row-fit">
+            <button class="btn btn-report-download btn-compact" onclick="downloadReport('weekly')">Download Weekly Report</button>
+            <button class="btn btn-report-download btn-compact" onclick="downloadReport('monthly')">Download Monthly Report</button>
+            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('weekly', false)">Email Weekly Report</button>
+            <button class="btn btn-report-email btn-compact" onclick="sendReportViaEmail('monthly', false)">Email Monthly Report</button>
+            <button class="btn btn-report-share btn-compact" onclick="shareReport('weekly')">📤 Share Weekly Report</button>
+            <button class="btn btn-report-share btn-compact" onclick="shareReport('monthly')">📤 Share Monthly Report</button>
         </div>
+        <div class="small-note" style="margin-top:4px; color:var(--warning);">Auto-sent Sundays &amp; month-end if signed in — or send manually above.</div>
     </div>
 
     <div class="card" style="margin-top:20px;">

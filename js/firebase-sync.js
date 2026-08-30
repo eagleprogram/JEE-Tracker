@@ -5,7 +5,7 @@ import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, cle
 // synced from an older client may still be the old flat shape) into the
 // new one, so sync logic below never has to branch on which shape it got.
 import { normalizeRecord } from './mistakes.js';
-import { getTodayKey } from './utils.js';
+import { getTodayKey, dateKeyFromWall } from './utils.js';
 // Forward reference — ui.js lands alongside this file in Step 7. Only used
 // inside function bodies, safe against the circular module graph (both
 // showToast and everything imported here are hoisted function declarations).
@@ -218,6 +218,53 @@ export async function signInWithGoogle() {
 // doing something else (e.g. ui.js's deleteCookiesAndReload, which wipes
 // local data right after) can await it instead of racing it.
 export function signOutOfGoogle() { return fbAuth ? fbAuth.signOut() : Promise.resolve(); }
+
+// ----------------- GOOGLE CALENDAR (feature request) -----------------
+// The regular sign-in above only ever grants Firebase Auth's own basic
+// profile/email scopes — never enough to call the real Google Calendar API
+// on the user's behalf. google-calendar.js needs an actual Google OAuth
+// access token with the Calendar scope granted, which is a separate
+// consent step from "sign in to this app."
+//
+// HONEST LIMIT: the access token returned here is a raw Google OAuth token,
+// not a Firebase ID token — the Firebase JS SDK only auto-refreshes the
+// latter in the background. This one is good for roughly an hour from
+// when it's granted; after that, syncing again just re-prompts the same
+// one-click consent popup (already-granted access isn't lost, Google just
+// re-issues a fresh token instantly on most repeat prompts) — there's no
+// way to silently refresh it from client-side code alone.
+let googleCalendarAccessToken = null;
+let googleCalendarTokenExpiresAt = 0;
+
+export function getGoogleCalendarAccessToken() {
+    if (googleCalendarAccessToken && Date.now() < googleCalendarTokenExpiresAt) return googleCalendarAccessToken;
+    return null;
+}
+
+export async function connectGoogleCalendar() {
+    if (!initFirebaseAuthIfNeeded()) return null;
+    try {
+        let provider = new firebase.auth.GoogleAuthProvider();
+        provider.addScope("https://www.googleapis.com/auth/calendar.events");
+        // signInWithPopup on an account that's already signed in re-
+        // authenticates the SAME Firebase account with the extra scope
+        // added — it doesn't create a duplicate account or sign the user
+        // into a different one, as long as they pick the same Google
+        // account in the popup.
+        let result = await fbAuth.signInWithPopup(provider);
+        let credential = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
+        if (!credential || !credential.accessToken) {
+            alert("Google didn't grant Calendar access — please try again and allow the Calendar permission.");
+            return null;
+        }
+        googleCalendarAccessToken = credential.accessToken;
+        googleCalendarTokenExpiresAt = Date.now() + 55 * 60 * 1000;
+        return googleCalendarAccessToken;
+    } catch (e) {
+        alert("Couldn't connect Google Calendar: " + e.message);
+        return null;
+    }
+}
 
 export async function pushToCloud(silent = false) {
     if (!initFirebaseAuthIfNeeded()) return;
@@ -664,35 +711,69 @@ export function startAutoServices() {
         }, 30 * 60000);
     }, msUntilNextHalfHour);
 
-    // Auto Email Reports check every 1 minute... (original comment; the
-    // actual interval below is 7,200,000ms/2hrs, matching source exactly —
-    // flagging the comment/interval mismatch here rather than silently
-    // "fixing" it, since it's the original's own inconsistency, not ours)
-    autoReportInterval = setInterval(() => {
-        if (!currentUser) return;
-        let now = new Date();
-        let todayKey = getTodayKey();
+    // BUG FIX: this used to only check on a 2-hour setInterval tick, and
+    // guarded with a flag keyed to *today's* date only
+    // ("weekly_report_sent_" + todayKey). Two separate problems came from
+    // that:
+    // 1) It never checked immediately when the site was opened — only after
+    //    sitting on an open tab for up to 2 more hours — so a user who
+    //    opened the app on Sunday, glanced at it, and closed it again could
+    //    easily miss the window entirely and never get that week's report.
+    // 2) The per-day flag was written via two separate localStorage writes
+    //    (setRawFlag(flagKey,...) then setRawFlag("..._last",...)) right
+    //    after firing sendReportViaEmail() — not awaited, not atomic. If the
+    //    interval fired again before those writes landed (or a second tab
+    //    was open at the same time, or the day rolled over mid-check), the
+    //    guard could be re-read as "not yet sent" a second time the same
+    //    day, sending the same report again — matching "the email came in
+    //    twice or thrice the same day."
+    // Fixed by checking once immediately (covers "must send when the user
+    // opens the website") AND on the periodic interval (covers a tab left
+    // open across the boundary), both routed through the SAME idempotent
+    // check below — it compares against "the last week/month a report was
+    // actually sent for", not "did today already fire", so calling it any
+    // number of times in the same week/month is always a no-op after the
+    // first successful send. This also naturally catches up a missed week:
+    // if the user didn't open the site on Sunday, the very next time they
+    // do (any day before the *following* Sunday) still sends for the week
+    // that just ended, using the most recent Sunday's data range.
+    checkAutoReports();
+    autoReportInterval = setInterval(checkAutoReports, 7200000);
+}
 
-        // Weekly Report on Sunday
-        if (now.getDay() === 0) {
-            let flagKey = "weekly_report_sent_" + todayKey;
-            if (!getRawFlag(flagKey)) {
-                sendReportViaEmail('weekly', true);
-                setRawFlag(flagKey, "1");
-                setRawFlag("weekly_report_sent_last", todayKey);
-            }
-        }
+// Most recent Sunday on/before `d` (today, if today IS Sunday) — this is
+// "the week that just completed and is due to be reported."
+function mostRecentSundayKey(d = new Date()) {
+    let sunday = new Date(d);
+    sunday.setDate(d.getDate() - d.getDay());
+    return dateKeyFromWall(sunday.getTime());
+}
 
-        // Monthly Report on last day of month
-        let tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        if (tomorrow.getMonth() !== now.getMonth()) {
-            let flagKey = "monthly_report_sent_" + todayKey;
-            if (!getRawFlag(flagKey)) {
-                sendReportViaEmail('monthly', true);
-                setRawFlag(flagKey, "1");
-                setRawFlag("monthly_report_sent_last", todayKey);
-            }
-        }
-    }, 7200000);
+// The most recently-COMPLETED calendar month's last day, as a full date key.
+// If `d` itself is the last day of its month, that month counts as just
+// completed today; otherwise the last completed month is the one before
+// this one (day 0 of the current month = the last day of the previous one).
+function lastCompletedMonthEndKey(d = new Date()) {
+    let tomorrow = new Date(d);
+    tomorrow.setDate(d.getDate() + 1);
+    let monthAlreadyEnded = tomorrow.getMonth() !== d.getMonth();
+    let ref = monthAlreadyEnded ? d : new Date(d.getFullYear(), d.getMonth(), 0);
+    return dateKeyFromWall(ref.getTime());
+}
+
+function checkAutoReports() {
+    if (!currentUser) return;
+    let now = new Date();
+
+    let sundayKey = mostRecentSundayKey(now);
+    if (getRawFlag("weekly_report_sent_last") !== sundayKey) {
+        sendReportViaEmail('weekly', true);
+        setRawFlag("weekly_report_sent_last", sundayKey);
+    }
+
+    let monthEndKey = lastCompletedMonthEndKey(now);
+    if (getRawFlag("monthly_report_sent_last") !== monthEndKey) {
+        sendReportViaEmail('monthly', true);
+        setRawFlag("monthly_report_sent_last", monthEndKey);
+    }
 }

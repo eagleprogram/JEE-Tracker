@@ -1,5 +1,5 @@
-import { formatDateDDMMYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWall, getTodayKey, isBeforeDayCutoff } from './utils.js';
-import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getNotifSettings } from './storage.js';
+import { formatDateDDMMYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWall, getTodayKey, isBeforeDayCutoff, timeToMinutes } from './utils.js';
+import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getNotifSettings, getDB } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
@@ -28,6 +28,28 @@ import { stopWaterReminder } from './notifications.js';
 // standalone completed entry the first time it runs, so this helper and the
 // 'wake' pending path only exist to handle that one-time cleanup.
 function pendingType(pending) { return pending ? (pending.type || 'sleep') : null; }
+
+// BUG FIX (cross-guard, feature request): nothing previously stopped a
+// bedtime being logged for `sleepDate` that was actually EARLIER than
+// study/break activity already logged for that same date (e.g. studying
+// until 9:40 PM, then logging bedtime as 9:35 PM — a real contradiction,
+// you can't have gone to sleep before you finished studying). Finds the
+// latest end-minute across that date's study sessions and breaks; returns
+// null if there's nothing logged yet (nothing to contradict).
+function latestActivityEndMinFor(dateKey) {
+    let day = getDB()[dateKey];
+    if (!day) return null;
+    let latest = null;
+    (day.studySessions || []).forEach(s => {
+        let end = timeToMinutes(s.time) + Math.round(s.duration / 60);
+        if (latest === null || end > latest) latest = end;
+    });
+    (day.breaks || []).forEach(b => {
+        let end = timeToMinutes(b.time) + Math.round(b.duration / 60);
+        if (latest === null || end > latest) latest = end;
+    });
+    return latest;
+}
 
 // BUG FIX (feature request): logging a bedtime in the wee hours (e.g. 1:00
 // AM) used to attribute it to literal calendar "today" — so the
@@ -126,6 +148,17 @@ export function saveSleepLog() {
         let sameDateCount = Object.values(log).filter(e => e.sleepDate === sleepDate).length;
         if (sameDateCount >= 2) {
             showToast("⚠️ You've already logged 2 sleep entries for this date (the max — one AM, one PM). For a nap, use the Break timer instead. Delete one in History first if you really need to redo it.");
+            return;
+        }
+
+        // Cross-guard: bedtime can't be before the day's own already-logged
+        // study/break activity ends.
+        let sleepMin = timeToMinutes(sleepVal);
+        let latestEnd = latestActivityEndMinFor(sleepDate);
+        if (latestEnd !== null && sleepMin < latestEnd) {
+            let h = Math.floor(latestEnd / 60) % 24, m = latestEnd % 60;
+            let latestEndHHMM = String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+            showToast(`⚠️ You already logged activity until ${formatTime12Hour(latestEndHHMM)} today — bedtime can't be earlier than that.`);
             return;
         }
 
@@ -231,6 +264,16 @@ export function saveSleepLog() {
 
         if (durationMin <= 0 || durationMin > 20 * 60) {
             showToast("⚠️ These times don't make sense — wake time is before sleep time or more than 20 hours apart. Please check.");
+            return;
+        }
+
+        // Same cross-guard as CASE 1 above — a retroactive bedtime still
+        // can't be earlier than activity already logged for that date.
+        let latestEnd3 = latestActivityEndMinFor(sleepDate);
+        if (latestEnd3 !== null && sleepMin < latestEnd3) {
+            let h = Math.floor(latestEnd3 / 60) % 24, m = latestEnd3 % 60;
+            let latestEndHHMM = String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+            showToast(`⚠️ You already logged activity until ${formatTime12Hour(latestEndHHMM)} on ${formatDateDDMMYY(sleepDate)} — bedtime can't be earlier than that.`);
             return;
         }
 
@@ -355,8 +398,40 @@ export function renderSleepPendingBanner() {
     let text = (pType === 'wake')
         ? `⏳ Pending: woke at ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYY(pending.date)} — waiting for your bedtime.`
         : `⏳ Pending: slept ${formatTime12Hour(fmtTime(pending.time))} on ${formatDateDDMMYY(pending.date)} — waiting for wake time.`;
-    banner.innerHTML = `<span class="sleep-pending-text">${text}</span><button onclick="cancelPendingSleepLog()" title="Cancel this pending log" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0;">✕</button>`;
+    banner.innerHTML = `<span class="sleep-pending-text" id="sleep-pending-text">${text}</span><button onclick="cancelPendingSleepLog()" title="Cancel this pending log" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0;">✕</button>`;
+    fitSleepPendingBannerText();
 }
+
+// Feature request: the banner text must be fully visible on one line, no
+// cropping and no horizontal scroll needed — but how long the sentence is
+// depends on today's specific date/time strings, so a single fixed
+// font-size in CSS can't guarantee it always fits every screen width.
+// This shrinks the font-size in small steps until the text's natural width
+// (scrollWidth) fits inside the space actually available for it
+// (clientWidth), then stops — so most of the time it stays at (or very
+// close to) the normal size, and only shrinks as much as it has to on a
+// narrow phone or a longer date string. Re-run on resize/orientation
+// change too (see the listener below), since "available width" can change
+// without the banner being re-rendered.
+const SLEEP_BANNER_BASE_FONT_PX = 12;
+const SLEEP_BANNER_MIN_FONT_PX = 8;
+function fitSleepPendingBannerText() {
+    let el = document.getElementById("sleep-pending-text");
+    if (!el) return;
+    el.style.fontSize = SLEEP_BANNER_BASE_FONT_PX + "px";
+    let fontPx = SLEEP_BANNER_BASE_FONT_PX;
+    // Loop instead of a single ratio calculation: text width doesn't scale
+    // perfectly linearly with font-size (kerning/rounding), so nudging down
+    // half a pixel at a time and re-measuring is more reliable than trying
+    // to compute the "right" size in one shot.
+    while (el.scrollWidth > el.clientWidth && fontPx > SLEEP_BANNER_MIN_FONT_PX) {
+        fontPx -= 0.5;
+        el.style.fontSize = fontPx + "px";
+    }
+}
+window.addEventListener("resize", () => {
+    if (document.getElementById("sleep-pending-banner")?.style.display !== "none") fitSleepPendingBannerText();
+});
 
 export function cancelPendingSleepLog() {
     if (!confirm("Cancel this pending log entry?")) return;
