@@ -78,20 +78,20 @@ export async function enableBackgroundPush() {
     if (!("serviceWorker" in navigator) || !("Notification" in window)) { alert("Push notifications aren't supported on this browser."); return; }
     try {
         let perm = await Notification.requestPermission();
-        if (perm !== "granted") { showToast("Notification permission not granted."); updatePushPermissionStatusUI(); return; }
+        if (perm !== "granted") { showToast("Notification Permission Not Granted."); updatePushPermissionStatusUI(); return; }
         let reg = await navigator.serviceWorker.ready;
         let msg = initMessagingIfNeeded();
-        if (!msg) { showToast("Push setup failed — try reloading the page."); return; }
+        if (!msg) { showToast("Push Setup Failed — Try Reloading the Page."); return; }
         // BUG FIX: msg.useServiceWorker(reg) was removed from the Firebase JS
         // SDK starting in v9 (index.html loads v10.12.2) — calling it threw
         // "msg.useServiceWorker is not a function" immediately, before a
         // token was ever requested. The v9+ replacement is to pass the
         // registration straight into getToken()'s options instead.
         let token = await msg.getToken({ vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: reg });
-        if (!token) { showToast("Could not get a push token — try again in a moment."); return; }
+        if (!token) { showToast("Could Not Get a Push Token — Try Again in a Moment."); return; }
         await saveTokenToCloud(token);
         setRawFlag(PUSH_ENABLED_FLAG, "1");
-        showToast("Background alerts enabled on this device!");
+        showToast("Background Alerts Enabled on This Device!");
         updatePushPermissionStatusUI();
     } catch (e) {
         console.log("enableBackgroundPush failed:", e);
@@ -120,7 +120,7 @@ export async function disableBackgroundPush() {
             }
         }
     } catch (e) { /* best-effort — the local flag is already cleared either way */ }
-    showToast("Background alerts disabled on this device.");
+    showToast("Background Alerts Disabled on This Device.");
     updatePushPermissionStatusUI();
 }
 

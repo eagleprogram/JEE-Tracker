@@ -84,7 +84,7 @@ export function saveSleepLog() {
     let wakeVal = document.getElementById("wake-time-input").value;
     let sleepVal = document.getElementById("sleep-time-input").value;
     if (!wakeVal && !sleepVal) {
-        showToast("Please enter at least one time.");
+        showToast("Please Enter at Least One Time.");
         return;
     }
     // Real-life rule: you only ever log a wake time for the morning you
@@ -92,7 +92,7 @@ export function saveSleepLog() {
     if (wakeVal) {
         let [wh] = wakeVal.split(':').map(Number);
         if (wh >= 12) {
-            showToast("⚠️ Wake time must be in the AM (before noon).");
+            showToast("⚠️ Wake Time Must Be in the AM (Before Noon).");
             return;
         }
     }
@@ -129,7 +129,7 @@ export function saveSleepLog() {
         // create a confusing duplicate "waiting" row.
         if (pending && pendingType(pending) === 'sleep') {
             if (pending.date === sleepDate) {
-                showToast("⚠️ You already have a bedtime pending — log your wake time to complete it, or cancel it (✕ on the banner) first.");
+                showToast("⚠️ You Already Have a Bedtime Pending — Log Your Wake Time to Complete It, or Cancel It (✕ on the Banner) First.");
                 return;
             }
             // Pending is from an earlier, different date (a forgotten
@@ -147,7 +147,7 @@ export function saveSleepLog() {
         // mid-study), not the Sleep/Wake log.
         let sameDateCount = Object.values(log).filter(e => e.sleepDate === sleepDate).length;
         if (sameDateCount >= 2) {
-            showToast("⚠️ You've already logged 2 sleep entries for this date (the max — one AM, one PM). For a nap, use the Break timer instead. Delete one in History first if you really need to redo it.");
+            showToast("⚠️ You've Already Logged 2 Sleep Entries for This Date (The Max — One AM, One PM). For a Nap, Use the Break Timer Instead. Delete One in History First if You Really Need to Redo It.");
             return;
         }
 
@@ -158,7 +158,7 @@ export function saveSleepLog() {
         if (latestEnd !== null && sleepMin < latestEnd) {
             let h = Math.floor(latestEnd / 60) % 24, m = latestEnd % 60;
             let latestEndHHMM = String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
-            showToast(`⚠️ You already logged activity until ${formatTime12Hour(latestEndHHMM)} today — bedtime can't be earlier than that.`);
+            showToast(`⚠️ You Already Logged Activity Until ${formatTime12Hour(latestEndHHMM)} Today — Bedtime Can't Be Earlier Than That.`);
             return;
         }
 
@@ -168,7 +168,7 @@ export function saveSleepLog() {
         document.getElementById("sleep-time-input").value = "";
         renderSleepLog();
         renderSleepPendingBanner();
-        showToast("Bedtime logged — log your wake time to complete it.");
+        showToast("Bedtime Logged — Log Your Wake Time to Complete It.");
         // Bedtime logged = a study day is effectively "closed out" — this is
         // the natural moment to ask how many questions were solved, then
         // chain into the night's Questions Solved → Attendance → (Tomorrow's)
@@ -200,7 +200,7 @@ export function saveSleepLog() {
             let diffMin = Math.round((wakeDateTime - sleepDateTime) / 60000);
 
             if (diffMin <= 0 || diffMin > 20 * 60) {
-                showToast("⚠️ Wake time seems wrong — can't go backward or sleep more than 20 hours. Please check.");
+                showToast("⚠️ Wake Time Seems Wrong — Can't Go Backward or Sleep More Than 20 Hours. Please Check.");
                 return;
             }
 
@@ -214,7 +214,7 @@ export function saveSleepLog() {
             writeSleepLog(log);
             setSleepPending(null);
             refreshMissedBreakConstraints();
-            showToast("Sleep log completed!");
+            showToast("Sleep Log Completed!");
         } else {
             // 2b: Nothing pending — the realistic first-time-opening-the-app
             // case (no prior bedtime on record to attach to). Save this as
@@ -225,7 +225,7 @@ export function saveSleepLog() {
             log[today] = { sleepDate: null, sleepTime: null, wakeDate: today, wakeTime: wakeVal, durationMin: null };
             writeSleepLog(log);
             refreshMissedBreakConstraints();
-            showToast("Wake time logged (no bedtime on record for last night).");
+            showToast("Wake Time Logged (No Bedtime on Record for Last Night).");
         }
         document.getElementById("wake-time-input").value = "";
         document.getElementById("sleep-time-input").value = "";
@@ -263,7 +263,7 @@ export function saveSleepLog() {
         }
 
         if (durationMin <= 0 || durationMin > 20 * 60) {
-            showToast("⚠️ These times don't make sense — wake time is before sleep time or more than 20 hours apart. Please check.");
+            showToast("⚠️ These Times Don't Make Sense — Wake Time Is Before Sleep Time or More Than 20 Hours Apart. Please Check.");
             return;
         }
 
@@ -273,7 +273,7 @@ export function saveSleepLog() {
         if (latestEnd3 !== null && sleepMin < latestEnd3) {
             let h = Math.floor(latestEnd3 / 60) % 24, m = latestEnd3 % 60;
             let latestEndHHMM = String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
-            showToast(`⚠️ You already logged activity until ${formatTime12Hour(latestEndHHMM)} on ${formatDateDDMMYY(sleepDate)} — bedtime can't be earlier than that.`);
+            showToast(`⚠️ You Already Logged Activity Until ${formatTime12Hour(latestEndHHMM)} on ${formatDateDDMMYY(sleepDate)} — Bedtime Can't Be Earlier Than That.`);
             return;
         }
 
@@ -285,7 +285,7 @@ export function saveSleepLog() {
         document.getElementById("sleep-time-input").value = "";
         renderSleepLog();
         renderSleepPendingBanner();
-        showToast("Sleep log saved.");
+        showToast("Sleep Log Saved.");
         // Same night chain as CASE 1 above — Questions Solved → Attendance
         // → Tomorrow's Planner. Same effectiveClosingDayKey() fix as CASE 1
         // (sleepDate itself stays the literal storage key, untouched).
@@ -413,8 +413,8 @@ export function renderSleepPendingBanner() {
 // narrow phone or a longer date string. Re-run on resize/orientation
 // change too (see the listener below), since "available width" can change
 // without the banner being re-rendered.
-const SLEEP_BANNER_BASE_FONT_PX = 12;
-const SLEEP_BANNER_MIN_FONT_PX = 8;
+const SLEEP_BANNER_BASE_FONT_PX = 14;
+const SLEEP_BANNER_MIN_FONT_PX = 7;
 function fitSleepPendingBannerText() {
     let el = document.getElementById("sleep-pending-text");
     if (!el) return;
@@ -437,7 +437,7 @@ export function cancelPendingSleepLog() {
     if (!confirm("Cancel this pending log entry?")) return;
     setSleepPending(null);
     renderSleepPendingBanner();
-    showToast("Pending log cancelled.");
+    showToast("Pending Log Cancelled.");
 }
 
 // Render today's log status (simple update of history if open)
@@ -525,5 +525,5 @@ export function deleteSleepLogEntry(wakeDate) {
     delete log[wakeDate];
     writeSleepLog(log);
     renderSleepHistory();
-    showToast("Sleep log entry deleted.");
+    showToast("Sleep Log Entry Deleted.");
 }

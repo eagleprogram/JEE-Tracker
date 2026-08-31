@@ -222,8 +222,8 @@ export function createOrLoadYTPlayer(id) {
                 }
             },
             onError: (e) => {
-                let reasons = { 2: "Invalid video link.", 5: "Can't play in embedded player.", 100: "Video not found.", 101: "Embedding disabled.", 150: "Embedding disabled." };
-                showToast(`Couldn't play — ${reasons[e.data] || "error " + e.data}`);
+                let reasons = { 2: "Invalid Video Link.", 5: "Can't Play in Embedded Player.", 100: "Video Not Found.", 101: "Embedding Disabled.", 150: "Embedding Disabled." };
+                showToast(`Couldn't Play — ${reasons[e.data] || "Error " + e.data}`);
             }
         }
     });

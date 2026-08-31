@@ -71,7 +71,7 @@ export function saveNotifSettingsFromUI() {
         waterBreakFrequencyMin: waterFreqSnapped,
         smRadioReminders: document.getElementById("notif-smRadioReminders").checked
     };
-    saveNotifSettings(s); showToast("Notification settings saved.");
+    saveNotifSettings(s); showToast("Notification Settings Saved.");
     // A frequency/on-off change should take effect immediately for a water
     // reminder that's already running (mid-study-session), not just the
     // next time study is started — restart it against the freshly-saved
@@ -93,7 +93,7 @@ export function enableNotifications() {
     Notification.requestPermission().then(perm => {
         let s = getNotifSettings(); s.enabled = (perm === "granted"); saveNotifSettings(s);
         updateNotifPermissionStatus();
-        if (perm === "granted") showToast("Notifications enabled!");
+        if (perm === "granted") showToast("Notifications Enabled!");
     });
 }
 
@@ -202,7 +202,7 @@ function setAlarmModalText(title, body) {
     let titleEl = document.getElementById("alarm-modal-title");
     let reasonEl = document.getElementById("alarm-modal-reason");
     if (titleEl) titleEl.innerText = title || "ALARM RINGING!";
-    if (reasonEl) reasonEl.innerText = body || "A critical notification requires your attention.";
+    if (reasonEl) reasonEl.innerText = body || "A Critical Notification Requires Your Attention.";
 }
 
 // ----------------- ALARM QUEUE (one at a time, most-important first) -----
@@ -225,6 +225,28 @@ function enqueueAlarm(title, body, priority) {
     alarmQueue.sort((a, b) => a.priority - b.priority);
 }
 
+// BUG FIX (feature request): "2+ alarms at the same time — tapping Stop
+// Alarm on the SECOND notification's tray popup doesn't actually stop it,
+// it still rings 15s later regardless." Root cause: stopAlarmLoop() used
+// to have no idea WHICH reason a Stop tap was for — every tray
+// notification's "Stop Alarm" action just told the page "stop whatever's
+// currently ringing," so tapping Stop on a reason that was still WAITING
+// its turn (queued, or sitting in the 15s gap, or in its 5-min
+// auto-silence re-ring wait) never actually reached or cancelled that
+// specific one — it just no-op'd (or worse, stopped the wrong one) while
+// the real target kept its own schedule and rang anyway.
+// Fixed by tracking, by title, exactly where every in-flight reason
+// currently lives: currentAlarmTitle (actively ringing right now),
+// nextAlarmTimerTitle (shifted off the queue, waiting out the 15s gap
+// before its turn), relaunchTimerTitle (auto-silenced, waiting out its
+// 5-min re-ring). stopAlarmLoop(targetTitle) now looks the target up
+// across all of these and cancels it wherever it actually is — the
+// currently-ringing case behaves exactly as before (that's what the
+// in-page "Stop Alarm" button's argument-less call still triggers).
+let currentAlarmTitle = null;
+let nextAlarmTimerTitle = null;
+let relaunchTimerTitle = null;
+
 // BUG FIX: a persistent alarm used to ring indefinitely until the user
 // actively hit "Stop Alarm" — if they never did (phone in another room,
 // asleep, etc.) it would just ring forever. Two changes:
@@ -243,6 +265,7 @@ let alarmRelaunchTimer = null;
 export function ringPersistentAlarm(title, body, priority = 5) {
     if (isAlarmActive) { enqueueAlarm(title, body, priority); return; }
     isAlarmActive = true;
+    currentAlarmTitle = title;
     setAlarmModalText(title, body);
     document.getElementById("alarm-modal").style.display = "flex";
     lockBodyScroll(); // block background scroll — shared counter, see ui.js
@@ -260,12 +283,15 @@ export function ringPersistentAlarm(title, body, priority = 5) {
 function autoSilenceAlarm(title, body, priority) {
     if (alarmInterval) { clearInterval(alarmInterval); alarmInterval = null; }
     isAlarmActive = false;
+    currentAlarmTitle = null;
     document.getElementById("alarm-modal").style.display = "none";
     unlockBodyScroll();
     stopTitleFlash();
-    showToast(`"${title}" wasn't acknowledged — you'll be reminded again in 5 min.`);
+    showToast(`"${title}" Wasn't Acknowledged — You'll Be Reminded Again in 5 Min.`);
+    relaunchTimerTitle = title;
     alarmRelaunchTimer = setTimeout(() => {
         alarmRelaunchTimer = null;
+        relaunchTimerTitle = null;
         ringPersistentAlarm(title, body, priority);
     }, ALARM_RERING_DELAY_MS);
     advanceAlarmQueue();
@@ -276,9 +302,11 @@ function autoSilenceAlarm(title, body, priority) {
 function advanceAlarmQueue() {
     if (alarmQueue.length === 0) return;
     let next = alarmQueue.shift();
-    showToast(`Next alarm ("${next.title}") in 15s…`);
+    showToast(`Next Alarm ("${next.title}") in 15s…`);
+    nextAlarmTimerTitle = next.title;
     nextAlarmTimer = setTimeout(() => {
         nextAlarmTimer = null;
+        nextAlarmTimerTitle = null;
         ringPersistentAlarm(next.title, next.body, next.priority);
     }, ALARM_QUEUE_GAP_MS);
 }
@@ -298,19 +326,59 @@ let nextAlarmTimer = null;
 // rather than it slamming straight back on with zero breathing room.
 const ALARM_QUEUE_GAP_MS = 15000;
 
-export function stopAlarmLoop() {
+// targetTitle: which specific reason this Stop tap is for.
+// - Omitted (the in-page "Stop Alarm" button's call, index.html, always
+//   argument-less) → "stop whatever's ringing right now," same as always.
+// - Given AND it matches whatever's currently ringing → same full-stop
+//   behavior — this is what happens when the OS notification for the
+//   CURRENTLY ringing reason gets tapped.
+// - Given but it DOESN'T match what's currently ringing → that reason
+//   isn't the one on screen right now; it's sitting somewhere else
+//   (still queued, waiting out its 15s gap, or waiting out its 5-min
+//   auto-silence re-ring) — find and cancel THAT one specifically,
+//   without touching whatever's actually ringing.
+export function stopAlarmLoop(targetTitle) {
+    if (targetTitle !== undefined && targetTitle !== null && targetTitle !== currentAlarmTitle) {
+        let sizeBefore = alarmQueue.length;
+        alarmQueue = alarmQueue.filter(a => a.title !== targetTitle);
+        let removedFromQueue = alarmQueue.length < sizeBefore;
+
+        let cancelledPendingRing = false;
+        if (nextAlarmTimerTitle === targetTitle && nextAlarmTimer) {
+            clearTimeout(nextAlarmTimer);
+            nextAlarmTimer = null;
+            nextAlarmTimerTitle = null;
+            cancelledPendingRing = true;
+        }
+        if (relaunchTimerTitle === targetTitle && alarmRelaunchTimer) {
+            clearTimeout(alarmRelaunchTimer);
+            alarmRelaunchTimer = null;
+            relaunchTimerTitle = null;
+            cancelledPendingRing = true;
+        }
+        if (removedFromQueue || cancelledPendingRing) {
+            showToast(`"${targetTitle}" Dismissed.`);
+        }
+        // If it wasn't found anywhere above, it's already been acknowledged
+        // (or this is a stale/duplicate tap) — nothing left to cancel, and
+        // critically, nothing here should touch whatever IS currently
+        // ringing just because a different notification got tapped.
+        return;
+    }
+
     // A manual Stop IS acknowledgment — cancel the 2-min auto-silence timer
     // (nothing to silence anymore) and, importantly, the 5-min re-ring timer
     // if this ring was already an auto-silenced one coming back around, so
     // it doesn't ring a 3rd time after the user has just dismissed it.
     if (alarmAutoSilenceTimer) { clearTimeout(alarmAutoSilenceTimer); alarmAutoSilenceTimer = null; }
-    if (alarmRelaunchTimer) { clearTimeout(alarmRelaunchTimer); alarmRelaunchTimer = null; }
+    if (alarmRelaunchTimer) { clearTimeout(alarmRelaunchTimer); alarmRelaunchTimer = null; relaunchTimerTitle = null; }
     if (alarmInterval) { clearInterval(alarmInterval); alarmInterval = null; }
     isAlarmActive = false;
+    currentAlarmTitle = null;
     document.getElementById("alarm-modal").style.display = "none";
     unlockBodyScroll();
     stopTitleFlash();
-    showToast("Alarm stopped.");
+    showToast("Alarm Stopped.");
     // Ring the next most-important queued reason after a short gap — this is
     // the "two (or more) reminders due at the same time" case: the more
     // important one rings, gets dismissed, then — after a 15-second
@@ -408,9 +476,15 @@ function fallbackPlainNotification(title, body) {
 // page yet to receive a message in that case, so nothing to relay; the
 // fresh load just boots normally (the OS notification itself already showed
 // the reason, which was the actual point).
+// BUG FIX: sw.js now includes the SPECIFIC notification's own title in this
+// message (event.data.title) — previously it just said "stop whatever's
+// ringing," with no way to say which of possibly several tray
+// notifications the tap was actually for. See the SCOPE CHOICE-style
+// comment on stopAlarmLoop() above for what that broke and how targeting
+// by title fixes it.
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("message", (event) => {
-        if (event.data && event.data.type === "STOP_ALARM") stopAlarmLoop();
+        if (event.data && event.data.type === "STOP_ALARM") stopAlarmLoop(event.data.title);
     });
 }
 
@@ -425,7 +499,7 @@ function maybeNudgeForOsNotifications() {
     if (!("Notification" in window) || Notification.permission === "denied") return;
     if (getRawFlag(NOTIF_HINT_SHOWN_KEY)) return;
     setRawFlag(NOTIF_HINT_SHOWN_KEY, "1");
-    showToast("Tip: tap 'Enable Notifications' in Settings so alarms can still reach you when this tab isn't in front.");
+    showToast("Tip: Tap 'Enable Notifications' in Settings So Alarms Can Still Reach You When This Tab Isn't in Front.");
 }
 
 // ----------------- LARGE-BREAK ALARM SUPPRESSION -----------------
@@ -494,7 +568,7 @@ export function checkBreakOverrun(s) {
     let elapsed = getSegmentElapsedMs();
     let thresholdMs = (s.breakThresholdMin || 45) * 60 * 1000;
     if (elapsed >= thresholdMs && (!lastBreakNotifyAt || Date.now() - lastBreakNotifyAt >= 10 * 60 * 1000)) {
-        notify("Break check-in", `You've been on break ${Math.floor(elapsed/60000)}+ min — come back?`, true, 6, true);
+        notify("Break Check-In", `You've Been on Break ${Math.floor(elapsed/60000)}+ Min — Come Back?`, true, 6, true);
         lastBreakNotifyAt = Date.now();
     }
 }
@@ -514,7 +588,7 @@ function checkIdleNudge(s) {
     let thresholdMs = (s.idleThresholdMin || 30) * 60 * 1000;
     let elapsed = Date.now() - idleSinceMs;
     if (elapsed >= thresholdMs && (!lastIdleNotifyAt || Date.now() - lastIdleNotifyAt >= 30 * 60 * 1000)) {
-        notify("Still there?", `You've been idle for ${Math.floor(elapsed/60000)}+ min — start a session?`, true, 7);
+        notify("Still There?", `You've Been Idle for ${Math.floor(elapsed/60000)}+ Min — Start a Session?`, true, 7);
         lastIdleNotifyAt = Date.now();
     }
 }
@@ -541,7 +615,7 @@ function checkExamMilestones(s) {
         if (EXAM_MILESTONE_DAYS.includes(daysUntil)) {
             let flagKey = `jee_exam_milestone_${key}_${daysUntil}_${getTodayKey()}`;
             if (!getRawFlag(flagKey)) {
-                notify("Exam milestone", `${label} is ${daysUntil} day${daysUntil === 1 ? '' : 's'} away.`, true, 2);
+                notify("Exam Milestone", `${label} Is ${daysUntil} Day${daysUntil === 1 ? '' : 's'} Away.`, true, 2);
                 setRawFlag(flagKey, "1");
             }
         }
@@ -574,7 +648,7 @@ function checkBackupReminder(s) {
     if (Date.now() - last < BACKUP_REMINDER_INTERVAL_MS) return; // backed up recently enough
     let lastReminded = parseInt(getRawFlag(BACKUP_REMINDER_LAST_KEY) || "0", 10);
     if (Date.now() - lastReminded < BACKUP_REMINDER_INTERVAL_MS) return; // already pinged within the last 48h
-    notify("Backup reminder", "It's been 2+ days since your last backup — export one now from Settings.", true, 8);
+    notify("Backup Reminder", "It's Been 2+ Days Since Your Last Backup — Export One Now from Settings.", true, 8);
     setRawFlag(BACKUP_REMINDER_LAST_KEY, String(Date.now()));
 }
 
@@ -597,7 +671,7 @@ export function startWaterReminder() {
     // regardless of what's actually sitting in storage.
     let ms = Math.min(180, Math.max(15, Math.round((s.waterBreakFrequencyMin || 30) / 15) * 15)) * 60 * 1000;
     waterReminderTimer = setInterval(() => {
-        notify("Water break", "Time to drink some water!", true, 6);
+        notify("Water Break", "Time to Drink Some Water!", true, 6);
     }, ms);
 }
 export function stopWaterReminder() {
@@ -628,7 +702,7 @@ export function runNotificationChecks() {
                 let tasks = plannerDB[getTodayKey()] || [];
                 let pending = tasks.filter(t => !t.done).length;
                 if (pending > 0) {
-                    notify("Today's tasks", `${pending} task(s) pending!`, true, 4);
+                    notify("Today's Tasks", `${pending} Task(s) Pending!`, true, 4);
                     setRawFlag(lastKey, String(Date.now()));
                 }
             }
@@ -645,7 +719,7 @@ export function runNotificationChecks() {
             let lastKey = "jee_sleep_reminder_last_" + getTodayKey();
             let last = parseInt(getRawFlag(lastKey) || "0", 10);
             if (Date.now() - last > 10 * 60 * 1000) {
-                notify("Wind down", `Past ${s.sleepReminderStartTime} - start winding down!`, true, 5);
+                notify("Wind Down", `Past ${s.sleepReminderStartTime} - Start Winding Down!`, true, 5);
                 setRawFlag(lastKey, String(Date.now()));
             }
         }
@@ -672,7 +746,7 @@ export function runNotificationChecks() {
         if (minOfDay >= targetMin) {
             let flagKey = "jee_revision_reminder_" + getTodayKey();
             if (!getRawFlag(flagKey)) {
-                notify("Revision reminder", `${s.revisionReminderTime} - Quick revision pass!`, true, 3);
+                notify("Revision Reminder", `${s.revisionReminderTime} - Quick Revision Pass!`, true, 3);
                 setRawFlag(flagKey, "1");
             }
         }
@@ -686,7 +760,7 @@ export function runNotificationChecks() {
         if (minOfDay >= targetMin) {
             let flagKey = "jee_parentlog_reminder_" + getTodayKey();
             if (!getRawFlag(flagKey)) {
-                notify("Daily log", "Send today's study log to your parent.", true, 1);
+                notify("Daily Log", "Send Today's Study Log to Your Parent.", true, 1);
                 setRawFlag(flagKey, "1");
             }
         }

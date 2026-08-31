@@ -84,7 +84,7 @@ export function importDataJSON(file) {
         if (payload.examYear) { setStoredExamYear(payload.examYear); renderExamYearUI(); tickCountdowns(); }
 
         initToday(); renderSidebarTools(); renderPlannerCalendar(); updateLiveSummary(); loadHistoryData(); renderGarden(); renderHeatmap(); renderTrendChart();
-        showToast(`Backup imported — ${dayCount} day(s), ${mockCount} mock test(s) restored.`);
+        showToast(`Backup Imported — ${dayCount} Day(s), ${mockCount} Mock Test(s) Restored.`);
     };
     reader.readAsText(file);
 }

@@ -422,14 +422,14 @@ export function hideGuestSignInReminder() {
 export function guestReminderIgnore() {
     setRawFlag(GUEST_REMINDER_IGNORED_DATE_KEY, getTodayKey());
     hideGuestSignInReminder();
-    showToast("Reminder ignored for today.");
+    showToast("Reminder Ignored for Today.");
 }
 
 export function guestReminderSnooze() {
     setRawFlag(GUEST_REMINDER_SNOOZE_KEY, String(Date.now() + GUEST_REMINDER_SNOOZE_MS));
     hideGuestSignInReminder();
     setTimeout(maybeShowGuestSignInReminder, GUEST_REMINDER_SNOOZE_MS + 500);
-    showToast("We'll remind you again in 5 minutes.");
+    showToast("We'll Remind You Again in 5 Minutes.");
 }
 
 // ----------------- ZEN / FOCUS MODE -----------------
@@ -464,7 +464,7 @@ export function toggleZenMode() {
         unlockBodyScroll();
         if (btn) btn.title = "Zen Mode — hide distractions and focus on the timer";
     }
-    showToast(turningOn ? "Zen mode enabled." : "Zen mode disabled.");
+    showToast(turningOn ? "Zen Mode Enabled." : "Zen Mode Disabled.");
 }
 
 // Auto-entry helper — called from timer.js whenever a study session actually
@@ -496,7 +496,7 @@ export function exitZenMode() {
     unlockBodyScroll();
     let btn = document.getElementById("zen-toggle-btn");
     if (btn) btn.title = "Zen Mode — hide distractions and focus on the timer";
-    showToast("Zen mode disabled.");
+    showToast("Zen Mode Disabled.");
 }
 
 // ----------------- SIDEBAR -----------------

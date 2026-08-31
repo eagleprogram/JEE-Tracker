@@ -13,6 +13,12 @@ import { showToast, maybeShowGuestSignInReminder, hideGuestSignInReminder } from
 // Forward reference — reports.js (Step 6) needs sendReportViaEmail for the
 // auto-report scheduler below.
 import { sendReportViaEmail } from './reports.js';
+// Forward reference — google-calendar.js (added alongside this file) needs
+// getCurrentUser/connectGoogleCalendar/getGoogleCalendarAccessToken from
+// THIS file, which is why this import the other direction only gets used
+// inside a function body below (see the onAuthStateChanged handler) — same
+// safe-circular-import pattern as sendReportViaEmail above.
+import { connectAndSyncGoogleCalendar } from './google-calendar.js';
 // Forward reference — push-notifications.js (Step 8-ish) imports FROM this
 // file (getFirebaseApp/getFirebaseDb/getCurrentUser), so this is the same
 // kind of circular import already used elsewhere in the app (timer.js/
@@ -65,13 +71,13 @@ export function firebaseConfigured() { return !FIREBASE_CONFIG.apiKey.includes("
 
 export function initFirebaseIfNeeded() {
     if (fbReady) return true;
-    if (!firebaseConfigured()) { showToast("Sync disabled. Add Firebase keys in the code."); return false; }
+    if (!firebaseConfigured()) { showToast("Sync Disabled. Add Firebase Keys in the Code."); return false; }
     try {
         fbApp = firebase.initializeApp(FIREBASE_CONFIG);
         fbDb = firebase.firestore();
         fbReady = true;
         return true;
-    } catch (e) { showToast("Firebase init failed: " + e.message); return false; }
+    } catch (e) { showToast("Firebase Init Failed: " + e.message); return false; }
 }
 
 export function initFirebaseAuthIfNeeded() {
@@ -99,11 +105,24 @@ export function initFirebaseAuthIfNeeded() {
             updatePushPermissionStatusUI();
             reregisterPushIfEnabled();
             if (user) {
-                showToast(`Signed in as ${user.displayName || user.email}`);
+                showToast(`Signed In as ${user.displayName || user.email}`);
                 hideGuestSignInReminder();
                 startAutoServices();
                 startCloudListener();
                 initialAutoLoadPromise = autoLoadCloudDataIfNeeded();
+                // BUG FIX (feature request): "when the user signs in, it
+                // should connect to Calendar directly" — signInWithGoogle()
+                // above already requests the Calendar scope as part of the
+                // same consent screen, so if it actually granted one (real
+                // fresh sign-in), immediately push this week's planner
+                // tasks and load the user's events, no second click needed.
+                // Guarded on a token actually being present: this same
+                // onAuthStateChanged callback also fires on a plain page
+                // reload restoring an existing session, where no fresh
+                // token exists in memory — that case correctly does
+                // nothing here rather than popping a surprise consent
+                // popup on every reload.
+                if (getGoogleCalendarAccessToken()) connectAndSyncGoogleCalendar();
             } else {
                 if (autoSyncTimeout) clearTimeout(autoSyncTimeout);
                 if (autoSyncInterval) clearInterval(autoSyncInterval);
@@ -206,11 +225,44 @@ export function resolveInitialAuthAndSync() {
     });
 }
 
+// BUG FIX (feature request): Calendar access used to only ever be requested
+// via a SEPARATE second consent step (the icon in Holiday Reference) — the
+// user asked for it to just be included in the normal sign-in instead, so
+// most people grant it in one go without a second popup later. The
+// Calendar scope is now requested on THIS provider too, and a granted
+// access token is captured here immediately (same googleCalendarAccessToken
+// used by connectGoogleCalendar() below), so google-calendar.js's
+// getGoogleCalendarAccessToken() already has something to use right after
+// a normal sign-in — no separate click needed for the common case.
+//
+// SCOPE CHOICE — read before changing: `calendar.events` (full read/write
+// on the user's ACTUAL calendars) is what's used here — this is a Google
+// "sensitive" scope, which is why real two-way sync means every user has
+// to be added as a Testing-mode test user in Google Cloud Console (see the
+// step-by-step given earlier) until the app goes through full
+// verification. The alternative — `calendar.app.created`, a non-sensitive
+// scope needing no whitelist — was tried and reverted: it can only touch a
+// calendar the app creates itself, not the user's real one, which isn't
+// real two-way sync. Given the choice, full sync with a per-user whitelist
+// (fine at this app's current 4-5 user scale — the cap is 100) was picked
+// over open access with no real sync.
+//
+// `prompt: 'consent'` is set on both this provider and connectGoogleCalendar()'s
+// below: without it, Google can silently skip re-showing the scope grant
+// screen on a repeat sign-in it already has some history with, which can
+// come back with a token that's missing the newly-added scope.
 export async function signInWithGoogle() {
     if (!initFirebaseAuthIfNeeded()) return;
     try {
         let provider = new firebase.auth.GoogleAuthProvider();
-        await fbAuth.signInWithPopup(provider);
+        provider.addScope("https://www.googleapis.com/auth/calendar.events");
+        provider.setCustomParameters({ prompt: "consent" });
+        let result = await fbAuth.signInWithPopup(provider);
+        let credential = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
+        if (credential && credential.accessToken) {
+            googleCalendarAccessToken = credential.accessToken;
+            googleCalendarTokenExpiresAt = Date.now() + 55 * 60 * 1000;
+        }
     } catch (e) { alert("Sign-in failed: " + e.message); }
 }
 
@@ -220,11 +272,11 @@ export async function signInWithGoogle() {
 export function signOutOfGoogle() { return fbAuth ? fbAuth.signOut() : Promise.resolve(); }
 
 // ----------------- GOOGLE CALENDAR (feature request) -----------------
-// The regular sign-in above only ever grants Firebase Auth's own basic
-// profile/email scopes — never enough to call the real Google Calendar API
-// on the user's behalf. google-calendar.js needs an actual Google OAuth
-// access token with the Calendar scope granted, which is a separate
-// consent step from "sign in to this app."
+// Regular sign-in above now requests the Calendar scope too, so this
+// separate step is only needed when: (a) it's an older session from before
+// this change and no Calendar token was ever captured, or (b) the user
+// deliberately wants to connect a DIFFERENT Google account for Calendar
+// than the one they're signed into the app with (the icon button's job).
 //
 // HONEST LIMIT: the access token returned here is a raw Google OAuth token,
 // not a Firebase ID token — the Firebase JS SDK only auto-refreshes the
@@ -246,11 +298,13 @@ export async function connectGoogleCalendar() {
     try {
         let provider = new firebase.auth.GoogleAuthProvider();
         provider.addScope("https://www.googleapis.com/auth/calendar.events");
+        provider.setCustomParameters({ prompt: "consent" });
         // signInWithPopup on an account that's already signed in re-
         // authenticates the SAME Firebase account with the extra scope
-        // added — it doesn't create a duplicate account or sign the user
-        // into a different one, as long as they pick the same Google
-        // account in the popup.
+        // added — it doesn't create a duplicate account. Picking a
+        // DIFFERENT Google account in the popup is exactly how a user
+        // connects a separate account for Calendar than the one they use
+        // for app sync.
         let result = await fbAuth.signInWithPopup(provider);
         let credential = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
         if (!credential || !credential.accessToken) {
@@ -319,7 +373,7 @@ export async function pushToCloud(silent = false) {
         }
         setRawFlag("jee_last_sync", now.toString());
         renderSyncUI();
-        showToast(silent ? "Auto-synced to the cloud." : "Saved to the cloud.");
+        showToast(silent ? "Auto-Synced to the Cloud." : "Saved to the Cloud.");
     } catch (e) {
         // BUG FIX: silent (auto-sync) failures used to hit `if (!silent) alert(...)`
         // and do nothing at all — meaning a failed background sync looked
@@ -329,7 +383,7 @@ export async function pushToCloud(silent = false) {
         // whatever the user is doing. Manual Save-to-Cloud keeps its existing
         // blocking alert, since that's an intentional user action expecting
         // a direct response.
-        if (silent) { showToast("⚠️ Auto-sync failed — will retry next cycle."); return; }
+        if (silent) { showToast("⚠️ Auto-Sync Failed — Will Retry Next Cycle."); return; }
         alert("Save failed: " + e.message);
     }
 }
@@ -659,7 +713,7 @@ export async function deleteCloudData() {
     try {
         await fbDb.collection("users").doc(currentUser.uid).delete();
         clearRawFlag("jee_last_sync");
-        showToast("Cloud data deleted.");
+        showToast("Cloud Data Deleted.");
         renderSyncUI();
     } catch (e) { alert("Delete failed: " + e.message); }
 }

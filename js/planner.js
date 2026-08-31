@@ -51,7 +51,7 @@ export function addTodo() {
     // Exact-character duplicate guard — case-sensitive match against every
     // task already on today's list (done or not), same rule applied in
     // addPlannerTask() below for the calendar modal's add box.
-    if (db[todayKey].some(t => t.text === text)) { showToast("That task is already on today's list."); return; }
+    if (db[todayKey].some(t => t.text === text)) { showToast("That Task Is Already on Today's List."); return; }
     // id/createdAt/updatedAt: needed so cloud sync can identify and merge
     // this exact task later instead of only ever overwriting the whole
     // day's list — see mergePlannerDB() in firebase-sync.js.
@@ -176,7 +176,7 @@ export function confirmCarryOverTodos() {
     let count = moved.length;
     closeCarryOverModal();
     renderSidebarTools(); renderPlannerCalendar();
-    showToast(`Moved ${count} ${count === 1 ? "task" : "tasks"} to today.`);
+    showToast(`Moved ${count} ${count === 1 ? "Task" : "Tasks"} to Today.`);
 }
 
 // "Not now" button on the carryover modal — leaves the old tasks exactly
@@ -238,7 +238,7 @@ export function addPlannerTask() {
     let prioritySel = document.getElementById("planner-priority-select");
     let priority = prioritySel ? prioritySel.value : "medium";
     let db = getPlannerDB(); if (!db[plannerActiveDateKey]) db[plannerActiveDateKey] = [];
-    if (db[plannerActiveDateKey].some(t => t.text === text)) { showToast("That task is already on this day's list."); return; }
+    if (db[plannerActiveDateKey].some(t => t.text === text)) { showToast("That Task Is Already on This Day's List."); return; }
     let now = Date.now();
     db[plannerActiveDateKey].push({ id: generateId(), text, done: false, priority, createdAt: now, updatedAt: now });
     savePlannerDB(db); inp.value = ""; renderPlannerTasks();

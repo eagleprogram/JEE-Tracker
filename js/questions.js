@@ -89,7 +89,7 @@ export function saveQuestionsSolved() {
     if (!activeQuestionsDateKey) { closeQuestionsModal(); return; }
     let input = document.getElementById("questions-count-input");
     let val = parseInt(input.value, 10);
-    if (isNaN(val) || val < 0) { showToast("⚠️ Enter a valid number (0 or more)."); return; }
+    if (isNaN(val) || val < 0) { showToast("⚠️ Enter a Valid Number (0 or More)."); return; }
     let dateKey = activeQuestionsDateKey;
     let db = getDB();
     let day = db[dateKey] || initDay(dateKey);
@@ -101,7 +101,7 @@ export function saveQuestionsSolved() {
     closeQuestionsModal();
     renderQuestionsWidget();
     renderHeatmap();
-    showToast(`✅ ${val} question${val === 1 ? '' : 's'} solved logged for ${formatDateDDMMYY(dateKey)}.`);
+    showToast(`✅ ${val} Question${val === 1 ? '' : 's'} Solved Logged for ${formatDateDDMMYY(dateKey)}.`);
 }
 
 // "Back" just closes the modal without saving anything — unlike the old
@@ -127,7 +127,7 @@ export function deleteQuestionsSolved() {
     closeQuestionsModal();
     renderQuestionsWidget();
     renderHeatmap();
-    showToast(`Questions log deleted for ${formatDateDDMMYY(dateKey)}.`);
+    showToast(`Questions Log Deleted for ${formatDateDDMMYY(dateKey)}.`);
 }
 
 // ---------------- WEEKLY QUESTION-PRACTICE RING WIDGET ----------------

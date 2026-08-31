@@ -5,7 +5,7 @@
 // thing that makes the activate handler below delete the old cache and let
 // the new files be fetched fresh. Forgetting this step means fixes silently
 // never reach anyone who doesn't manually hard-refresh.
-const CACHE_NAME = "jee-tracker-v2.7.0";
+const CACHE_NAME = "jee-tracker-v2.8.0";
 
 // ----------------- BACKGROUND PUSH (Firebase Cloud Messaging) -----------------
 // Handles push messages that arrive while no tab of this app is open or
@@ -86,6 +86,7 @@ const APP_SHELL = [
   "./js/reports.js",
   "./js/backup.js",
   "./js/firebase-sync.js",
+  "./js/google-calendar.js",
   "./js/ui.js",
   "./js/main.js",
   "./assets/icon-192.png",
@@ -168,14 +169,24 @@ self.addEventListener("fetch", (event) => {
 // client (tab) for this app and postMessage it; if none is open, open one
 // (there's no live page yet to message in that case — the fresh load just
 // boots normally, which is the best a static, backend-less site can do).
+// BUG FIX (feature request): when 2+ reminders are due close together,
+// each gets its own tray notification — but this used to just say
+// {type: "STOP_ALARM"} with no indication of WHICH reminder was tapped.
+// js/notifications.js's stopAlarmLoop() then had no way to tell "stop the
+// one that's still queued/waiting" from "stop whatever's on screen right
+// now," so tapping Stop on a reminder that hadn't started its in-page turn
+// yet did nothing to actually cancel it — it rang anyway once its turn
+// came up. Passing event.notification.title through lets stopAlarmLoop()
+// find and cancel THAT specific reminder wherever it's currently sitting.
 self.addEventListener("notificationclick", (event) => {
   const isStop = event.action === "stop-alarm";
+  const notifTitle = event.notification.title;
   event.notification.close();
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ("focus" in client) {
-          client.postMessage({ type: isStop ? "STOP_ALARM" : "FOCUS_ALARM" });
+          client.postMessage({ type: isStop ? "STOP_ALARM" : "FOCUS_ALARM", title: notifTitle });
           return client.focus();
         }
       }

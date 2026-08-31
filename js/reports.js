@@ -274,7 +274,7 @@ function buildShareCanvas(dt) {
 export function downloadDayLog() {
         let dt = document.getElementById("history-picker").value; if (!dt) return;
         let canvas = buildShareCanvas(dt);
-        canvas.toBlob((blob) => { let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = `study-log-${dt}.png`; a.click(); URL.revokeObjectURL(url); showToast("Log downloaded."); });
+        canvas.toBlob((blob) => { let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = `study-log-${dt}.png`; a.click(); URL.revokeObjectURL(url); showToast("Log Downloaded."); });
     }
 
 export async function shareDayLog() {
@@ -285,7 +285,7 @@ export async function shareDayLog() {
             if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: "My Study Log", text }); return; } catch (e) { if (e.name === "AbortError") return; } }
             if (navigator.share) { try { await navigator.share({ title: "My Study Log", text }); return; } catch (e) { if (e.name === "AbortError") return; } }
             let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = `study-log-${dt}.png`; a.click(); URL.revokeObjectURL(url);
-            try { await navigator.clipboard.writeText(text); showToast("Image downloaded & summary copied!"); } catch (e) { showToast("Image downloaded!"); }
+            try { await navigator.clipboard.writeText(text); showToast("Image Downloaded & Summary Copied!"); } catch (e) { showToast("Image Downloaded!"); }
         }, "image/png");
     }
 
@@ -404,14 +404,14 @@ if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain.toLowerCase())) {
                 });
 
                 if (response.ok) {
-                    showToast(`Report sent successfully to ${emailInput}!`);
+                    showToast(`Report Sent Successfully to ${emailInput}!`);
                 } else {
                     const errorText = await response.text();
-                    if (silent) { showToast(`⚠️ Auto-email of the ${type} report failed — will retry next cycle.`); }
+                    if (silent) { showToast(`⚠️ Auto-Email of the ${type.charAt(0).toUpperCase() + type.slice(1)} Report Failed — Will Retry Next Cycle.`); }
                     else { alert("Email send failed: " + errorText); }
                 }
             } catch (e) {
-                if (silent) { showToast(`⚠️ Auto-email of the ${type} report failed — will retry next cycle.`); }
+                if (silent) { showToast(`⚠️ Auto-Email of the ${type.charAt(0).toUpperCase() + type.slice(1)} Report Failed — Will Retry Next Cycle.`); }
                 else { alert("Email send failed: " + e.message); }
             }
         };
@@ -741,7 +741,7 @@ function getReportDayRange(type) {
 export function downloadReport(type) {
         let days = getReportDayRange(type);
         let canvas = buildReportCanvas(days, type === 'weekly' ? 'Weekly Study Report' : 'Monthly Study Report');
-        canvas.toBlob((blob) => { let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = `report-${type}-${getTodayKey()}.png`; a.click(); URL.revokeObjectURL(url); showToast(`${type} report downloaded.`); });
+        canvas.toBlob((blob) => { let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = `report-${type}-${getTodayKey()}.png`; a.click(); URL.revokeObjectURL(url); showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} Report Downloaded.`); });
     }
 
 // Aggregated share text for a weekly/monthly report — mirrors buildShareText's
@@ -785,7 +785,7 @@ export async function shareReport(type) {
             if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: type === 'weekly' ? "My Weekly Study Report" : "My Monthly Study Report", text }); return; } catch (e) { if (e.name === "AbortError") return; } }
             if (navigator.share) { try { await navigator.share({ title: type === 'weekly' ? "My Weekly Study Report" : "My Monthly Study Report", text }); return; } catch (e) { if (e.name === "AbortError") return; } }
             let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = `report-${type}-${getTodayKey()}.png`; a.click(); URL.revokeObjectURL(url);
-            try { await navigator.clipboard.writeText(text); showToast("Image downloaded & summary copied!"); } catch (e) { showToast("Image downloaded!"); }
+            try { await navigator.clipboard.writeText(text); showToast("Image Downloaded & Summary Copied!"); } catch (e) { showToast("Image Downloaded!"); }
         }, "image/png");
     }
 

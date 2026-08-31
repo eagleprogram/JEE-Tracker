@@ -4,7 +4,7 @@ import { openMockDB, getAllMockTests, MOCK_STORE } from './storage.js';
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
 
-export const MISTAKE_TAGS = ["Silly mistake", "Concept gap", "Time pressure", "Calculation error", "Misread question", "Not revised", "Panic/anxiety", "Guessed wrong", "Formula error", "Skipped step", "Overconfidence", "Other"];
+export const MISTAKE_TAGS = ["Silly Mistake", "Concept Gap", "Time Pressure", "Calculation Error", "Misread Question", "Not Revised", "Panic/Anxiety", "Guessed Wrong", "Formula Error", "Skipped Step", "Over Confidence", "Other"];
 let selectedMistakeTags = [];
 
 export function renderMistakeTagPicker() {
@@ -89,7 +89,7 @@ export async function addMockTestEntry() {
     let tx = db.transaction(MOCK_STORE, "readwrite");
     tx.objectStore(MOCK_STORE).add(entry);
     tx.oncomplete = () => {
-        showToast("Mock test entry saved.");
+        showToast("Mock Test Entry Saved.");
         document.getElementById("mock-subject-input").value = "";
         document.getElementById("mock-score-input").value = "";
         document.getElementById("mock-maxscore-input").value = "";

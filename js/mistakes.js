@@ -152,7 +152,7 @@ export async function saveAddMistake() {
 
     if (notesInput) notesInput.value = "";
     if (filesInput) filesInput.value = "";
-    showToast(`Mistake logged for ${addFormChapter}.`);
+    showToast(`Mistake Logged for ${addFormChapter}.`);
     renderMistakesTracker();
 }
 
@@ -231,7 +231,7 @@ async function doAddFilesToEntry(subject, chapter, entryId) {
     await saveMistakeEntry(record);
     mistakeCache[key] = record;
     input.value = "";
-    showToast("Attachment added.");
+    showToast("Attachment Added.");
     renderMistakesTracker();
 }
 
