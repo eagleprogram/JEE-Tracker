@@ -13,12 +13,6 @@ import { showToast, maybeShowGuestSignInReminder, hideGuestSignInReminder } from
 // Forward reference — reports.js (Step 6) needs sendReportViaEmail for the
 // auto-report scheduler below.
 import { sendReportViaEmail } from './reports.js';
-// Forward reference — google-calendar.js (added alongside this file) needs
-// getCurrentUser/connectGoogleCalendar/getGoogleCalendarAccessToken from
-// THIS file, which is why this import the other direction only gets used
-// inside a function body below (see the onAuthStateChanged handler) — same
-// safe-circular-import pattern as sendReportViaEmail above.
-import { connectAndSyncGoogleCalendar } from './google-calendar.js';
 // Forward reference — push-notifications.js (Step 8-ish) imports FROM this
 // file (getFirebaseApp/getFirebaseDb/getCurrentUser), so this is the same
 // kind of circular import already used elsewhere in the app (timer.js/
@@ -110,19 +104,6 @@ export function initFirebaseAuthIfNeeded() {
                 startAutoServices();
                 startCloudListener();
                 initialAutoLoadPromise = autoLoadCloudDataIfNeeded();
-                // BUG FIX (feature request): "when the user signs in, it
-                // should connect to Calendar directly" — signInWithGoogle()
-                // above already requests the Calendar scope as part of the
-                // same consent screen, so if it actually granted one (real
-                // fresh sign-in), immediately push this week's planner
-                // tasks and load the user's events, no second click needed.
-                // Guarded on a token actually being present: this same
-                // onAuthStateChanged callback also fires on a plain page
-                // reload restoring an existing session, where no fresh
-                // token exists in memory — that case correctly does
-                // nothing here rather than popping a surprise consent
-                // popup on every reload.
-                if (getGoogleCalendarAccessToken()) connectAndSyncGoogleCalendar();
             } else {
                 if (autoSyncTimeout) clearTimeout(autoSyncTimeout);
                 if (autoSyncInterval) clearInterval(autoSyncInterval);
@@ -225,44 +206,22 @@ export function resolveInitialAuthAndSync() {
     });
 }
 
-// BUG FIX (feature request): Calendar access used to only ever be requested
-// via a SEPARATE second consent step (the icon in Holiday Reference) — the
-// user asked for it to just be included in the normal sign-in instead, so
-// most people grant it in one go without a second popup later. The
-// Calendar scope is now requested on THIS provider too, and a granted
-// access token is captured here immediately (same googleCalendarAccessToken
-// used by connectGoogleCalendar() below), so google-calendar.js's
-// getGoogleCalendarAccessToken() already has something to use right after
-// a normal sign-in — no separate click needed for the common case.
-//
-// SCOPE CHOICE — read before changing: `calendar.events` (full read/write
-// on the user's ACTUAL calendars) is what's used here — this is a Google
-// "sensitive" scope, which is why real two-way sync means every user has
-// to be added as a Testing-mode test user in Google Cloud Console (see the
-// step-by-step given earlier) until the app goes through full
-// verification. The alternative — `calendar.app.created`, a non-sensitive
-// scope needing no whitelist — was tried and reverted: it can only touch a
-// calendar the app creates itself, not the user's real one, which isn't
-// real two-way sync. Given the choice, full sync with a per-user whitelist
-// (fine at this app's current 4-5 user scale — the cap is 100) was picked
-// over open access with no real sync.
-//
-// `prompt: 'consent'` is set on both this provider and connectGoogleCalendar()'s
-// below: without it, Google can silently skip re-showing the scope grant
-// screen on a repeat sign-in it already has some history with, which can
-// come back with a token that's missing the newly-added scope.
+// BUG FIX (feature request): requesting the Calendar scope as part of
+// normal sign-in caused real problems in practice — an intimidating
+// "wants access to see, edit, share, and permanently delete calendar
+// events" consent screen for EVERY user, whether or not they cared about
+// Calendar sync at all, and (per the Testing-mode/verification
+// constraints described elsewhere) actual errors for anyone not
+// whitelisted yet. Reverted: plain sign-in requests no extra scope and no
+// forced consent screen — fast and unremarkable for everyone, exactly
+// like before Calendar sync was ever added. Calendar access is now ONLY
+// ever requested from the dedicated icon in the Holiday Reference card
+// (connectGoogleCalendar() below), for whoever actually wants it.
 export async function signInWithGoogle() {
     if (!initFirebaseAuthIfNeeded()) return;
     try {
         let provider = new firebase.auth.GoogleAuthProvider();
-        provider.addScope("https://www.googleapis.com/auth/calendar.events");
-        provider.setCustomParameters({ prompt: "consent" });
-        let result = await fbAuth.signInWithPopup(provider);
-        let credential = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
-        if (credential && credential.accessToken) {
-            googleCalendarAccessToken = credential.accessToken;
-            googleCalendarTokenExpiresAt = Date.now() + 55 * 60 * 1000;
-        }
+        await fbAuth.signInWithPopup(provider);
     } catch (e) { alert("Sign-in failed: " + e.message); }
 }
 
@@ -272,11 +231,14 @@ export async function signInWithGoogle() {
 export function signOutOfGoogle() { return fbAuth ? fbAuth.signOut() : Promise.resolve(); }
 
 // ----------------- GOOGLE CALENDAR (feature request) -----------------
-// Regular sign-in above now requests the Calendar scope too, so this
-// separate step is only needed when: (a) it's an older session from before
-// this change and no Calendar token was ever captured, or (b) the user
-// deliberately wants to connect a DIFFERENT Google account for Calendar
-// than the one they're signed into the app with (the icon button's job).
+// Deliberately kept SEPARATE from the plain sign-in above: combining the
+// Calendar scope into normal sign-in was tried and reverted — it made
+// every sign-in show Google's "wants access to see, edit, share, and
+// permanently delete calendar events" consent screen, which is enough of
+// a red flag on an unverified app to make people bail on signing in at
+// all. So signInWithGoogle() stays scope-free and fast; this is the ONLY
+// path that ever requests Calendar access, and only when someone
+// deliberately taps the Google icon on the Holiday Reference card.
 //
 // HONEST LIMIT: the access token returned here is a raw Google OAuth token,
 // not a Firebase ID token — the Firebase JS SDK only auto-refreshes the
