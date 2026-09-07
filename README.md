@@ -19,6 +19,7 @@ For multi-device users, Firebase Firestore provides effortless, cross-device syn
 * **Offline-First PWA:** Service worker caching enables full functionality without an internet connection, including the question-practice tracker module.
 * **Cross-Device Cloud Sync:** Securely syncs all data (study logs, planner, sleep, syllabus, and question-practice counts) across devices using Firebase Auth and Firestore.
 * **Background Push Reminders:** Optional second delivery channel (Firebase Cloud Messaging + a free GitHub Actions cron job) that delivers reminders/alarms even when the browser is fully closed.
+* **Google Calendar Sync:** Pushes the next 7 days of planner tasks into the user's real primary Google Calendar as all-day events, and lists their own upcoming Google Calendar events in the app. Syncs on sign-in and on tap (not a continuous background sync).
 
 \---
 
@@ -37,6 +38,9 @@ For multi-device users, Firebase Firestore provides effortless, cross-device syn
 
 ```text
 JEE-Tracker/
+├── LICENSE.txt
+├── README.md
+├── AUDIT_LOG.md                      — running log of the module-by-module code audit (bugs found + fixed, batch by batch)
 ├── index.html                       — page shell, all markup
 ├── manifest.json                    — PWA manifest
 ├── sw.js                            — service worker (offline app-shell caching + background push display)
@@ -45,10 +49,13 @@ JEE-Tracker/
 │       └── scheduled-alarms.yml     — GitHub Actions cron (every 5 min) that runs the push scheduler
 ├── server/
 │   ├── package.json                 — scheduler dependencies (firebase-admin)
-│   └── send-scheduled-alarms.js     — reads Firestore, decides which reminders are due, sends FCM pushes
+│   ├── send-scheduled-alarms.js     — reads Firestore, decides which reminders are due, sends FCM pushes
+│   └── .gitignore                   — ignores node_modules/
 ├── assets/
-│   ├── icon-192.png / icon-512.png  — PWA icons
-│   └── target-icon.png              — used for the header title icon
+│   ├── icon-192.png / icon-512.png                 — PWA icons
+│   ├── icon-192-maskable.png / icon-512-maskable.png — maskable variants for adaptive home-screen icons
+│   ├── target-icon.png              — used for the header title icon
+│   └── garden-icon.png              — garden chart icon
 ├── css/
 │   ├── variables.css    — color/spacing tokens + shared --tint-\* button palette
 │   ├── base.css         — layout, sidebar, scrollbars
@@ -69,9 +76,11 @@ JEE-Tracker/
     ├── mistakes.js           — chapter-wise mistakes tracker
     ├── youtube.js            — study-music player + history
     ├── charts.js             — garden, heatmap, streak, trend
+    ├── week-nav.js           — shared per-widget "which week am I viewing" state
     ├── reports.js            — share/download/email reports
     ├── backup.js             — export/import JSON
     ├── firebase-sync.js      — auth + cloud sync
+    ├── google-calendar.js    — two-way-ish sync of planner tasks with the user's real Google Calendar
     ├── ui.js                 — sidebar, toasts, countdown
     └── main.js               — entry point, wires it all
 ```

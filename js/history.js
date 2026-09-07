@@ -15,10 +15,24 @@ import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
 // this date), if any. Used both here (as a max bound on missed-break
 // times) and in saveSleepLog() (as a min bound on a new bedtime being
 // logged) so the two can never silently overlap or contradict each other.
+// BUG FIX (2026-09-07): a COMPLETED entry only still counts as "asleep for
+// the rest of `dt`" if its wake side landed on a DIFFERENT date than `dt`
+// (a real PM bedtime → next-day wake). An early-AM bedtime (e.g. 12:58 AM)
+// that was woken from LATER THE SAME `dt` (e.g. 9:46 AM) is already over —
+// the person is awake again for the rest of `dt`, so that old bedtime must
+// not keep capping later same-day breaks. Previously this loop matched
+// sleepDate===dt regardless of wakeDate, so an early-AM bedtime + same-day
+// wake produced a stale, already-resolved "bedtime" (e.g. 12:58 AM) that
+// then wrongly blocked every break for the rest of the day, since
+// timeToMinutes() compares raw clock times and 12:58 AM sorts before any
+// later same-day time. Only a still-open bedtime (pending, handled below)
+// or one that carried sleep through into a genuinely different wake date
+// should still cap breaks on `dt`.
 function bedtimeLoggedFor(dt) {
     let log = getSleepLog();
     for (let key of Object.keys(log)) {
-        if (log[key].sleepDate === dt && log[key].sleepTime) return log[key].sleepTime;
+        let e = log[key];
+        if (e.sleepDate === dt && e.sleepTime && e.wakeDate !== dt) return e.sleepTime;
     }
     let pending = getSleepPending();
     if (pending && (pending.type || 'sleep') === 'sleep' && pending.date === dt) return pending.time;
