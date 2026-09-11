@@ -1,4 +1,4 @@
-import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry, getLastBackupAt } from './storage.js';
+import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry, getLastBackupAt, blankDay } from './storage.js';
 // mistakes.js switched each chapter's stored record from one flat
 // {count, notes, files} blob to an `entries` array (separately editable
 // mistake log entries). normalizeRecord() upgrades either shape (a record
@@ -293,41 +293,86 @@ export async function pushToCloud(silent = false) {
         // once a user has logged a handful of tests with photos. The mock
         // test entries themselves (subject, score, notes, mistake tags) DO
         // sync — only each entry's `files` array is stripped before upload.
-        let mockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
+        let localMockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
         // Same file-stripping approach as mock tests: each entry's counter,
         // notes, and hasFiles flag sync — the actual attachment bytes don't
         // (keeps documents under Firestore's 1MiB limit). Each chapter can
         // now hold several separately-logged entries (see mistakes.js).
-        let mistakeChapters = (await getAllMistakeChapters()).map(rec => {
+        let localMistakeChapters = (await getAllMistakeChapters()).map(rec => {
             let norm = normalizeRecord(rec) || { key: rec.key, subject: rec.subject, chapter: rec.chapter, entries: [], updatedAt: rec.updatedAt || 0 };
             return {
                 key: norm.key, subject: norm.subject, chapter: norm.chapter, updatedAt: norm.updatedAt,
                 entries: (norm.entries || []).map(({ files, ...erest }) => ({ ...erest, hasFiles: !!(files && files.length > 0) || !!erest.hasFiles }))
             };
         });
+        let localStudyDB = getDB();
+        let localPlannerDB = getPlannerDB();
+        let localSleepLog = getSleepLog();
+        let localSyllabus = getSyllabusProgress();
+
         let docRef = fbDb.collection("users").doc(currentUser.uid);
-        await docRef.set({
-            studyDB: getDB(),
-            plannerDB: getPlannerDB(),
-            sleepLog: getSleepLog(),
-            sleepPending: getSleepPending(),
-            syllabusProgress: getSyllabusProgress(),
-            notifSettings: getNotifSettings(),
-            ytHistory: getYtHistory(),
-            examYear: getExamYear(),
-            ytLastLink: getRawFlag("jee_yt_last_link") || "",
-            // Lets the scheduled server-side push job (server/send-scheduled-alarms.js)
-            // compute the "2+ days since backup" reminder too — it has no
-            // other way to know when this device last exported a backup.
-            lastBackupAt: getLastBackupAt(),
-            mockTests,
-            mistakeChapters,
-            updatedAt: now
+        // BUG FIX (root cause of "cloud sync isn't working properly — data
+        // present on mobile isn't coming across to the laptop and vice
+        // versa"): this used to be a blind `docRef.set({studyDB: getDB(),
+        // ...})` — every push OVERWROTE THE ENTIRE CLOUD DOCUMENT with only
+        // what THIS device had locally, with no regard for what was already
+        // sitting in the cloud. If device A pushed at 9am and device B
+        // (which hadn't pulled A's 9am changes yet) pushed at 9:30am,
+        // B's push didn't just add its own new data — it ERASED A's from
+        // the cloud entirely, because B's payload was built purely from B's
+        // own local storage. Reading the cloud doc INSIDE a transaction and
+        // merging every category onto it (same merge functions
+        // applyCloudData uses on the way IN, now also used on the way OUT)
+        // makes a push additive instead of destructive, no matter which
+        // device pushed most recently — and the transaction guarantees
+        // we're merging against the truly-latest cloud state even if
+        // another device's push lands in the split second between the read
+        // and the write below.
+        let mergedStudyDB, mergedPlannerDB, mergedSleepLog, mergedSyllabus;
+        await fbDb.runTransaction(async (tx) => {
+            let cloudSnap = await tx.get(docRef);
+            let cloud = cloudSnap.exists ? cloudSnap.data() : {};
+            mergedStudyDB = mergeStudyDBs(cloud.studyDB || {}, localStudyDB);
+            mergedPlannerDB = mergePlannerDBs(cloud.plannerDB || {}, localPlannerDB);
+            mergedSleepLog = mergeSleepLogs(cloud.sleepLog || {}, localSleepLog);
+            mergedSyllabus = mergeSyllabusProgress(cloud.syllabusProgress || {}, localSyllabus);
+            let mergedMockTests = mergeMockTestArraysForCloud(cloud.mockTests || [], localMockTests);
+            let mergedMistakeChapters = mergeMistakeChapterArraysForCloud(cloud.mistakeChapters || [], localMistakeChapters);
+
+            tx.set(docRef, {
+                studyDB: mergedStudyDB,
+                plannerDB: mergedPlannerDB,
+                sleepLog: mergedSleepLog,
+                sleepPending: getSleepPending(),
+                syllabusProgress: mergedSyllabus,
+                notifSettings: getNotifSettings(),
+                ytHistory: getYtHistory(),
+                examYear: getExamYear(),
+                ytLastLink: getRawFlag("jee_yt_last_link") || "",
+                // Lets the scheduled server-side push job (server/send-scheduled-alarms.js)
+                // compute the "2+ days since backup" reminder too — it has no
+                // other way to know when this device last exported a backup.
+                lastBackupAt: getLastBackupAt(),
+                mockTests: mergedMockTests,
+                mistakeChapters: mergedMistakeChapters,
+                updatedAt: now
+            });
         });
+
+        // Write the merged result back to THIS device's own storage too —
+        // otherwise this device would keep showing its own pre-merge data
+        // (missing whatever the cloud had that this device hadn't seen
+        // yet) until its next pull, even though the cloud now has the
+        // fuller merged picture this device just wrote.
+        saveDB(mergedStudyDB);
+        savePlannerDB(mergedPlannerDB);
+        writeSleepLog(mergedSleepLog);
+        saveSyllabusProgress(mergedSyllabus);
+
         // Verify the write actually landed on the server (force a real
         // round-trip, bypassing local cache) before trusting it. Without
-        // this, set() can resolve successfully off the SDK's local cache
-        // while the server ends up holding different data — silently
+        // this, a transaction can resolve successfully off the SDK's local
+        // cache while the server ends up holding different data — silently
         // desyncing "last synced" from what's actually in the cloud.
         let confirmDoc = await docRef.get({ source: "server" });
         if (!confirmDoc.exists || confirmDoc.data().updatedAt !== now) {
@@ -424,6 +469,163 @@ async function restoreMistakeChapters(chapters) {
     }
 }
 
+// ----------------- STUDY DB MERGE (cloud <-> local) -----------------
+// BUG FIX (root cause of "cloud sync isn't working properly — data on
+// mobile doesn't come across to laptop and vice versa"): unlike plannerDB/
+// mockTests/mistakeChapters below (which already merge cloud onto local
+// entry-by-entry), studyDB — the actual study/break minutes, subject
+// breakdown, and Today's Live Summary numbers — used to be applied with a
+// blind `saveDB(data.studyDB || {})`, AND pushed with a blind
+// `studyDB: getDB()` that overwrote the ENTIRE cloud document with only
+// whatever this one device had locally. Combine those two one-way mirrors
+// and syncing between two devices was never actually safe: whichever
+// device synced LAST simply erased whatever the other device's studyDB
+// held that this device hadn't already pulled in — exactly "not everything
+// that's on mobile is coming across."
+//
+// study/break entries have no separate updatedAt, but they don't need one:
+// timer.js's commit loop only ever EXTENDS an existing entry's `duration`
+// in place (same id, every ~20s while that segment is still open) or
+// creates a brand-new id — it never legitimately shrinks an entry's
+// duration except by deleting it outright (history.js). So for a given id
+// present on both sides, whichever copy has the LARGER duration is simply
+// the newer one — no extra timestamp field needed. An id that exists on
+// only one side is always kept (same no-tombstone trade-off already
+// accepted for plannerDB/mockTests/mistakeChapters elsewhere in this file —
+// a session deleted on one device can reappear if a snapshot predating
+// that delete merges in later; closing that gap needs a soft-delete flag,
+// a bigger change than this fix).
+function mergeEntryArraysByIdAndDuration(a, b) {
+    let byId = new Map();
+    (a || []).forEach(e => { if (e && e.id) byId.set(e.id, e); });
+    (b || []).forEach(e => {
+        if (!e || !e.id) return;
+        let existing = byId.get(e.id);
+        if (!existing || (e.duration || 0) > (existing.duration || 0)) byId.set(e.id, e);
+    });
+    return Array.from(byId.values());
+}
+
+// subjects/totalStudy/totalBreak are maintained as running totals in
+// timer.js/history.js, not derived on read — so after merging two
+// independently-updated sets of sessions/breaks, the only trustworthy way
+// to get correct aggregates is to recompute them FROM the merged entries,
+// rather than trying to reconcile two already-diverged totals.
+function recomputeDayAggregates(day) {
+    let subjects = { ...blankDay().subjects };
+    (day.studySessions || []).forEach(s => { subjects[s.subject] = (subjects[s.subject] || 0) + (s.duration || 0); });
+    day.subjects = subjects;
+    day.totalStudy = Object.values(subjects).reduce((sum, v) => sum + v, 0);
+    day.totalBreak = (day.breaks || []).reduce((sum, b) => sum + (b.duration || 0), 0);
+    return day;
+}
+
+function mergeDayObjects(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    let merged = { ...blankDay(), ...a };
+    merged.studySessions = mergeEntryArraysByIdAndDuration(a.studySessions, b.studySessions);
+    merged.breaks = mergeEntryArraysByIdAndDuration(a.breaks, b.breaks);
+    recomputeDayAggregates(merged);
+    // questionsSolved/questionsAsked have no timestamp of their own — once
+    // asked on EITHER device, treat the day as asked everywhere (never
+    // re-nag with the popup), and keep whichever side actually has a real
+    // logged answer.
+    merged.questionsAsked = !!a.questionsAsked || !!b.questionsAsked;
+    merged.questionsSolved = a.questionsAsked ? a.questionsSolved : (b.questionsAsked ? b.questionsSolved : 0);
+    // todos/slots are legacy fields blankDay() still carries but nothing in
+    // the app writes to anymore (plannerDB replaced them) — kept as-is from
+    // whichever side has them, purely so old data already saved under these
+    // keys is never dropped by a merge.
+    merged.todos = (a.todos && a.todos.length ? a.todos : b.todos) || [];
+    merged.slots = (a.slots && a.slots.length ? a.slots : b.slots) || [];
+    return merged;
+}
+
+export function mergeStudyDBs(dbA, dbB) {
+    dbA = dbA || {}; dbB = dbB || {};
+    let dayKeys = new Set([...Object.keys(dbA), ...Object.keys(dbB)]);
+    let merged = {};
+    dayKeys.forEach(dayKey => { merged[dayKey] = mergeDayObjects(dbA[dayKey], dbB[dayKey]); });
+    return merged;
+}
+
+// ----------------- SLEEP LOG MERGE (cloud <-> local) -----------------
+// Sleep entries are keyed by date, one object per date-key (see
+// storage.js), with no updatedAt of their own either. A COMPLETE entry
+// (both a sleep side and a wake side actually filled in) is always strictly
+// more informative than a half-open PENDING one started on the other device
+// — so per date-key, whichever side is more complete wins; a date-key that
+// only exists on one side is always kept.
+function sleepEntryCompleteness(e) {
+    if (!e) return -1;
+    return (e.sleepTime ? 1 : 0) + (e.wakeTime ? 1 : 0) + (typeof e.durationMin === "number" ? 1 : 0);
+}
+function mergeSleepLogs(logA, logB) {
+    logA = logA || {}; logB = logB || {};
+    let keys = new Set([...Object.keys(logA), ...Object.keys(logB)]);
+    let merged = {};
+    keys.forEach(k => { merged[k] = sleepEntryCompleteness(logB[k]) > sleepEntryCompleteness(logA[k]) ? logB[k] : (logA[k] || logB[k]); });
+    return merged;
+}
+
+// ----------------- SYLLABUS PROGRESS MERGE (cloud <-> local) -----------------
+// Each chapter's tags (lecture/revision/DPP/etc.) are plain completion
+// checkboxes with no timestamp — OR-merged per tag so a chapter marked done
+// on one device can never be silently un-marked by an older snapshot from a
+// device that hadn't caught up yet. (Deliberately un-checking a tag still
+// works locally — it just re-syncs as done again if a stale snapshot from
+// before that un-check merges in later, the same no-tombstone trade-off
+// already accepted for the other categories in this file.)
+function mergeSyllabusProgress(progA, progB) {
+    progA = progA || {}; progB = progB || {};
+    let keys = new Set([...Object.keys(progA), ...Object.keys(progB)]);
+    let merged = {};
+    keys.forEach(key => {
+        let a = progA[key] || {}, b = progB[key] || {};
+        let tags = new Set([...Object.keys(a), ...Object.keys(b)]);
+        let entry = {};
+        tags.forEach(tag => { entry[tag] = !!a[tag] || !!b[tag]; });
+        merged[key] = entry;
+    });
+    return merged;
+}
+
+// ----------------- MOCK TESTS / MISTAKE CHAPTERS MERGE (for the OUTGOING cloud payload) -----------------
+// restoreMockTests/restoreMistakeChapters below already merge an incoming
+// cloud snapshot onto local storage safely (add-only, never overwrite real
+// local fields). What they DIDN'T protect against: pushToCloud used to
+// build its outgoing payload purely from this device's own local state and
+// overwrite the cloud with it wholesale — so if a second device had added a
+// mock test or mistake entry that this device never pulled down yet, THIS
+// device's push would erase it from the cloud anyway. These mirror the same
+// add-only philosophy, applied to the payload being written, not just the
+// payload being read.
+function mergeMockTestArraysForCloud(cloudTests, localTests) {
+    let byId = new Map();
+    (cloudTests || []).forEach(t => { if (t) byId.set(t.id, t); });
+    (localTests || []).forEach(t => {
+        if (!t) return;
+        let existing = byId.get(t.id);
+        byId.set(t.id, existing ? { ...existing, hasFiles: existing.hasFiles || t.hasFiles } : t);
+    });
+    return Array.from(byId.values());
+}
+function mergeMistakeChapterArraysForCloud(cloudChapters, localChapters) {
+    let byKey = new Map();
+    (cloudChapters || []).forEach(c => { if (c && c.key) byKey.set(c.key, c); });
+    (localChapters || []).forEach(local => {
+        if (!local || !local.key) return;
+        let cloudEntry = byKey.get(local.key);
+        if (!cloudEntry) { byKey.set(local.key, local); return; }
+        let localIds = new Set((local.entries || []).map(e => String(e.id)));
+        let combinedEntries = [...(local.entries || [])];
+        (cloudEntry.entries || []).forEach(ce => { if (!localIds.has(String(ce.id))) combinedEntries.push(ce); });
+        byKey.set(local.key, { key: local.key, subject: local.subject, chapter: local.chapter, entries: combinedEntries, updatedAt: Math.max(local.updatedAt || 0, cloudEntry.updatedAt || 0) });
+    });
+    return Array.from(byKey.values());
+}
+
 // ----------------- PLANNER MERGE (cloud <-> local) -----------------
 // Unlike mock tests / mistake chapters just above (which already merge by
 // id instead of overwriting — see restoreMockTests/restoreMistakeChapters),
@@ -459,18 +661,23 @@ function taskIdentity(t) { return t && t.id ? "id:" + t.id : "text:" + (t && t.t
 // mock-test deletions already have in this codebase — flagging it here
 // rather than leaving it silent, since closing that gap properly needs a
 // soft-delete flag, which is a bigger change than this fix.
-function mergePlannerDB(cloudPlannerDB) {
-    if (!cloudPlannerDB || typeof cloudPlannerDB !== "object") return;
-    let localDB = getPlannerDB(); // already id/updatedAt-normalized by getPlannerDB()
-    let dayKeys = new Set([...Object.keys(localDB), ...Object.keys(cloudPlannerDB)]);
+// Pure merge — takes two plannerDBs, returns the merged result without
+// touching storage. Split out so pushToCloud can merge local onto a
+// FRESHLY-READ cloud snapshot (inside its transaction, see below) without
+// this device's own storage being involved at all, while
+// applyCloudData/catchUpPlannerFromCloud keep using the thin wrapper below
+// exactly as before.
+function mergePlannerDBs(dbA, dbB) {
+    dbA = dbA || {}; dbB = dbB || {};
+    let dayKeys = new Set([...Object.keys(dbA), ...Object.keys(dbB)]);
 
     // Pass 1: merge each day's list independently — newest updatedAt wins
     // per task identity WITHIN that one day-key.
     let merged = {};
     dayKeys.forEach(dayKey => {
         let byIdentity = new Map();
-        (localDB[dayKey] || []).forEach(t => byIdentity.set(taskIdentity(t), t));
-        (cloudPlannerDB[dayKey] || []).forEach(ct => {
+        (dbA[dayKey] || []).forEach(t => byIdentity.set(taskIdentity(t), t));
+        (dbB[dayKey] || []).forEach(ct => {
             let key = taskIdentity(ct);
             let existing = byIdentity.get(key);
             if (!existing || (ct.updatedAt || 0) > (existing.updatedAt || 0)) byIdentity.set(key, ct);
@@ -501,7 +708,15 @@ function mergePlannerDB(cloudPlannerDB) {
         if (merged[dayKey].length === 0) delete merged[dayKey];
     });
 
-    savePlannerDB(merged);
+    return merged;
+}
+
+// Thin, side-effecting wrapper — kept so applyCloudData/catchUpPlannerFromCloud
+// don't need to change: "merge this cloud snapshot onto whatever's local
+// right now, and save it."
+function mergePlannerDB(cloudPlannerDB) {
+    if (!cloudPlannerDB || typeof cloudPlannerDB !== "object") return;
+    savePlannerDB(mergePlannerDBs(getPlannerDB(), cloudPlannerDB));
 }
 
 // ----------------- OPPORTUNISTIC PLANNER CATCH-UP (wake-from-background) -----------------
@@ -550,16 +765,28 @@ export async function catchUpPlannerFromCloud() {
 // listener below (automatic, from another device). Applies every synced
 // category to local storage.
 async function applyCloudData(data) {
-    saveDB(data.studyDB || {});
+    // BUG FIX: was `saveDB(data.studyDB || {})` — a wholesale overwrite that
+    // discarded any local study/break minutes logged on THIS device after
+    // whatever moment this cloud snapshot was captured. mergeStudyDBs()
+    // combines the two (see its own comment above) instead of picking one
+    // side wholesale — the same class of fix plannerDB already had.
+    saveDB(mergeStudyDBs(getDB(), data.studyDB || {}));
     // BUG FIX: was `savePlannerDB(data.plannerDB || {})` — a wholesale
     // overwrite that discarded any local planner change (a carryover, a
     // toggle, a newly-added task) made after this cloud snapshot was taken.
     // mergePlannerDB() combines the two instead of picking one wholesale —
     // see its own comment above for the full story.
     mergePlannerDB(data.plannerDB || {});
-    if (data.sleepLog) writeSleepLog(data.sleepLog);
+    // BUG FIX: was `writeSleepLog(data.sleepLog)` — same wholesale-overwrite
+    // problem, for the sleep log. mergeSleepLogs() keeps whichever side's
+    // entry is more complete per date instead of always taking the cloud's.
+    if (data.sleepLog) writeSleepLog(mergeSleepLogs(getSleepLog(), data.sleepLog));
     if (data.sleepPending !== undefined) setSleepPending(data.sleepPending);
-    if (data.syllabusProgress) saveSyllabusProgress(data.syllabusProgress);
+    // BUG FIX: was `saveSyllabusProgress(data.syllabusProgress)` — same
+    // wholesale-overwrite problem. mergeSyllabusProgress() OR-merges each
+    // chapter's completion tags instead of letting an older cloud snapshot
+    // silently un-mark something completed locally.
+    if (data.syllabusProgress) saveSyllabusProgress(mergeSyllabusProgress(getSyllabusProgress(), data.syllabusProgress));
     if (data.notifSettings) saveNotifSettings(data.notifSettings);
     if (data.ytHistory) saveYtHistory(data.ytHistory);
     if (data.examYear) setStoredExamYear(data.examYear);
@@ -571,14 +798,19 @@ async function applyCloudData(data) {
 export async function pullFromCloud() {
     if (!initFirebaseAuthIfNeeded()) return;
     if (!currentUser) { alert("Sign in first."); return; }
-    if (!confirm("This will REPLACE all study logs, planner tasks, sleep log, syllabus progress, notification settings, YouTube history, exam year, mock test entries, and mistake-tracker entries (scores/counts & notes — not attached files) on THIS device with your saved cloud data. Continue?")) return;
     try {
         let doc = await fbDb.collection("users").doc(currentUser.uid).get();
         if (!doc.exists) { alert("No cloud data saved yet — tap Save to Cloud first."); return; }
         let data = doc.data();
+        // BUG FIX: the old confirm() ("This will REPLACE all study logs...")
+        // described a wholesale overwrite that applyCloudData() no longer
+        // does — every category is now MERGED with what's already on this
+        // device (see applyCloudData's own comments), so there's nothing
+        // left on this device to lose, and nothing left to ask permission
+        // for.
         await applyCloudData(data);
         setRawFlag("jee_last_sync", (data.updatedAt || Date.now()).toString());
-        alert("Loaded! The page will reload.");
+        setRawFlag("jee_pending_toast", "Synced with the cloud.");
         location.reload();
     } catch (e) { alert("Load failed: " + e.message); }
 }
@@ -599,10 +831,17 @@ async function autoLoadCloudDataIfNeeded() {
         let doc = await fbDb.collection("users").doc(currentUser.uid).get();
         if (!doc.exists) return; // nothing saved to the cloud yet for this account
         let data = doc.data();
-        let localHasData = Object.keys(getDB() || {}).length > 0;
-        if (localHasData) {
-            if (!confirm("Cloud data was found for this account. Load it onto this device now? This will replace the study logs, planner tasks, and other data currently on this device.")) return;
-        }
+        // BUG FIX: this used to confirm() "Cloud data was found for this
+        // account. Load it onto this device now? This will replace the
+        // study logs, planner tasks, and other data currently on this
+        // device" whenever the device already had local data — a leftover
+        // from when applyCloudData() was a destructive overwrite and this
+        // confirm was the only thing standing between a user and losing
+        // local work. applyCloudData() now MERGES every category instead
+        // of replacing it (see its own comment), so there's nothing left to
+        // lose by applying automatically — this confirm was exactly the
+        // unexplained "new data found on the cloud" pop-up reported as
+        // sync friction.
         await applyCloudData(data);
         setRawFlag("jee_last_sync", (data.updatedAt || Date.now()).toString());
         // BUG FIX: showToast() immediately followed by location.reload() never
@@ -612,7 +851,7 @@ async function autoLoadCloudDataIfNeeded() {
         // the message and showing it after the reload (via
         // showPendingToastIfAny(), called from main.js on init) guarantees
         // it's actually seen.
-        setRawFlag("jee_pending_toast", "Loaded your data from the cloud.");
+        setRawFlag("jee_pending_toast", "Synced with the cloud.");
         location.reload();
     } catch (e) {
         console.log("Auto-load from cloud failed:", e.message);
@@ -653,7 +892,14 @@ function startCloudListener() {
         // Only react to a genuinely newer write from elsewhere — otherwise
         // this fires as an echo of our own pushToCloud() on this same tab.
         if (remoteUpdatedAt <= lastLocalSync) return;
-        if (!confirm("New data was saved to the cloud from another device. Load it here now? This will replace local data on this device.")) return;
+        // BUG FIX: this used to confirm() "New data was saved to the cloud
+        // from another device. Load it here now? This will replace local
+        // data on this device." — surfacing as an unexplained pop-up
+        // mid-session (reported: "an option pops up on the laptop like new
+        // data found on the cloud or something"). Same reasoning as
+        // autoLoadCloudDataIfNeeded above: applyCloudData() merges now, it
+        // doesn't replace, so there's no local data at risk and nothing
+        // left to ask permission for.
         await applyCloudData(data);
         setRawFlag("jee_last_sync", remoteUpdatedAt.toString());
         // Same reason as autoLoadCloudDataIfNeeded above — see that comment.

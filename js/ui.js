@@ -102,8 +102,51 @@ export function initHolidayReference() {
     let src = frame.dataset.src;
     if (!src) return;
     holidayFrameLoaded = true;
-    frame.src = src;
-    setTimeout(() => { frame.src = src; }, 3000);
+
+    // BUG FIX (persistent mobile-only failure, survived both fixes above):
+    // becoming visible (offsetParent non-null) doesn't mean the panel has
+    // finished OPENING — on mobile the drawer's WIDTH animates from 48px to
+    // its expanded size over 0.28s (css/base.css, `.sidebar { transition:
+    // width 0.28s ...}`), on its own promoted compositor layer
+    // (will-change/transform, added specifically to keep that resize
+    // smooth). This function was assigning `src` the INSTANT that animation
+    // started — handing a heavy cross-origin Google Calendar embed to the
+    // browser at the exact moment its container's compositor layer was
+    // still being resized underneath it. A constrained mobile GPU can load
+    // that embed's content just fine while still failing to ever actually
+    // PAINT it — the frame that finishes loading with nothing visible until
+    // something else forces a repaint, which is exactly what a manual
+    // refresh does (it loads into an already-settled, non-animating page,
+    // the one case that always worked). Desktop has the same transition but
+    // rarely shows this, simply because it has far more GPU headroom to
+    // spare. Waiting for the drawer's OWN transition to finish (with a
+    // timeout fallback in case transitionend never fires — e.g. the panel
+    // gets closed again mid-animation, or this is the window-`load` path
+    // where the panel was already sitting open with no transition to wait
+    // for at all) before ever touching `src` guarantees the iframe only
+    // ever starts loading into a settled, already-sized layout.
+    let sidebar = document.getElementById("sidebar");
+    let alreadyLoaded = false;
+    let loadFrame = () => {
+        if (alreadyLoaded) return;
+        alreadyLoaded = true;
+        frame.src = src;
+        setTimeout(() => { frame.src = src; }, 3000);
+    };
+    if (sidebar) {
+        sidebar.addEventListener("transitionend", function onSidebarTransitionEnd(e) {
+            if (e.target !== sidebar || e.propertyName !== "width") return;
+            sidebar.removeEventListener("transitionend", onSidebarTransitionEnd);
+            loadFrame();
+        });
+        // Safety net, same reasoning as the 3s re-assignment above: covers
+        // the panel already being open (no transition ever fires) and any
+        // browser where transitionend is unreliable. 400ms comfortably
+        // clears the 0.28s mobile transition (and the shorter desktop one).
+        setTimeout(loadFrame, 400);
+    } else {
+        loadFrame();
+    }
 }
 
 // ----------------- FULL DEVICE RESET (Delete Cookies & Reload) -----------------
@@ -829,12 +872,59 @@ const JEE_QUOTES = [
         { text: "The rank you want is waiting for the effort you haven't given yet.", author: "Anonymous" }
 ];
 
+// BUG FIX (feature request): quotes used to be allowed to wrap onto a
+// second line (text-wrap:balance in css/base.css kept that 2-line look
+// tidy). Now every quote must render on exactly ONE line — a long quote is
+// no longer wrapped OR truncated, it's skipped in favor of the next one in
+// the rotation. Rather than permanently deleting "too long" quotes from
+// JEE_QUOTES above (a length that overflows a small phone screen might fit
+// fine on a laptop, and a fixed character-count cutoff would need
+// re-tuning every time a quote is added later), this measures the ACTUAL
+// rendered width against the ACTUAL available width, live, on every render:
+// 1. Try the bucketed quote at the card's normal font size.
+// 2. If it doesn't fit on one line, shrink the font down to a minimum
+//    readable floor before giving up on that quote.
+// 3. If it still doesn't fit even at the floor size, move to the NEXT
+//    quote in the same chronological rotation (bucket+1, +2, ...) instead —
+//    so the 6-hourly rotation order is preserved, just with any quote too
+//    long for THIS screen silently stepped over on THIS screen only.
+const QUOTE_FONT_FLOOR_PX = 13;
 let lastQuoteBucket = null;
 export function renderQuoteOfDay() {
     let bucket = Math.floor((Date.now() + 5.5 * 3600000) / (6 * 60 * 60 * 1000));
     lastQuoteBucket = bucket;
-    let q = JEE_QUOTES[bucket % JEE_QUOTES.length];
-    document.getElementById("quote-of-day").innerHTML = `<span class="quote-text">"${q.text}"</span><span class="quote-author">— ${q.author}</span>`;
+    let container = document.getElementById("quote-of-day");
+    if (!container) return;
+    let n = JEE_QUOTES.length;
+    // Matches the two font sizes actually defined for .quote-banner
+    // .quote-text in css/base.css (24px desktop / 18px @ max-width:850px) —
+    // this is only the STARTING point per attempt; the loop below may
+    // shrink it further for a specific quote.
+    let baseFontPx = window.innerWidth <= 850 ? 18 : 24;
+
+    for (let attempt = 0; attempt < n; attempt++) {
+        let q = JEE_QUOTES[(bucket + attempt) % n];
+        container.innerHTML = `<span class="quote-text" style="font-size:${baseFontPx}px">"${q.text}"</span><span class="quote-author">— ${q.author}</span>`;
+        let textEl = container.querySelector(".quote-text");
+        // textEl is display:block with no explicit width, so its clientWidth
+        // is the actual available space (card width minus padding); nowrap
+        // (css/base.css) means scrollWidth only exceeds it when the text
+        // genuinely doesn't fit on one line at the current font size.
+        let fontPx = baseFontPx;
+        while (textEl.scrollWidth > textEl.clientWidth && fontPx > QUOTE_FONT_FLOOR_PX) {
+            fontPx -= 1;
+            textEl.style.fontSize = fontPx + "px";
+        }
+        if (textEl.scrollWidth <= textEl.clientWidth) return; // found one that fits — done
+        // Doesn't fit even at the floor size on this screen — try the next
+        // quote in rotation instead of showing it wrapped/cut off.
+    }
+    // Fallback — should never actually trigger (every quote in the list
+    // fits at the floor size on any realistic phone screen), but if every
+    // single quote somehow failed, show the bucketed one with the
+    // CSS-level ellipsis as a last resort rather than a blank card.
+    let q = JEE_QUOTES[bucket % n];
+    container.innerHTML = `<span class="quote-text" style="font-size:${QUOTE_FONT_FLOOR_PX}px">"${q.text}"</span><span class="quote-author">— ${q.author}</span>`;
 }
 
 // ----------------- EXAM YEAR / COUNTDOWNS -----------------
