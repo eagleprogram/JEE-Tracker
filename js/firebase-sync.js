@@ -42,6 +42,10 @@ let cloudUnsubscribe = null;
 // triggering a second, racing one. See that function's own comment further
 // down for why this matters.
 let initialAutoLoadPromise = null;
+// Set true for the duration of pushToCloud() (see its own comment) so the
+// real-time listener below can unconditionally ignore every snapshot while
+// this tab's own push is in flight, instead of relying solely on timing.
+let pushInFlight = false;
 
 export function getCurrentUser() { return currentUser; }
 
@@ -285,6 +289,14 @@ export async function connectGoogleCalendar() {
 export async function pushToCloud(silent = false) {
     if (!initFirebaseAuthIfNeeded()) return;
     if (!currentUser) { if (!silent) alert("Sign in first."); return; }
+    // Belt-and-braces alongside the jee_last_sync-timing fix below: while
+    // this tab has a push in flight, the real-time listener (startCloudListener)
+    // ignores every snapshot outright rather than trying to work out whether
+    // it's this push echoing back or a genuinely different device's change —
+    // pushToCloud already applies the fully-merged result to local storage
+    // itself when it finishes, so there's nothing the listener needs to do
+    // for this tab's own write either way.
+    pushInFlight = true;
     try {
         let now = Date.now();
         // Full sync: every content category goes to the cloud now. The one
@@ -328,7 +340,7 @@ export async function pushToCloud(silent = false) {
         // we're merging against the truly-latest cloud state even if
         // another device's push lands in the split second between the read
         // and the write below.
-        let mergedStudyDB, mergedPlannerDB, mergedSleepLog, mergedSyllabus;
+        let mergedStudyDB, mergedPlannerDB, mergedSleepLog, mergedSyllabus, mergedMockTests, mergedMistakeChapters;
         await fbDb.runTransaction(async (tx) => {
             let cloudSnap = await tx.get(docRef);
             let cloud = cloudSnap.exists ? cloudSnap.data() : {};
@@ -336,8 +348,8 @@ export async function pushToCloud(silent = false) {
             mergedPlannerDB = mergePlannerDBs(cloud.plannerDB || {}, localPlannerDB);
             mergedSleepLog = mergeSleepLogs(cloud.sleepLog || {}, localSleepLog);
             mergedSyllabus = mergeSyllabusProgress(cloud.syllabusProgress || {}, localSyllabus);
-            let mergedMockTests = mergeMockTestArraysForCloud(cloud.mockTests || [], localMockTests);
-            let mergedMistakeChapters = mergeMistakeChapterArraysForCloud(cloud.mistakeChapters || [], localMistakeChapters);
+            mergedMockTests = mergeMockTestArraysForCloud(cloud.mockTests || [], localMockTests);
+            mergedMistakeChapters = mergeMistakeChapterArraysForCloud(cloud.mistakeChapters || [], localMistakeChapters);
 
             tx.set(docRef, {
                 studyDB: mergedStudyDB,
@@ -368,16 +380,45 @@ export async function pushToCloud(silent = false) {
         savePlannerDB(mergedPlannerDB);
         writeSleepLog(mergedSleepLog);
         saveSyllabusProgress(mergedSyllabus);
-
-        // Verify the write actually landed on the server (force a real
-        // round-trip, bypassing local cache) before trusting it. Without
-        // this, a transaction can resolve successfully off the SDK's local
-        // cache while the server ends up holding different data — silently
-        // desyncing "last synced" from what's actually in the cloud.
-        let confirmDoc = await docRef.get({ source: "server" });
-        if (!confirmDoc.exists || confirmDoc.data().updatedAt !== now) {
-            throw new Error("Write did not verify on the server — try again.");
-        }
+        // BUG FIX (found in re-audit): mergedMockTests/mergedMistakeChapters
+        // were only ever written to the CLOUD payload above — never applied
+        // back to this device's own IndexedDB, unlike the four categories
+        // just above. So if another device had logged a mock test or
+        // mistake entry this device hadn't pulled yet, this device's push
+        // correctly preserved it in the cloud, but wouldn't actually show it
+        // locally until a separate explicit pull. restoreMockTests/
+        // restoreMistakeChapters are already the exact add-only functions
+        // used to apply an incoming cloud snapshot (see their own comments
+        // above) — reusing them here on the merged result closes that last
+        // gap, so a push is now just as complete as a pull for every synced
+        // category.
+        await restoreMockTests(mergedMockTests);
+        await restoreMistakeChapters(mergedMistakeChapters);
+        // BUG FIX: a follow-up `docRef.get({source:"server"})` used to sit
+        // here to "verify" the write actually landed, because a plain
+        // `docRef.set()` can resolve early from the SDK's local cache
+        // before the server has actually acknowledged it. A Firestore
+        // TRANSACTION doesn't have that failure mode at all — per the SDK's
+        // own guarantee, runTransaction()'s promise only resolves once the
+        // transaction has genuinely committed on the backend — so that
+        // extra round-trip was pure dead weight AND actively harmful: the
+        // `await` it introduced was a real gap where this tab's own
+        // real-time listener (started below) could receive this exact
+        // write, misread it as "new data from another device" (see the
+        // hasPendingWrites comment on that listener — transactions don't
+        // set that flag the way a plain write does, so the listener had no
+        // way to recognize this as an echo of its own tab's push), and
+        // race ahead of this function to reload the page before
+        // jee_last_sync below had even been set — producing exactly the
+        // "Write did not verify on the server" failure this was reported
+        // as. Setting jee_last_sync IMMEDIATELY here, with no `await`
+        // between it and the transaction resolving above, closes that gap:
+        // by the time the listener's snapshot callback gets a turn to run,
+        // jee_last_sync already reflects this exact write, so its own
+        // `remoteUpdatedAt <= lastLocalSync` guard now correctly
+        // recognizes it as this tab's own echo and skips it (see
+        // `pushInFlight` below for a second, belt-and-braces guard against
+        // the same class of race).
         setRawFlag("jee_last_sync", now.toString());
         renderSyncUI();
         showToast(silent ? "Auto-Synced to the Cloud." : "Saved to the Cloud.");
@@ -392,6 +433,8 @@ export async function pushToCloud(silent = false) {
         // a direct response.
         if (silent) { showToast("⚠️ Auto-Sync Failed — Will Retry Next Cycle."); return; }
         alert("Save failed: " + e.message);
+    } finally {
+        pushInFlight = false;
     }
 }
 
@@ -875,16 +918,22 @@ function startCloudListener() {
     if (!fbDb || !currentUser || cloudUnsubscribe) return;
     cloudUnsubscribe = fbDb.collection("users").doc(currentUser.uid).onSnapshot(async (doc) => {
         if (!doc.exists) return;
-        // Skip local echoes of our own writes (pushToCloud). Firestore fires
-        // this listener the instant a write is queued locally, before the
-        // server acknowledges it and before pushToCloud has a chance to
-        // update jee_last_sync — a race that previously slipped past the
-        // timestamp check below and triggered a false "new data from
-        // another device" prompt, whose reload then aborted our own
-        // in-flight push. hasPendingWrites is true only for that unconfirmed
-        // local echo, never for a genuinely remote change, so this is a
-        // clean, race-free filter.
-        if (doc.metadata.hasPendingWrites) return;
+        // BUG FIX: pushToCloud() now writes via a Firestore TRANSACTION
+        // (see its own comment), not a plain set() — and transactions never
+        // set hasPendingWrites the way a plain write does (they only
+        // resolve once genuinely committed server-side), so this guard
+        // alone could no longer recognize this tab's own push as an echo.
+        // That let a successful push's own snapshot be misread as "new data
+        // from another device," triggering an unnecessary merge + reload in
+        // the middle of that same push and racing its jee_last_sync update
+        // — reported as "Save failed: Write did not verify on the server."
+        // pushInFlight is the explicit fix: set for the exact duration of
+        // pushToCloud(), so every snapshot arriving during that window is
+        // skipped outright, no timing assumptions needed. hasPendingWrites
+        // stays as a second filter alongside it — still correct and useful
+        // for any other plain (non-transactional) write this document might
+        // ever receive.
+        if (pushInFlight || doc.metadata.hasPendingWrites) return;
         let lastLocalSync = parseInt(getRawFlag("jee_last_sync") || "0", 10);
         if (lastLocalSync <= 0) return;
         let data = doc.data();
