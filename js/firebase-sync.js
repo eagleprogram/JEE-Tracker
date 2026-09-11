@@ -1,4 +1,4 @@
-import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry, getLastBackupAt, blankDay } from './storage.js';
+import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry, getLastBackupAt, blankDay, ensureDayShape } from './storage.js';
 // mistakes.js switched each chapter's stored record from one flat
 // {count, notes, files} blob to an `entries` array (separately editable
 // mistake log entries). normalizeRecord() upgrades either shape (a record
@@ -318,6 +318,12 @@ export async function pushToCloud(silent = false) {
             };
         });
         let localStudyDB = getDB();
+        // Self-heal any id-less historical entries BEFORE they're merged —
+        // see ensureAllDayShapes' own comment above for why this matters.
+        // Persisting the backfilled ids immediately means this only ever
+        // has to run once per day of old data, not on every single sync.
+        ensureAllDayShapes(localStudyDB);
+        saveDB(localStudyDB);
         let localPlannerDB = getPlannerDB();
         let localSleepLog = getSleepLog();
         let localSyllabus = getSyllabusProgress();
@@ -538,15 +544,52 @@ async function restoreMistakeChapters(chapters) {
 // a session deleted on one device can reappear if a snapshot predating
 // that delete merges in later; closing that gap needs a soft-delete flag,
 // a bigger change than this fix).
+//
+// BUG FIX (real data loss, reported as "refresh removes data"): this
+// originally kept a Map keyed ONLY by `e.id`, and simply SKIPPED any entry
+// with no id at all (`if (e && e.id) byId.set(...)`). ensureDayShape()
+// (storage.js) — the function that backfills a real id onto every
+// studySessions/breaks entry — is only ever called on ONE specific day at a
+// time, exactly when the timer/history/questions/reports code happens to
+// touch that day; it has never run across the WHOLE database at once. Any
+// day of older data that hadn't been recently touched could easily still
+// have entries with no id field — completely normal, pre-dating the id
+// feature. Those entries were being silently thrown away by this merge
+// every single time it ran (which, once the confirm() dialogs were removed,
+// was now happening automatically and invisibly on almost every load) —
+// and since totalStudy/totalBreak/subjects are RECOMPUTED from the merged
+// list right after (see recomputeDayAggregates below), real logged minutes
+// visibly disappeared. Every entry now gets a stable merge key even without
+// a real id — falling back to its content (time + subject/duration) so nothing
+// is ever silently dropped, only ever deduplicated against a genuine exact
+// duplicate. ensureAllDayShapes() below additionally self-heals this
+// permanently by backfilling real ids into local storage the next time this
+// runs, so the fallback key is only ever a safety net after that.
+function entryMergeKey(e) {
+    if (e && e.id) return "id:" + e.id;
+    return "noid:" + (e && e.time || "") + "|" + (e && e.subject || "") + "|" + (e && e.duration || 0);
+}
 function mergeEntryArraysByIdAndDuration(a, b) {
-    let byId = new Map();
-    (a || []).forEach(e => { if (e && e.id) byId.set(e.id, e); });
+    let byKey = new Map();
+    (a || []).forEach(e => { if (e) byKey.set(entryMergeKey(e), e); });
     (b || []).forEach(e => {
-        if (!e || !e.id) return;
-        let existing = byId.get(e.id);
-        if (!existing || (e.duration || 0) > (existing.duration || 0)) byId.set(e.id, e);
+        if (!e) return;
+        let key = entryMergeKey(e);
+        let existing = byKey.get(key);
+        if (!existing || (e.duration || 0) > (existing.duration || 0)) byKey.set(key, e);
     });
-    return Array.from(byId.values());
+    return Array.from(byKey.values());
+}
+
+// Self-heals the root cause above: backfills a real, stable id onto every
+// studySessions/breaks entry across the ENTIRE local database (not just
+// whichever single day some other feature happens to touch), so future
+// merges use the reliable id-based path instead of the content-based
+// fallback in entryMergeKey above. Safe and idempotent — entries that
+// already have ids are left completely untouched.
+function ensureAllDayShapes(db) {
+    Object.keys(db || {}).forEach(dayKey => { ensureDayShape(db[dayKey]); });
+    return db;
 }
 
 // subjects/totalStudy/totalBreak are maintained as running totals in
@@ -813,7 +856,9 @@ async function applyCloudData(data) {
     // whatever moment this cloud snapshot was captured. mergeStudyDBs()
     // combines the two (see its own comment above) instead of picking one
     // side wholesale — the same class of fix plannerDB already had.
-    saveDB(mergeStudyDBs(getDB(), data.studyDB || {}));
+    let localStudyDB = getDB();
+    ensureAllDayShapes(localStudyDB); // see its own comment above
+    saveDB(mergeStudyDBs(localStudyDB, data.studyDB || {}));
     // BUG FIX: was `savePlannerDB(data.plannerDB || {})` — a wholesale
     // overwrite that discarded any local planner change (a carryover, a
     // toggle, a newly-added task) made after this cloud snapshot was taken.
