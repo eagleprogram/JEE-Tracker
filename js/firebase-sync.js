@@ -286,6 +286,61 @@ export async function connectGoogleCalendar() {
     }
 }
 
+// Gathers everything this device would sync, in the cloud-ready shape
+// (mock test / mistake attachment bytes stripped, study DB self-healed
+// with real ids). Shared by pushToCloud (merges this onto the cloud) and
+// forcePushToCloud (overwrites the cloud with exactly this, no merge) so
+// both always sync from the identical local snapshot.
+async function gatherLocalSyncPayload() {
+    // Full sync: every content category goes to the cloud now. The one
+    // exception is mock-test FILE ATTACHMENTS — base64 image/PDF blobs
+    // that can exceed Firestore's 1MiB per-document limit on their own
+    // once a user has logged a handful of tests with photos. The mock
+    // test entries themselves (subject, score, notes, mistake tags) DO
+    // sync — only each entry's `files` array is stripped before upload.
+    let localMockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
+    // Same file-stripping approach as mock tests: each entry's counter,
+    // notes, and hasFiles flag sync — the actual attachment bytes don't
+    // (keeps documents under Firestore's 1MiB limit). Each chapter can
+    // now hold several separately-logged entries (see mistakes.js).
+    let localMistakeChapters = (await getAllMistakeChapters()).map(rec => {
+        let norm = normalizeRecord(rec) || { key: rec.key, subject: rec.subject, chapter: rec.chapter, entries: [], updatedAt: rec.updatedAt || 0 };
+        return {
+            key: norm.key, subject: norm.subject, chapter: norm.chapter, updatedAt: norm.updatedAt,
+            entries: (norm.entries || []).map(({ files, ...erest }) => ({ ...erest, hasFiles: !!(files && files.length > 0) || !!erest.hasFiles }))
+        };
+    });
+    let localStudyDB = getDB();
+    // Self-heal any id-less historical entries BEFORE they're merged —
+    // see ensureAllDayShapes' own comment above for why this matters.
+    // Persisting the backfilled ids immediately means this only ever
+    // has to run once per day of old data, not on every single sync.
+    ensureAllDayShapes(localStudyDB);
+    saveDB(localStudyDB);
+    return {
+        localMockTests, localMistakeChapters, localStudyDB,
+        localPlannerDB: getPlannerDB(), localSleepLog: getSleepLog(), localSyllabus: getSyllabusProgress()
+    };
+}
+
+// The full cloud document shape, shared by pushToCloud's merged write and
+// forcePushToCloud's overwrite write — so the two only ever differ in
+// WHETHER they merge with the cloud first, never in what fields get sent.
+function buildCloudDocument(payload, now) {
+    return {
+        studyDB: payload.studyDB, plannerDB: payload.plannerDB, sleepLog: payload.sleepLog,
+        sleepPending: getSleepPending(), syllabusProgress: payload.syllabus,
+        notifSettings: getNotifSettings(), ytHistory: getYtHistory(), examYear: getExamYear(),
+        ytLastLink: getRawFlag("jee_yt_last_link") || "",
+        // Lets the scheduled server-side push job (server/send-scheduled-alarms.js)
+        // compute the "2+ days since backup" reminder too — it has no
+        // other way to know when this device last exported a backup.
+        lastBackupAt: getLastBackupAt(),
+        mockTests: payload.mockTests, mistakeChapters: payload.mistakeChapters,
+        updatedAt: now
+    };
+}
+
 export async function pushToCloud(silent = false) {
     if (!initFirebaseAuthIfNeeded()) return;
     if (!currentUser) { if (!silent) alert("Sign in first."); return; }
@@ -299,34 +354,8 @@ export async function pushToCloud(silent = false) {
     pushInFlight = true;
     try {
         let now = Date.now();
-        // Full sync: every content category goes to the cloud now. The one
-        // exception is mock-test FILE ATTACHMENTS — base64 image/PDF blobs
-        // that can exceed Firestore's 1MiB per-document limit on their own
-        // once a user has logged a handful of tests with photos. The mock
-        // test entries themselves (subject, score, notes, mistake tags) DO
-        // sync — only each entry's `files` array is stripped before upload.
-        let localMockTests = (await getAllMockTests()).map(({ files, ...rest }) => ({ ...rest, hasFiles: !!(files && files.length > 0) || !!rest.hasFiles }));
-        // Same file-stripping approach as mock tests: each entry's counter,
-        // notes, and hasFiles flag sync — the actual attachment bytes don't
-        // (keeps documents under Firestore's 1MiB limit). Each chapter can
-        // now hold several separately-logged entries (see mistakes.js).
-        let localMistakeChapters = (await getAllMistakeChapters()).map(rec => {
-            let norm = normalizeRecord(rec) || { key: rec.key, subject: rec.subject, chapter: rec.chapter, entries: [], updatedAt: rec.updatedAt || 0 };
-            return {
-                key: norm.key, subject: norm.subject, chapter: norm.chapter, updatedAt: norm.updatedAt,
-                entries: (norm.entries || []).map(({ files, ...erest }) => ({ ...erest, hasFiles: !!(files && files.length > 0) || !!erest.hasFiles }))
-            };
-        });
-        let localStudyDB = getDB();
-        // Self-heal any id-less historical entries BEFORE they're merged —
-        // see ensureAllDayShapes' own comment above for why this matters.
-        // Persisting the backfilled ids immediately means this only ever
-        // has to run once per day of old data, not on every single sync.
-        ensureAllDayShapes(localStudyDB);
-        saveDB(localStudyDB);
-        let localPlannerDB = getPlannerDB();
-        let localSleepLog = getSleepLog();
-        let localSyllabus = getSyllabusProgress();
+        let local = await gatherLocalSyncPayload();
+        let { localMockTests, localMistakeChapters, localStudyDB, localPlannerDB, localSleepLog, localSyllabus } = local;
 
         let docRef = fbDb.collection("users").doc(currentUser.uid);
         // BUG FIX (root cause of "cloud sync isn't working properly — data
@@ -345,7 +374,11 @@ export async function pushToCloud(silent = false) {
         // device pushed most recently — and the transaction guarantees
         // we're merging against the truly-latest cloud state even if
         // another device's push lands in the split second between the read
-        // and the write below.
+        // and the write below. (For the rare case you actually WANT a plain
+        // overwrite instead of a merge — recovering from bad data that's
+        // already reached the cloud from another device — use
+        // forcePushToCloud below instead; merging can never undo that on
+        // its own, by design.)
         let mergedStudyDB, mergedPlannerDB, mergedSleepLog, mergedSyllabus, mergedMockTests, mergedMistakeChapters;
         await fbDb.runTransaction(async (tx) => {
             let cloudSnap = await tx.get(docRef);
@@ -357,24 +390,10 @@ export async function pushToCloud(silent = false) {
             mergedMockTests = mergeMockTestArraysForCloud(cloud.mockTests || [], localMockTests);
             mergedMistakeChapters = mergeMistakeChapterArraysForCloud(cloud.mistakeChapters || [], localMistakeChapters);
 
-            tx.set(docRef, {
-                studyDB: mergedStudyDB,
-                plannerDB: mergedPlannerDB,
-                sleepLog: mergedSleepLog,
-                sleepPending: getSleepPending(),
-                syllabusProgress: mergedSyllabus,
-                notifSettings: getNotifSettings(),
-                ytHistory: getYtHistory(),
-                examYear: getExamYear(),
-                ytLastLink: getRawFlag("jee_yt_last_link") || "",
-                // Lets the scheduled server-side push job (server/send-scheduled-alarms.js)
-                // compute the "2+ days since backup" reminder too — it has no
-                // other way to know when this device last exported a backup.
-                lastBackupAt: getLastBackupAt(),
-                mockTests: mergedMockTests,
-                mistakeChapters: mergedMistakeChapters,
-                updatedAt: now
-            });
+            tx.set(docRef, buildCloudDocument({
+                studyDB: mergedStudyDB, plannerDB: mergedPlannerDB, sleepLog: mergedSleepLog,
+                syllabus: mergedSyllabus, mockTests: mergedMockTests, mistakeChapters: mergedMistakeChapters
+            }, now));
         });
 
         // Write the merged result back to THIS device's own storage too —
@@ -439,6 +458,40 @@ export async function pushToCloud(silent = false) {
         // a direct response.
         if (silent) { showToast("⚠️ Auto-Sync Failed — Will Retry Next Cycle."); return; }
         alert("Save failed: " + e.message);
+    } finally {
+        pushInFlight = false;
+    }
+}
+
+// A genuine, deliberate escape hatch — separate from pushToCloud above on
+// purpose. pushToCloud always MERGES with whatever's currently in the
+// cloud, and merging is additive by design: it can never remove data
+// either side has, which also means it can never "clean up" bad data that
+// already reached the cloud (e.g. a corrupted/duplicated mess auto-synced
+// up from a phone). This instead OVERWRITES the entire cloud document with
+// only what's on THIS device — exactly the old pre-merge push behavior —
+// so a known-good device can be used to wipe out a bad state a merge could
+// never undo. Its own confirm() below is deliberately worded differently
+// from pushToCloud's (which needs none — merging is always safe), since
+// the two do meaningfully different, differently risky things.
+export async function forcePushToCloud() {
+    if (!initFirebaseAuthIfNeeded()) return;
+    if (!currentUser) { alert("Sign in first."); return; }
+    if (!confirm("This OVERWRITES the cloud with ONLY what's on THIS device — anything in the cloud that this device doesn't have (including unsynced changes from other devices) will be discarded, not merged. Use this only to recover from bad/corrupted data on another device. Continue?")) return;
+    pushInFlight = true;
+    try {
+        let now = Date.now();
+        let local = await gatherLocalSyncPayload();
+        let docRef = fbDb.collection("users").doc(currentUser.uid);
+        await docRef.set(buildCloudDocument({
+            studyDB: local.localStudyDB, plannerDB: local.localPlannerDB, sleepLog: local.localSleepLog,
+            syllabus: local.localSyllabus, mockTests: local.localMockTests, mistakeChapters: local.localMistakeChapters
+        }, now));
+        setRawFlag("jee_last_sync", now.toString());
+        renderSyncUI();
+        showToast("Cloud data overwritten with this device.");
+    } catch (e) {
+        alert("Force save failed: " + e.message);
     } finally {
         pushInFlight = false;
     }
@@ -919,17 +972,21 @@ async function autoLoadCloudDataIfNeeded() {
         let doc = await fbDb.collection("users").doc(currentUser.uid).get();
         if (!doc.exists) return; // nothing saved to the cloud yet for this account
         let data = doc.data();
-        // BUG FIX: this used to confirm() "Cloud data was found for this
-        // account. Load it onto this device now? This will replace the
-        // study logs, planner tasks, and other data currently on this
-        // device" whenever the device already had local data — a leftover
-        // from when applyCloudData() was a destructive overwrite and this
-        // confirm was the only thing standing between a user and losing
-        // local work. applyCloudData() now MERGES every category instead
-        // of replacing it (see its own comment), so there's nothing left to
-        // lose by applying automatically — this confirm was exactly the
-        // unexplained "new data found on the cloud" pop-up reported as
-        // sync friction.
+        // BUG FIX (re-restored per explicit request): this used to confirm()
+        // "Cloud data was found for this account. Load it onto this device
+        // now?" and I removed it, reasoning that applyCloudData() merges
+        // instead of replacing so there was nothing left to lose. That's
+        // true for DATA LOSS, but misses a different, real risk: merging is
+        // additive, so it happily merges in BAD data too — a corrupted or
+        // duplicated mess from another device — with no way to later
+        // "unmerge" it. The confirm is back so you get a chance to say no
+        // and leave this device untouched (e.g. because you know the other
+        // device's data is the one that's messed up, and you'd rather fix
+        // it FROM here using Force Save to Cloud in Account & Sync instead
+        // of merging its mess in). Declining leaves jee_last_sync unset, so
+        // this will keep asking on future loads until you either accept it
+        // or force-overwrite the cloud — it won't just quietly give up.
+        if (!confirm("Cloud data was found for this account. Merge it into this device now? Choose Cancel to leave this device exactly as-is (for example if you suspect the OTHER device's data is the messy one, and would rather fix things from here instead).")) return;
         await applyCloudData(data);
         setRawFlag("jee_last_sync", (data.updatedAt || Date.now()).toString());
         // BUG FIX: showToast() immediately followed by location.reload() never
@@ -986,14 +1043,20 @@ function startCloudListener() {
         // Only react to a genuinely newer write from elsewhere — otherwise
         // this fires as an echo of our own pushToCloud() on this same tab.
         if (remoteUpdatedAt <= lastLocalSync) return;
-        // BUG FIX: this used to confirm() "New data was saved to the cloud
-        // from another device. Load it here now? This will replace local
-        // data on this device." — surfacing as an unexplained pop-up
-        // mid-session (reported: "an option pops up on the laptop like new
-        // data found on the cloud or something"). Same reasoning as
-        // autoLoadCloudDataIfNeeded above: applyCloudData() merges now, it
-        // doesn't replace, so there's no local data at risk and nothing
-        // left to ask permission for.
+        // BUG FIX (re-restored per explicit request): this used to confirm()
+        // "New data was saved to the cloud from another device. Load it
+        // here now?" and I removed it, reasoning that applyCloudData()
+        // merges now instead of replacing, so nothing local was at risk.
+        // True for data LOSS — but merging is additive, so it also happily
+        // merges in BAD data with no way to undo it afterward. This confirm
+        // exists specifically so a device with known-good data (e.g. your
+        // laptop) can decline a messy auto-sync arriving from elsewhere
+        // (e.g. a phone with corrupted data) instead of absorbing it, and
+        // use Force Save to Cloud in Account & Sync to make the good device
+        // the source of truth instead. Declining does NOT update
+        // jee_last_sync, so this correctly keeps prompting on future loads
+        // for as long as the cloud holds this un-merged newer state.
+        if (!confirm("New data was synced to the cloud from another device. Merge it into this device now? Choose Cancel to leave this device exactly as-is (for example if you suspect the OTHER device's data is the messy one, and would rather fix things from here instead).")) return;
         await applyCloudData(data);
         setRawFlag("jee_last_sync", remoteUpdatedAt.toString());
         // Same reason as autoLoadCloudDataIfNeeded above — see that comment.

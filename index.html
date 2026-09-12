@@ -299,6 +299,21 @@
                     <button class="btn btn-stop" onclick="resetAllData()">Reset All Data</button>
                     <button class="btn btn-stop" onclick="signOutOfGoogle()">Sign Out</button>
                 </div>
+                <!-- Force Save exists for a specific, narrow scenario: another
+                     device's data (e.g. a phone) got messed up and has ALREADY
+                     auto-synced its mess into the cloud. Plain "Save to Cloud"
+                     above always MERGES with the cloud instead of overwriting
+                     it — by design, so two devices' real changes never wipe
+                     each other out — but that same safety means it can never
+                     clean up bad data once it's reached the cloud; merging
+                     just adds this device's good data ALONGSIDE the mess
+                     instead of replacing it. Force Save is the deliberate
+                     exception: it discards whatever's in the cloud and
+                     replaces it with ONLY what's on this device, so a
+                     known-good device can be used to wipe the mess out —
+                     then the messed-up device just needs Load from Cloud (or
+                     its own real-time listener) to pick up the clean data. -->
+                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="forcePushToCloud()" title="Overwrites the cloud with ONLY this device's data, discarding anything the cloud has that this device doesn't — use only to recover from bad data on another device">⚠ Force Save to Cloud (Overwrite)</button>
                 <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: saves to cloud if signed in, then clears all data and reloads">Delete Cookies & Reload Website</button>
             </div>
         </div>
