@@ -100,6 +100,13 @@ export function extractYouTubeId(url) {
         if (m) return m[1];
         let sm = u.pathname.match(/\/shorts\/([^/?]+)/);
         if (sm) return sm[1];
+        // Live streams use their own URL shape (youtube.com/live/VIDEO_ID) —
+        // both while actually live AND for a while after the stream has
+        // ended (YouTube keeps the /live/ link valid for the VOD/replay).
+        // A live stream copied as a regular watch?v= link already worked
+        // via the `v` param check above; this covers the /live/ path form.
+        let lm = u.pathname.match(/\/live\/([^/?]+)/);
+        if (lm) return lm[1];
     } catch (e) {}
     return null;
 }
