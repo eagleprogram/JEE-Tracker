@@ -290,31 +290,48 @@
             </div>
             <div id="signed-in-block" style="display:none;">
                 <div id="sync-last" class="small-note"></div>
-                <div style="display:flex; gap:6px; margin-top:6px;">
-                    <button class="btn btn-start btn-small" style="flex:1;" onclick="pushToCloud()">Save to Cloud ⬆</button>
-                    <button class="btn btn-start btn-small" style="flex:1;" onclick="pullFromCloud()">Load from Cloud ⬇</button>
-                </div>
+                <!-- REFORM: Save to Cloud + Load from Cloud used to be two
+                     separate buttons/functions. Once every synced category
+                     properly merges both directions (see firebase-sync.js's
+                     syncNow()), they're mathematically the same operation —
+                     read the cloud, merge with local, write the merged
+                     result to both sides. One button, no more "which one do
+                     I tap?" confusion. -->
+                <button class="btn btn-start btn-small" style="width:100%; margin-top:6px;" onclick="syncNow()">Sync Now ⇅</button>
                 <div class="btn-row-fit" style="margin-top:6px;">
-                    <button class="btn btn-stop" onclick="deleteCloudData()">Delete Cloud Data</button>
                     <button class="btn btn-stop" onclick="resetAllData()">Reset All Data</button>
                     <button class="btn btn-stop" onclick="signOutOfGoogle()">Sign Out</button>
                 </div>
-                <!-- Force Save exists for a specific, narrow scenario: another
-                     device's data (e.g. a phone) got messed up and has ALREADY
-                     auto-synced its mess into the cloud. Plain "Save to Cloud"
-                     above always MERGES with the cloud instead of overwriting
-                     it — by design, so two devices' real changes never wipe
-                     each other out — but that same safety means it can never
-                     clean up bad data once it's reached the cloud; merging
-                     just adds this device's good data ALONGSIDE the mess
-                     instead of replacing it. Force Save is the deliberate
-                     exception: it discards whatever's in the cloud and
-                     replaces it with ONLY what's on this device, so a
-                     known-good device can be used to wipe the mess out —
-                     then the messed-up device just needs Load from Cloud (or
-                     its own real-time listener) to pick up the clean data. -->
-                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="forcePushToCloud()" title="Overwrites the cloud with ONLY this device's data, discarding anything the cloud has that this device doesn't — use only to recover from bad data on another device">⚠ Force Save to Cloud (Overwrite)</button>
-                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: saves to cloud if signed in, then clears all data and reloads">Delete Cookies & Reload Website</button>
+                <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="deleteCookiesAndReload()" title="Full reset: syncs to cloud if signed in, then clears all data and reloads">Delete Cookies & Reload Website</button>
+                <!-- REFORM: Force Save and Delete Cloud Data are rare
+                     recovery actions, not everyday ones — tucked into a
+                     collapsed section instead of sitting in the main button
+                     row so they're never an accidental tap. Now that every
+                     category (including deletions, via tombstones — see
+                     firebase-sync.js) merges safely in both directions,
+                     Force Save should be needed far less often than before;
+                     it stays only as a genuine last-resort escape hatch. -->
+                <details style="margin-top:10px;">
+                    <summary style="cursor:pointer; font-size:12px; color:var(--muted); font-weight:700;">⚙ Advanced / Recovery</summary>
+                    <div style="margin-top:8px;">
+                        <button class="btn btn-stop btn-small" style="width:100%;" onclick="deleteCloudData()">Delete Cloud Data</button>
+                        <!-- Force Save exists for a specific, narrow scenario: another
+                             device's data (e.g. a phone) got messed up and has ALREADY
+                             auto-synced its mess into the cloud. Plain "Sync Now"
+                             above always MERGES with the cloud instead of overwriting
+                             it — by design, so two devices' real changes never wipe
+                             each other out — but that same safety means it can never
+                             clean up bad data once it's reached the cloud; merging
+                             just adds this device's good data ALONGSIDE the mess
+                             instead of replacing it. Force Save is the deliberate
+                             exception: it discards whatever's in the cloud and
+                             replaces it with ONLY what's on this device, so a
+                             known-good device can be used to wipe the mess out —
+                             then the messed-up device just needs Sync Now (or
+                             its own real-time listener) to pick up the clean data. -->
+                        <button class="btn btn-pause btn-small" style="width:100%; margin-top:6px;" onclick="forcePushToCloud()" title="Overwrites the cloud with ONLY this device's data, discarding anything the cloud has that this device doesn't — use only to recover from bad data on another device">⚠ Force Save to Cloud (Overwrite)</button>
+                    </div>
+                </details>
             </div>
         </div>
     </div>

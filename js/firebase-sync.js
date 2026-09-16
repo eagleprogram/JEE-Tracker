@@ -1,4 +1,4 @@
-import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry, getLastBackupAt, blankDay, ensureDayShape } from './storage.js';
+import { getDB, saveDB, getPlannerDB, savePlannerDB, getRawFlag, setRawFlag, clearRawFlag, getSleepLog, writeSleepLog, getSleepPending, getSleepPendingUpdatedAt, setSleepPendingRaw, getSyllabusProgress, saveSyllabusProgress, getNotifSettings, saveNotifSettings, getYtHistory, saveYtHistory, getExamYear, setStoredExamYear, getAllMockTests, openMockDB, MOCK_STORE, getAllMistakeChapters, getMistakeEntry, saveMistakeEntry, getLastBackupAt, blankDay, ensureDayShape, getTombstones, saveTombstones } from './storage.js';
 // mistakes.js switched each chapter's stored record from one flat
 // {count, notes, files} blob to an `entries` array (separately editable
 // mistake log entries). normalizeRecord() upgrades either shape (a record
@@ -21,6 +21,16 @@ import { sendReportViaEmail } from './reports.js';
 // body below, well after the full module graph has finished loading, never
 // at this file's own top-level evaluation time.
 import { updatePushPermissionStatusUI, reregisterPushIfEnabled } from './push-notifications.js';
+// Forward references — same circular-import pattern as ui.js/reports.js
+// above (planner.js/sleep.js don't import this file at module top-level,
+// only call scheduleDebouncedSync() from inside their own function
+// bodies). Used here so a sync that actually merges in new planner/sleep
+// data from elsewhere repaints those two small, cheap widgets immediately
+// instead of only becoming visible next time the user happens to navigate
+// there — the exact "why isn't it showing up" gap silent auto-sync used to
+// leave.
+import { renderSidebarTools, renderPlannerCalendar } from './planner.js';
+import { renderSleepPendingBanner, renderSleepLog } from './sleep.js';
 
 // ----------------- FIREBASE CONFIG -----------------
 const FIREBASE_CONFIG = {
@@ -42,7 +52,7 @@ let cloudUnsubscribe = null;
 // triggering a second, racing one. See that function's own comment further
 // down for why this matters.
 let initialAutoLoadPromise = null;
-// Set true for the duration of pushToCloud() (see its own comment) so the
+// Set true for the duration of syncNow() (see its own comment) so the
 // real-time listener below can unconditionally ignore every snapshot while
 // this tab's own push is in flight, instead of relying solely on timing.
 let pushInFlight = false;
@@ -288,7 +298,7 @@ export async function connectGoogleCalendar() {
 
 // Gathers everything this device would sync, in the cloud-ready shape
 // (mock test / mistake attachment bytes stripped, study DB self-healed
-// with real ids). Shared by pushToCloud (merges this onto the cloud) and
+// with real ids). Shared by syncNow (merges this onto the cloud) and
 // forcePushToCloud (overwrites the cloud with exactly this, no merge) so
 // both always sync from the identical local snapshot.
 async function gatherLocalSyncPayload() {
@@ -319,17 +329,30 @@ async function gatherLocalSyncPayload() {
     saveDB(localStudyDB);
     return {
         localMockTests, localMistakeChapters, localStudyDB,
-        localPlannerDB: getPlannerDB(), localSleepLog: getSleepLog(), localSyllabus: getSyllabusProgress()
+        localPlannerDB: getPlannerDB(), localSleepLog: getSleepLog(), localSyllabus: getSyllabusProgress(),
+        // BUG FIX: sleepPending/tombstones used to be read fresh, straight
+        // from local storage, at the point buildCloudDocument() built the
+        // outgoing payload — bypassing the merge entirely (see that
+        // function's old comment). Gathering them here, alongside
+        // everything else this device is syncing, is what lets syncNow
+        // merge them properly instead of overwriting.
+        localSleepPending: getSleepPending(), localSleepPendingUpdatedAt: getSleepPendingUpdatedAt(),
+        localTombstones: getTombstones()
     };
 }
 
-// The full cloud document shape, shared by pushToCloud's merged write and
+// The full cloud document shape, shared by syncNow's merged write and
 // forcePushToCloud's overwrite write — so the two only ever differ in
 // WHETHER they merge with the cloud first, never in what fields get sent.
+// sleepPending/sleepPendingUpdatedAt/tombstones are now passed in as
+// already-decided values (merged by the caller, or gathered fresh for a
+// force-overwrite) rather than read fresh from local storage here — see
+// gatherLocalSyncPayload's own comment for why that used to be a bug.
 function buildCloudDocument(payload, now) {
     return {
         studyDB: payload.studyDB, plannerDB: payload.plannerDB, sleepLog: payload.sleepLog,
-        sleepPending: getSleepPending(), syllabusProgress: payload.syllabus,
+        sleepPending: payload.sleepPending, sleepPendingUpdatedAt: payload.sleepPendingUpdatedAt,
+        tombstones: payload.tombstones, syllabusProgress: payload.syllabus,
         notifSettings: getNotifSettings(), ytHistory: getYtHistory(), examYear: getExamYear(),
         ytLastLink: getRawFlag("jee_yt_last_link") || "",
         // Lets the scheduled server-side push job (server/send-scheduled-alarms.js)
@@ -341,21 +364,44 @@ function buildCloudDocument(payload, now) {
     };
 }
 
-export async function pushToCloud(silent = false) {
+// ----------------- SYNC NOW (unified push + pull) -----------------
+// REFORM: this used to be two separate buttons/functions — pushToCloud
+// ("Save to Cloud") and pullFromCloud ("Load from Cloud"). Once every
+// category merges properly (studyDB/plannerDB/sleepLog already did;
+// sleepPending and per-category deletions now do too — see the merge
+// functions above), the two are mathematically the SAME operation: read
+// the cloud, merge it with local, write the merged result to both sides.
+// Having two buttons for "the same result, described from two directions"
+// was pure UX debt — a real source of confusion ("which one do I tap?")
+// that added no actual safety. This single function replaces both.
+export async function syncNow(silent = false) {
     if (!initFirebaseAuthIfNeeded()) return;
     if (!currentUser) { if (!silent) alert("Sign in first."); return; }
     // Belt-and-braces alongside the jee_last_sync-timing fix below: while
-    // this tab has a push in flight, the real-time listener (startCloudListener)
+    // this tab has a sync in flight, the real-time listener (startCloudListener)
     // ignores every snapshot outright rather than trying to work out whether
-    // it's this push echoing back or a genuinely different device's change —
-    // pushToCloud already applies the fully-merged result to local storage
+    // it's this sync echoing back or a genuinely different device's change —
+    // syncNow already applies the fully-merged result to local storage
     // itself when it finishes, so there's nothing the listener needs to do
     // for this tab's own write either way.
     pushInFlight = true;
+    if (!silent) { renderSyncStatus("Syncing…"); }
     try {
         let now = Date.now();
         let local = await gatherLocalSyncPayload();
-        let { localMockTests, localMistakeChapters, localStudyDB, localPlannerDB, localSleepLog, localSyllabus } = local;
+        let {
+            localMockTests, localMistakeChapters, localStudyDB, localPlannerDB, localSleepLog, localSyllabus,
+            localSleepPending, localSleepPendingUpdatedAt, localTombstones
+        } = local;
+        // Snapshot of what this device had BEFORE merging, purely to detect
+        // whether the merge actually brought in anything new from
+        // elsewhere — see the reload decision below. Cheap: these are
+        // small JSON blobs and this only runs once per sync, never on a
+        // hot path.
+        let preMergePlannerJSON = JSON.stringify(localPlannerDB);
+        let preMergeSleepLogJSON = JSON.stringify(localSleepLog);
+        let preMergeSleepPendingJSON = JSON.stringify(localSleepPending);
+        let preMergeStudyDBJSON = JSON.stringify(localStudyDB);
 
         let docRef = fbDb.collection("users").doc(currentUser.uid);
         // BUG FIX (root cause of "cloud sync isn't working properly — data
@@ -368,30 +414,34 @@ export async function pushToCloud(silent = false) {
         // B's push didn't just add its own new data — it ERASED A's from
         // the cloud entirely, because B's payload was built purely from B's
         // own local storage. Reading the cloud doc INSIDE a transaction and
-        // merging every category onto it (same merge functions
-        // applyCloudData uses on the way IN, now also used on the way OUT)
-        // makes a push additive instead of destructive, no matter which
-        // device pushed most recently — and the transaction guarantees
-        // we're merging against the truly-latest cloud state even if
-        // another device's push lands in the split second between the read
-        // and the write below. (For the rare case you actually WANT a plain
-        // overwrite instead of a merge — recovering from bad data that's
-        // already reached the cloud from another device — use
-        // forcePushToCloud below instead; merging can never undo that on
-        // its own, by design.)
+        // merging every category onto it makes a sync additive instead of
+        // destructive, no matter which device synced most recently — and
+        // the transaction guarantees we're merging against the truly-latest
+        // cloud state even if another device's sync lands in the split
+        // second between the read and the write below. (For the rare case
+        // you actually WANT a plain overwrite instead of a merge —
+        // recovering from bad data that's already reached the cloud from
+        // another device — use forcePushToCloud below instead; merging can
+        // never undo that on its own, by design.)
         let mergedStudyDB, mergedPlannerDB, mergedSleepLog, mergedSyllabus, mergedMockTests, mergedMistakeChapters;
+        let mergedSleepPending, mergedSleepPendingUpdatedAt, mergedTombstones;
         await fbDb.runTransaction(async (tx) => {
             let cloudSnap = await tx.get(docRef);
             let cloud = cloudSnap.exists ? cloudSnap.data() : {};
-            mergedStudyDB = mergeStudyDBs(cloud.studyDB || {}, localStudyDB);
-            mergedPlannerDB = mergePlannerDBs(cloud.plannerDB || {}, localPlannerDB);
-            mergedSleepLog = mergeSleepLogs(cloud.sleepLog || {}, localSleepLog);
+            mergedTombstones = pruneTombstones(mergeAllTombstones(cloud.tombstones || {}, localTombstones));
+            mergedStudyDB = mergeStudyDBs(cloud.studyDB || {}, localStudyDB, mergedTombstones);
+            mergedPlannerDB = mergePlannerDBs(cloud.plannerDB || {}, localPlannerDB, mergedTombstones);
+            mergedSleepLog = mergeSleepLogs(cloud.sleepLog || {}, localSleepLog, mergedTombstones);
+            let sp = mergeSleepPending(localSleepPending, localSleepPendingUpdatedAt, cloud.sleepPending, cloud.sleepPendingUpdatedAt || 0);
+            mergedSleepPending = sp.pending; mergedSleepPendingUpdatedAt = sp.updatedAt;
             mergedSyllabus = mergeSyllabusProgress(cloud.syllabusProgress || {}, localSyllabus);
-            mergedMockTests = mergeMockTestArraysForCloud(cloud.mockTests || [], localMockTests);
-            mergedMistakeChapters = mergeMistakeChapterArraysForCloud(cloud.mistakeChapters || [], localMistakeChapters);
+            mergedMockTests = mergeMockTestArraysForCloud(cloud.mockTests || [], localMockTests, mergedTombstones);
+            mergedMistakeChapters = mergeMistakeChapterArraysForCloud(cloud.mistakeChapters || [], localMistakeChapters, mergedTombstones);
 
             tx.set(docRef, buildCloudDocument({
                 studyDB: mergedStudyDB, plannerDB: mergedPlannerDB, sleepLog: mergedSleepLog,
+                sleepPending: mergedSleepPending, sleepPendingUpdatedAt: mergedSleepPendingUpdatedAt,
+                tombstones: mergedTombstones,
                 syllabus: mergedSyllabus, mockTests: mergedMockTests, mistakeChapters: mergedMistakeChapters
             }, now));
         });
@@ -404,21 +454,18 @@ export async function pushToCloud(silent = false) {
         saveDB(mergedStudyDB);
         savePlannerDB(mergedPlannerDB);
         writeSleepLog(mergedSleepLog);
+        // Preserves the real decision timestamp the merge actually used
+        // (not "now") — see setSleepPendingRaw's own comment in storage.js.
+        setSleepPendingRaw(mergedSleepPending, mergedSleepPendingUpdatedAt);
+        saveTombstones(mergedTombstones);
         saveSyllabusProgress(mergedSyllabus);
-        // BUG FIX (found in re-audit): mergedMockTests/mergedMistakeChapters
-        // were only ever written to the CLOUD payload above — never applied
-        // back to this device's own IndexedDB, unlike the four categories
-        // just above. So if another device had logged a mock test or
-        // mistake entry this device hadn't pulled yet, this device's push
-        // correctly preserved it in the cloud, but wouldn't actually show it
-        // locally until a separate explicit pull. restoreMockTests/
-        // restoreMistakeChapters are already the exact add-only functions
-        // used to apply an incoming cloud snapshot (see their own comments
-        // above) — reusing them here on the merged result closes that last
-        // gap, so a push is now just as complete as a pull for every synced
-        // category.
-        await restoreMockTests(mergedMockTests);
-        await restoreMistakeChapters(mergedMistakeChapters);
+        // restoreMockTests/restoreMistakeChapters apply the merged result
+        // back to this device's own IndexedDB (add missing entries AND
+        // remove anything now tombstoned) — so a sync is just as complete
+        // in both directions for every category, not just the ones stored
+        // as a single localStorage blob.
+        await restoreMockTests(mergedMockTests, mergedTombstones);
+        await restoreMistakeChapters(mergedMistakeChapters, mergedTombstones);
         // BUG FIX: a follow-up `docRef.get({source:"server"})` used to sit
         // here to "verify" the write actually landed, because a plain
         // `docRef.set()` can resolve early from the SDK's local cache
@@ -432,20 +479,50 @@ export async function pushToCloud(silent = false) {
         // write, misread it as "new data from another device" (see the
         // hasPendingWrites comment on that listener — transactions don't
         // set that flag the way a plain write does, so the listener had no
-        // way to recognize this as an echo of its own tab's push), and
-        // race ahead of this function to reload the page before
-        // jee_last_sync below had even been set — producing exactly the
-        // "Write did not verify on the server" failure this was reported
-        // as. Setting jee_last_sync IMMEDIATELY here, with no `await`
-        // between it and the transaction resolving above, closes that gap:
-        // by the time the listener's snapshot callback gets a turn to run,
-        // jee_last_sync already reflects this exact write, so its own
-        // `remoteUpdatedAt <= lastLocalSync` guard now correctly
-        // recognizes it as this tab's own echo and skips it (see
-        // `pushInFlight` below for a second, belt-and-braces guard against
-        // the same class of race).
+        // way to recognize this as an echo of its own tab's sync), and race
+        // ahead of this function to reload the page before jee_last_sync
+        // below had even been set — producing exactly the "Write did not
+        // verify on the server" failure this was reported as. Setting
+        // jee_last_sync IMMEDIATELY here, with no `await` between it and
+        // the transaction resolving above, closes that gap: by the time the
+        // listener's snapshot callback gets a turn to run, jee_last_sync
+        // already reflects this exact write, so its own `remoteUpdatedAt <=
+        // lastLocalSync` guard now correctly recognizes it as this tab's
+        // own echo and skips it (see `pushInFlight` below for a second,
+        // belt-and-braces guard against the same class of race).
         setRawFlag("jee_last_sync", now.toString());
         renderSyncUI();
+
+        // Did this sync actually bring in something new from elsewhere, or
+        // did it just push this device's own unchanged data back out? A
+        // manual "Sync Now" tap does a full page reload when something new
+        // arrived — same reliable, guaranteed-fresh-render approach every
+        // other "new data applied" path in this file already uses (the
+        // real-time listener, the very first auto-load) — but skips the
+        // reload entirely when nothing changed, since reloading on every
+        // tap of a button that usually has nothing new to pull would be
+        // needlessly disruptive.
+        let somethingNewArrived =
+            JSON.stringify(mergedPlannerDB) !== preMergePlannerJSON ||
+            JSON.stringify(mergedSleepLog) !== preMergeSleepLogJSON ||
+            JSON.stringify(mergedSleepPending) !== preMergeSleepPendingJSON ||
+            JSON.stringify(mergedStudyDB) !== preMergeStudyDBJSON;
+
+        if (!silent && somethingNewArrived) {
+            setRawFlag("jee_pending_toast", "Synced with the cloud.");
+            location.reload();
+            return;
+        }
+        // Silent (background/debounced/focus-triggered) syncs never reload
+        // — that would be jarring mid-session — but if something new DID
+        // merge in, repaint the couple of small, cheap widgets most likely
+        // to be stale (sidebar todo list, planner calendar, sleep pending
+        // banner/history) so it's visible right away instead of only after
+        // the next unrelated re-render or a full page reload.
+        if (silent && somethingNewArrived) {
+            try { renderSidebarTools(); renderPlannerCalendar(); } catch (e) { /* DOM not ready yet — next natural render will catch up */ }
+            try { renderSleepPendingBanner(); renderSleepLog(); } catch (e) { /* same */ }
+        }
         showToast(silent ? "Auto-Synced to the Cloud." : "Saved to the Cloud.");
     } catch (e) {
         // BUG FIX: silent (auto-sync) failures used to hit `if (!silent) alert(...)`
@@ -453,18 +530,68 @@ export async function pushToCloud(silent = false) {
         // identical to a successful one from the user's perspective. A quiet
         // toast (not a blocking alert, which would be intrusive popping up
         // unprompted every 30 min) makes failures visible without interrupting
-        // whatever the user is doing. Manual Save-to-Cloud keeps its existing
+        // whatever the user is doing. Manual "Sync Now" keeps its existing
         // blocking alert, since that's an intentional user action expecting
         // a direct response.
         if (silent) { showToast("⚠️ Auto-Sync Failed — Will Retry Next Cycle."); return; }
-        alert("Save failed: " + e.message);
+        alert("Sync failed: " + e.message);
     } finally {
         pushInFlight = false;
+        renderSyncUI();
     }
 }
 
-// A genuine, deliberate escape hatch — separate from pushToCloud above on
-// purpose. pushToCloud always MERGES with whatever's currently in the
+// ----------------- EVENT-TRIGGERED SYNC (reliability hardening) -----------------
+// REFORM: syncing used to only ever happen on a clock-aligned 30-minute
+// interval (startAutoServices below) or an explicit button tap — meaning a
+// change logged seconds ago could sit local-only for up to half an hour
+// before the cloud (and every other device) even knew about it. That gap
+// is exactly the window "I logged it on my phone, checked my laptop 5
+// minutes later, nothing there" lives in — not a merge bug, just nothing
+// had told the cloud yet. These two triggers close that gap without
+// spamming Firestore on every keystroke:
+//
+// 1) scheduleDebouncedSync() — called from planner.js/sleep.js right after
+//    a real change (add/toggle/delete a task, save/cancel/delete a sleep
+//    log entry). Fires a silent sync a few seconds after the user stops
+//    interacting, not on every single keystroke/tap.
+let debouncedSyncTimeout = null;
+const DEBOUNCED_SYNC_DELAY_MS = 8000;
+export function scheduleDebouncedSync() {
+    if (!currentUser) return; // guest/offline — nothing to sync yet
+    if (debouncedSyncTimeout) clearTimeout(debouncedSyncTimeout);
+    debouncedSyncTimeout = setTimeout(() => {
+        debouncedSyncTimeout = null;
+        if (currentUser) syncNow(true);
+    }, DEBOUNCED_SYNC_DELAY_MS);
+}
+// 2) a sync the moment the tab regains focus (phone screen turns back on,
+//    switching back from another app/tab) — catches up immediately instead
+//    of waiting for the next half-hour mark on the interval below.
+//    Throttled to once every 2 minutes so rapidly flicking between tabs
+//    can't spam Firestore.
+const FOCUS_SYNC_MIN_GAP_MS = 2 * 60 * 1000;
+let lastFocusSyncAt = 0;
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !currentUser) return;
+    let now = Date.now();
+    if (now - lastFocusSyncAt < FOCUS_SYNC_MIN_GAP_MS) return;
+    lastFocusSyncAt = now;
+    syncNow(true);
+});
+
+// Small helper for the live "Syncing…" status text — separate from
+// renderSyncUI() (which repaints the whole Account & Sync panel) since this
+// only needs to touch the one status line, and gets called mid-sync before
+// jee_last_sync has been updated (renderSyncUI would show stale "Last
+// synced" text at that exact moment).
+function renderSyncStatus(text) {
+    let el = document.getElementById("sync-last");
+    if (el) el.innerText = text;
+}
+
+// A genuine, deliberate escape hatch — separate from syncNow above on
+// purpose. syncNow always MERGES with whatever's currently in the
 // cloud, and merging is additive by design: it can never remove data
 // either side has, which also means it can never "clean up" bad data that
 // already reached the cloud (e.g. a corrupted/duplicated mess auto-synced
@@ -472,7 +599,7 @@ export async function pushToCloud(silent = false) {
 // only what's on THIS device — exactly the old pre-merge push behavior —
 // so a known-good device can be used to wipe out a bad state a merge could
 // never undo. Its own confirm() below is deliberately worded differently
-// from pushToCloud's (which needs none — merging is always safe), since
+// from syncNow's (which needs none — merging is always safe), since
 // the two do meaningfully different, differently risky things.
 export async function forcePushToCloud() {
     if (!initFirebaseAuthIfNeeded()) return;
@@ -483,8 +610,13 @@ export async function forcePushToCloud() {
         let now = Date.now();
         let local = await gatherLocalSyncPayload();
         let docRef = fbDb.collection("users").doc(currentUser.uid);
+        // A true overwrite carries this device's own tombstones/sleepPending
+        // straight through too — no merge, exactly like every other
+        // category here (that's the whole point of Force Save).
         await docRef.set(buildCloudDocument({
             studyDB: local.localStudyDB, plannerDB: local.localPlannerDB, sleepLog: local.localSleepLog,
+            sleepPending: local.localSleepPending, sleepPendingUpdatedAt: local.localSleepPendingUpdatedAt,
+            tombstones: local.localTombstones,
             syllabus: local.localSyllabus, mockTests: local.localMockTests, mistakeChapters: local.localMistakeChapters
         }, now));
         setRawFlag("jee_last_sync", now.toString());
@@ -498,14 +630,14 @@ export async function forcePushToCloud() {
 }
 
 // Cloud mock-test entries never carry `files` (stripped before upload — see
-// pushToCloud). Never clear() the store or overwrite an existing local
+// syncNow). Never clear() the store or overwrite an existing local
 // entry's real fields: either would destroy locally-attached mock-test
 // images/PDFs, or wipe out a brand-new local entry the cloud snapshot
 // predates. New entries are added as-is; for an entry that already exists
 // locally, the only thing ever touched is upgrading hasFiles false->true —
 // every other field, and `files` itself, is left exactly as this browser
 // already has it.
-async function restoreMockTests(entries) {
+async function restoreMockTests(entries, tombstones) {
     if (!Array.isArray(entries)) return;
     let db = await openMockDB();
     let tx = db.transaction(MOCK_STORE, "readwrite");
@@ -522,6 +654,15 @@ async function restoreMockTests(entries) {
             store.put({ ...existing, hasFiles: true });
         }
     }
+    // BUG FIX (deletions resurrecting): entries passed in are already
+    // tombstone-filtered by mergeMockTestArraysForCloud above, so nothing
+    // tombstoned gets ADDED back — but this device may still be holding
+    // its OWN local copy of an entry that was deleted on another device
+    // (this store has always been add-only until now). Actively remove any
+    // locally-held entry whose id is tombstoned; deleting an id that isn't
+    // actually present locally is a harmless no-op.
+    let tombstonedIds = Object.keys((tombstones && tombstones.mocktest) || {});
+    tombstonedIds.forEach(idStr => { let id = Number(idStr); if (!isNaN(id)) store.delete(id); });
     await new Promise((resolve) => { tx.oncomplete = resolve; tx.onerror = resolve; });
 }
 
@@ -530,12 +671,13 @@ async function restoreMockTests(entries) {
 // repeatedly across devices, so the cloud's metadata is merged onto
 // whatever's local, entry-by-entry (matched by each entry's id). The one
 // thing that's NEVER taken from the cloud is `files` — cloud entries never
-// carry attachment bytes (see pushToCloud), so blindly overwriting `files`
+// carry attachment bytes (see syncNow), so blindly overwriting `files`
 // with the cloud's copy would silently wipe this browser's locally-attached
 // images/PDFs. Entries that only exist locally (created after the last
 // push, or never pushed) are kept rather than dropped.
-async function restoreMistakeChapters(chapters) {
+async function restoreMistakeChapters(chapters, tombstones) {
     if (!Array.isArray(chapters)) return;
+    let tombstonedIds = new Set(Object.keys((tombstones && tombstones.mistake) || {}));
     for (const cloudEntry of chapters) {
         let cloudNorm = normalizeRecord(cloudEntry) || { entries: [] };
         let localRaw = await getMistakeEntry(cloudEntry.key);
@@ -543,19 +685,25 @@ async function restoreMistakeChapters(chapters) {
         let localById = {};
         (localNorm.entries || []).forEach(e => { localById[String(e.id)] = e; });
 
-        let mergedEntries = (cloudNorm.entries || []).map(ce => {
-            let le = localById[String(ce.id)];
-            return {
-                id: ce.id,
-                notes: ce.notes || "",
-                count: ce.count || 1,
-                hasFiles: !!ce.hasFiles,
-                files: (le && le.files) ? le.files : [],
-                createdAt: ce.createdAt || (le && le.createdAt) || Date.now()
-            };
-        });
+        let mergedEntries = (cloudNorm.entries || [])
+            .filter(ce => !tombstonedIds.has(String(ce.id)))
+            .map(ce => {
+                let le = localById[String(ce.id)];
+                return {
+                    id: ce.id,
+                    notes: ce.notes || "",
+                    count: ce.count || 1,
+                    hasFiles: !!ce.hasFiles,
+                    files: (le && le.files) ? le.files : [],
+                    createdAt: ce.createdAt || (le && le.createdAt) || Date.now()
+                };
+            });
         let cloudIds = new Set(mergedEntries.map(e => String(e.id)));
-        (localNorm.entries || []).forEach(le => { if (!cloudIds.has(String(le.id))) mergedEntries.push(le); });
+        // BUG FIX (deletions resurrecting): a locally-held entry that's
+        // been tombstoned (deleted on this device, or seen as deleted from
+        // a merged cloud tombstone) is skipped here too — this store used
+        // to keep any local-only entry unconditionally.
+        (localNorm.entries || []).forEach(le => { if (!cloudIds.has(String(le.id)) && !tombstonedIds.has(String(le.id))) mergedEntries.push(le); });
 
         await saveMistakeEntry({
             key: cloudEntry.key,
@@ -622,7 +770,15 @@ function entryMergeKey(e) {
     if (e && e.id) return "id:" + e.id;
     return "noid:" + (e && e.time || "") + "|" + (e && e.subject || "") + "|" + (e && e.duration || 0);
 }
-function mergeEntryArraysByIdAndDuration(a, b) {
+// BUG FIX (deletions resurrecting as "duplicates"): this used to be pure
+// add-only — a studySessions/breaks entry deleted on one device (see
+// history.js's deleteStudySessionEntry/deleteBreakEntry/deleteSubjectEntry/
+// deleteStudyLog/deleteBreakLog) had no way to stay deleted once a stale
+// cloud snapshot or another device's copy merged back in. `tombstonedIds`
+// (built from storage.js's tombstone log — see mergeStudyDBs below) is
+// checked last, after the normal id/duration merge above, and simply drops
+// any surviving entry whose id was deliberately deleted on this device.
+function mergeEntryArraysByIdAndDuration(a, b, tombstonedIds) {
     let byKey = new Map();
     (a || []).forEach(e => { if (e) byKey.set(entryMergeKey(e), e); });
     (b || []).forEach(e => {
@@ -631,6 +787,9 @@ function mergeEntryArraysByIdAndDuration(a, b) {
         let existing = byKey.get(key);
         if (!existing || (e.duration || 0) > (existing.duration || 0)) byKey.set(key, e);
     });
+    if (tombstonedIds && tombstonedIds.size) {
+        byKey.forEach((e, key) => { if (e && e.id && tombstonedIds.has(String(e.id))) byKey.delete(key); });
+    }
     return Array.from(byKey.values());
 }
 
@@ -659,12 +818,12 @@ function recomputeDayAggregates(day) {
     return day;
 }
 
-function mergeDayObjects(a, b) {
+function mergeDayObjects(a, b, tombstonedStudyIds) {
     if (!a) return b;
     if (!b) return a;
     let merged = { ...blankDay(), ...a };
-    merged.studySessions = mergeEntryArraysByIdAndDuration(a.studySessions, b.studySessions);
-    merged.breaks = mergeEntryArraysByIdAndDuration(a.breaks, b.breaks);
+    merged.studySessions = mergeEntryArraysByIdAndDuration(a.studySessions, b.studySessions, tombstonedStudyIds);
+    merged.breaks = mergeEntryArraysByIdAndDuration(a.breaks, b.breaks, tombstonedStudyIds);
     recomputeDayAggregates(merged);
     // questionsSolved/questionsAsked have no timestamp of their own — once
     // asked on EITHER device, treat the day as asked everywhere (never
@@ -681,11 +840,12 @@ function mergeDayObjects(a, b) {
     return merged;
 }
 
-export function mergeStudyDBs(dbA, dbB) {
+export function mergeStudyDBs(dbA, dbB, tombstones) {
     dbA = dbA || {}; dbB = dbB || {};
+    let tombstonedStudyIds = new Set(Object.keys((tombstones && tombstones.study) || {}));
     let dayKeys = new Set([...Object.keys(dbA), ...Object.keys(dbB)]);
     let merged = {};
-    dayKeys.forEach(dayKey => { merged[dayKey] = mergeDayObjects(dbA[dayKey], dbB[dayKey]); });
+    dayKeys.forEach(dayKey => { merged[dayKey] = mergeDayObjects(dbA[dayKey], dbB[dayKey], tombstonedStudyIds); });
     return merged;
 }
 
@@ -700,12 +860,88 @@ function sleepEntryCompleteness(e) {
     if (!e) return -1;
     return (e.sleepTime ? 1 : 0) + (e.wakeTime ? 1 : 0) + (typeof e.durationMin === "number" ? 1 : 0);
 }
-function mergeSleepLogs(logA, logB) {
+// BUG FIX (deletions resurrecting): deleteSleepLogEntry() (sleep.js) only
+// ever removed a date-key locally — a stale cloud snapshot or the other
+// device's still-un-synced copy for that same date-key would otherwise
+// merge right back in on the next sync, undoing the delete. Every entry
+// saved from now on carries `loggedAt` (see sleep.js) so a genuinely
+// RE-logged entry for a date you'd previously deleted (logged after the
+// delete) can still be told apart from the stale pre-delete copy the
+// delete was actually meant to remove: an entry only gets dropped here if
+// it's tombstoned AND wasn't (re-)logged after that deletion happened. An
+// older entry with no loggedAt (saved before this fix existed) is treated
+// as loggedAt 0 — always droppable once tombstoned, since there's no way
+// it could postdate a deletion that hasn't happened yet.
+function mergeSleepLogs(logA, logB, tombstones) {
     logA = logA || {}; logB = logB || {};
+    let sleepTombstones = (tombstones && tombstones.sleep) || {};
     let keys = new Set([...Object.keys(logA), ...Object.keys(logB)]);
     let merged = {};
-    keys.forEach(k => { merged[k] = sleepEntryCompleteness(logB[k]) > sleepEntryCompleteness(logA[k]) ? logB[k] : (logA[k] || logB[k]); });
+    keys.forEach(k => {
+        let winner = sleepEntryCompleteness(logB[k]) > sleepEntryCompleteness(logA[k]) ? logB[k] : (logA[k] || logB[k]);
+        let deletedAt = sleepTombstones[k];
+        if (winner && deletedAt && (winner.loggedAt || 0) <= deletedAt) return; // stays deleted — don't add to merged
+        merged[k] = winner;
+    });
     return merged;
+}
+
+// ----------------- SLEEP PENDING MERGE (cloud <-> local) -----------------
+// BUG FIX (root cause of "sleep data logged on mobile doesn't come through
+// when I finish it on laptop"): the pending-bedtime flag used to be synced
+// by blindly overwriting it in both directions — see buildCloudDocument and
+// applyCloudData's old comments below — instead of merging like every
+// other field. It has no natural "more complete" ordering the way a
+// finished sleepLog entry does (it's just one in-progress value, not two
+// sides to combine), so the correct rule is simply: whichever device
+// changed it MORE RECENTLY — setting a fresh bedtime, or clearing it once
+// completed — reflects the real current state, and wins outright. That
+// correctly lets a completed (cleared to null) pending on one device
+// override a stale still-pending copy elsewhere, and vice versa for a
+// genuinely newer bedtime. Returns both the winning value and its
+// timestamp so the caller can persist them together.
+function mergeSleepPending(localPending, localUpdatedAt, cloudPending, cloudUpdatedAt) {
+    let useCloud = (cloudUpdatedAt || 0) > (localUpdatedAt || 0);
+    return {
+        pending: useCloud ? (cloudPending !== undefined ? cloudPending : null) : (localPending || null),
+        updatedAt: useCloud ? (cloudUpdatedAt || 0) : (localUpdatedAt || 0)
+    };
+}
+
+// ----------------- SYNC DELETION TOMBSTONES MERGE (cloud <-> local) -----------------
+// Tombstones themselves are unioned (never dropped by a merge) so a
+// deletion recorded on either device is remembered by both going forward —
+// dropping one side's tombstone would just let the very thing it protects
+// against happen again on the next sync. Keeps the LATER deletedAt if
+// somehow both sides recorded a tombstone for the same id (doesn't really
+// matter which — both agree it's deleted — but a later value is never
+// wrong to keep).
+function mergeTombstoneCategory(a, b) {
+    a = a || {}; b = b || {};
+    let merged = { ...a };
+    Object.keys(b).forEach(id => { merged[id] = Math.max(merged[id] || 0, b[id] || 0); });
+    return merged;
+}
+function mergeAllTombstones(tA, tB) {
+    tA = tA || {}; tB = tB || {};
+    let merged = {};
+    ["planner", "sleep", "mocktest", "mistake", "study"].forEach(cat => { merged[cat] = mergeTombstoneCategory(tA[cat], tB[cat]); });
+    return merged;
+}
+// Tombstones only need to outlive "every device has had a chance to sync
+// since the delete" — 120 days is comfortably longer than any realistic
+// gap between opens, so this keeps the tombstone log from growing forever
+// without risking a delete resurrecting because its tombstone aged out too
+// early.
+const TOMBSTONE_MAX_AGE_MS = 120 * 24 * 60 * 60 * 1000;
+function pruneTombstones(t) {
+    let now = Date.now();
+    let pruned = {};
+    Object.keys(t || {}).forEach(cat => {
+        pruned[cat] = {};
+        Object.keys(t[cat] || {}).forEach(id => { if (now - t[cat][id] < TOMBSTONE_MAX_AGE_MS) pruned[cat][id] = t[cat][id]; });
+    });
+    return pruned;
 }
 
 // ----------------- SYLLABUS PROGRESS MERGE (cloud <-> local) -----------------
@@ -733,14 +969,22 @@ function mergeSyllabusProgress(progA, progB) {
 // ----------------- MOCK TESTS / MISTAKE CHAPTERS MERGE (for the OUTGOING cloud payload) -----------------
 // restoreMockTests/restoreMistakeChapters below already merge an incoming
 // cloud snapshot onto local storage safely (add-only, never overwrite real
-// local fields). What they DIDN'T protect against: pushToCloud used to
+// local fields). What they DIDN'T protect against: syncNow used to
 // build its outgoing payload purely from this device's own local state and
 // overwrite the cloud with it wholesale — so if a second device had added a
 // mock test or mistake entry that this device never pulled down yet, THIS
 // device's push would erase it from the cloud anyway. These mirror the same
 // add-only philosophy, applied to the payload being written, not just the
 // payload being read.
-function mergeMockTestArraysForCloud(cloudTests, localTests) {
+// BUG FIX (deletions resurrecting as "duplicates"): deleteMockTestEntry()
+// (mocktest.js) only removed the entry from THIS device's IndexedDB — a
+// still-un-synced copy from the cloud (or from another device) would
+// otherwise merge right back into the very payload being pushed. Mock-test
+// ids are `Date.now()` at creation (see mocktest.js) — always older than
+// any deletedAt tombstoned against them — so a tombstoned id is simply
+// always excluded, no completeness/recency comparison needed.
+function mergeMockTestArraysForCloud(cloudTests, localTests, tombstones) {
+    let tombstonedIds = new Set(Object.keys((tombstones && tombstones.mocktest) || {}));
     let byId = new Map();
     (cloudTests || []).forEach(t => { if (t) byId.set(t.id, t); });
     (localTests || []).forEach(t => {
@@ -748,13 +992,19 @@ function mergeMockTestArraysForCloud(cloudTests, localTests) {
         let existing = byId.get(t.id);
         byId.set(t.id, existing ? { ...existing, hasFiles: existing.hasFiles || t.hasFiles } : t);
     });
-    return Array.from(byId.values());
+    return Array.from(byId.values()).filter(t => !tombstonedIds.has(String(t.id)));
 }
-function mergeMistakeChapterArraysForCloud(cloudChapters, localChapters) {
+// Same fix as mergeMockTestArraysForCloud above, applied per mistake ENTRY
+// (a chapter itself is never deleted — see doDeleteChapterLog in
+// mistakes.js, which clears its entries rather than removing the record —
+// only individual logged entries are).
+function mergeMistakeChapterArraysForCloud(cloudChapters, localChapters, tombstones) {
+    let tombstonedIds = new Set(Object.keys((tombstones && tombstones.mistake) || {}));
     let byKey = new Map();
-    (cloudChapters || []).forEach(c => { if (c && c.key) byKey.set(c.key, c); });
+    (cloudChapters || []).forEach(c => { if (c && c.key) byKey.set(c.key, { ...c, entries: (c.entries || []).filter(e => !tombstonedIds.has(String(e.id))) }); });
     (localChapters || []).forEach(local => {
         if (!local || !local.key) return;
+        local = { ...local, entries: (local.entries || []).filter(e => !tombstonedIds.has(String(e.id))) };
         let cloudEntry = byKey.get(local.key);
         if (!cloudEntry) { byKey.set(local.key, local); return; }
         let localIds = new Set((local.entries || []).map(e => String(e.id)));
@@ -794,20 +1044,15 @@ function taskIdentity(t) { return t && t.id ? "id:" + t.id : "text:" + (t && t.t
 // kept — merging only ever adds, it never silently drops a task neither
 // side actually deleted.
 //
-// Known trade-off, shared with restoreMockTests above: there are no
-// tombstones, so a task deleted on this device can reappear if a cloud
-// snapshot that predates the deletion is merged in later. Same limitation
-// mock-test deletions already have in this codebase — flagging it here
-// rather than leaving it silent, since closing that gap properly needs a
-// soft-delete flag, which is a bigger change than this fix.
 // Pure merge — takes two plannerDBs, returns the merged result without
-// touching storage. Split out so pushToCloud can merge local onto a
+// touching storage. Split out so syncNow can merge local onto a
 // FRESHLY-READ cloud snapshot (inside its transaction, see below) without
 // this device's own storage being involved at all, while
 // applyCloudData/catchUpPlannerFromCloud keep using the thin wrapper below
 // exactly as before.
-function mergePlannerDBs(dbA, dbB) {
+function mergePlannerDBs(dbA, dbB, tombstones) {
     dbA = dbA || {}; dbB = dbB || {};
+    let tombstonedIds = (tombstones && tombstones.planner) || {};
     let dayKeys = new Set([...Object.keys(dbA), ...Object.keys(dbB)]);
 
     // Pass 1: merge each day's list independently — newest updatedAt wins
@@ -844,6 +1089,49 @@ function mergePlannerDBs(dbA, dbB) {
     });
     Object.keys(merged).forEach(dayKey => {
         merged[dayKey] = merged[dayKey].filter(t => !t.id || idToLatest.get(t.id).dayKey === dayKey);
+    });
+
+    // BUG FIX (deletions resurrecting as "duplicates"): deleteTodo/
+    // deletePlannerTask (planner.js) only ever removed a task from THIS
+    // device's local list — a still-un-synced copy from the cloud, or from
+    // another device, would otherwise merge right back in on the next
+    // sync. A tombstoned id is dropped UNLESS it comes back with an
+    // updatedAt newer than the deletion itself — that's a genuine re-add
+    // (same id can't really happen since a fresh add always calls
+    // generateId(), but a resurrected id with a later edit timestamp is
+    // treated as intentional rather than silently eaten).
+    Object.keys(merged).forEach(dayKey => {
+        merged[dayKey] = merged[dayKey].filter(t => {
+            if (!t.id) return true;
+            let deletedAt = tombstonedIds[t.id];
+            return !deletedAt || (t.updatedAt || 0) > deletedAt;
+        });
+    });
+
+    // BUG FIX (duplicate "copies" of the same task): if the identical task
+    // text is added independently on two devices before either has synced
+    // (each gets its own real, distinct id — see addTodo/addPlannerTask),
+    // the identity-based passes above have no way to know they're "the
+    // same" task, so both survive the merge as two rows with identical
+    // text. Same rule already used by addTodo/addPlannerTask's own
+    // single-device duplicate guard (exact, case-sensitive text match)
+    // extended across devices here: within a day, if two tasks share exact
+    // text, keep only the earliest-created one.
+    Object.keys(merged).forEach(dayKey => {
+        let seenText = new Map(); // text -> kept task
+        let deduped = [];
+        merged[dayKey].forEach(t => {
+            let prior = seenText.get(t.text);
+            if (!prior) { seenText.set(t.text, t); deduped.push(t); return; }
+            if ((t.createdAt || 0) < (prior.createdAt || 0)) {
+                // this one is actually the earlier original — swap it in.
+                let idx = deduped.indexOf(prior);
+                deduped[idx] = t;
+                seenText.set(t.text, t);
+            }
+            // otherwise this is the later duplicate — drop it (simply not pushed).
+        });
+        merged[dayKey] = deduped;
         if (merged[dayKey].length === 0) delete merged[dayKey];
     });
 
@@ -853,9 +1141,9 @@ function mergePlannerDBs(dbA, dbB) {
 // Thin, side-effecting wrapper — kept so applyCloudData/catchUpPlannerFromCloud
 // don't need to change: "merge this cloud snapshot onto whatever's local
 // right now, and save it."
-function mergePlannerDB(cloudPlannerDB) {
+function mergePlannerDB(cloudPlannerDB, tombstones) {
     if (!cloudPlannerDB || typeof cloudPlannerDB !== "object") return;
-    savePlannerDB(mergePlannerDBs(getPlannerDB(), cloudPlannerDB));
+    savePlannerDB(mergePlannerDBs(getPlannerDB(), cloudPlannerDB, tombstones));
 }
 
 // ----------------- OPPORTUNISTIC PLANNER CATCH-UP (wake-from-background) -----------------
@@ -889,7 +1177,17 @@ export async function catchUpPlannerFromCloud() {
             new Promise((_, reject) => setTimeout(() => reject(new Error("planner catch-up timed out")), 5000))
         ]);
         if (!doc.exists) return;
-        mergePlannerDB(doc.data().plannerDB);
+        // Also catch up this device's planner tombstones from the cloud —
+        // otherwise a task deleted on another device, whose tombstone
+        // hasn't reached this device yet, could get carried right back
+        // over by carryOverIncompleteTodos() the moment this rollover
+        // runs. Merged and saved locally (not the full-category apply
+        // jee_last_sync gates — see this function's own comment below —
+        // just the tombstone log itself, which is always safe to merge in
+        // early).
+        let mergedTombstones = pruneTombstones(mergeAllTombstones(getTombstones(), doc.data().tombstones || {}));
+        saveTombstones(mergedTombstones);
+        mergePlannerDB(doc.data().plannerDB, mergedTombstones);
     } catch (e) {
         // Offline, slow reconnect, or timed out — proceed with whatever's
         // local rather than blocking the rollover indefinitely. The
@@ -900,10 +1198,15 @@ export async function catchUpPlannerFromCloud() {
     }
 }
 
-// Shared by pullFromCloud (explicit, user-initiated) and the real-time
-// listener below (automatic, from another device). Applies every synced
-// category to local storage.
+// Shared by the real-time listener below (automatic, from another device)
+// and autoLoadCloudDataIfNeeded (the very first sign-in load). Applies
+// every synced category to local storage.
 async function applyCloudData(data) {
+    // Tombstones first — every other merge below needs the up-to-date
+    // combined tombstone log to correctly drop anything that's been
+    // deleted elsewhere, instead of silently resurrecting it.
+    let mergedTombstones = pruneTombstones(mergeAllTombstones(getTombstones(), data.tombstones || {}));
+    saveTombstones(mergedTombstones);
     // BUG FIX: was `saveDB(data.studyDB || {})` — a wholesale overwrite that
     // discarded any local study/break minutes logged on THIS device after
     // whatever moment this cloud snapshot was captured. mergeStudyDBs()
@@ -911,18 +1214,24 @@ async function applyCloudData(data) {
     // side wholesale — the same class of fix plannerDB already had.
     let localStudyDB = getDB();
     ensureAllDayShapes(localStudyDB); // see its own comment above
-    saveDB(mergeStudyDBs(localStudyDB, data.studyDB || {}));
+    saveDB(mergeStudyDBs(localStudyDB, data.studyDB || {}, mergedTombstones));
     // BUG FIX: was `savePlannerDB(data.plannerDB || {})` — a wholesale
     // overwrite that discarded any local planner change (a carryover, a
     // toggle, a newly-added task) made after this cloud snapshot was taken.
     // mergePlannerDB() combines the two instead of picking one wholesale —
     // see its own comment above for the full story.
-    mergePlannerDB(data.plannerDB || {});
+    mergePlannerDB(data.plannerDB || {}, mergedTombstones);
     // BUG FIX: was `writeSleepLog(data.sleepLog)` — same wholesale-overwrite
     // problem, for the sleep log. mergeSleepLogs() keeps whichever side's
     // entry is more complete per date instead of always taking the cloud's.
-    if (data.sleepLog) writeSleepLog(mergeSleepLogs(getSleepLog(), data.sleepLog));
-    if (data.sleepPending !== undefined) setSleepPending(data.sleepPending);
+    if (data.sleepLog) writeSleepLog(mergeSleepLogs(getSleepLog(), data.sleepLog, mergedTombstones));
+    // BUG FIX (root cause of the cross-device sleep-log complaint): was
+    // `if (data.sleepPending !== undefined) setSleepPending(data.sleepPending);`
+    // — an unconditional overwrite with no merge at all, unlike every other
+    // field here. mergeSleepPending() picks whichever device's most recent
+    // real action (set OR clear) actually wins — see its own comment above.
+    let sp = mergeSleepPending(getSleepPending(), getSleepPendingUpdatedAt(), data.sleepPending, data.sleepPendingUpdatedAt || 0);
+    setSleepPendingRaw(sp.pending, sp.updatedAt);
     // BUG FIX: was `saveSyllabusProgress(data.syllabusProgress)` — same
     // wholesale-overwrite problem. mergeSyllabusProgress() OR-merges each
     // chapter's completion tags instead of letting an older cloud snapshot
@@ -932,28 +1241,8 @@ async function applyCloudData(data) {
     if (data.ytHistory) saveYtHistory(data.ytHistory);
     if (data.examYear) setStoredExamYear(data.examYear);
     if (data.ytLastLink) setRawFlag("jee_yt_last_link", data.ytLastLink);
-    await restoreMockTests(data.mockTests);
-    await restoreMistakeChapters(data.mistakeChapters);
-}
-
-export async function pullFromCloud() {
-    if (!initFirebaseAuthIfNeeded()) return;
-    if (!currentUser) { alert("Sign in first."); return; }
-    try {
-        let doc = await fbDb.collection("users").doc(currentUser.uid).get();
-        if (!doc.exists) { alert("No cloud data saved yet — tap Save to Cloud first."); return; }
-        let data = doc.data();
-        // BUG FIX: the old confirm() ("This will REPLACE all study logs...")
-        // described a wholesale overwrite that applyCloudData() no longer
-        // does — every category is now MERGED with what's already on this
-        // device (see applyCloudData's own comments), so there's nothing
-        // left on this device to lose, and nothing left to ask permission
-        // for.
-        await applyCloudData(data);
-        setRawFlag("jee_last_sync", (data.updatedAt || Date.now()).toString());
-        setRawFlag("jee_pending_toast", "Synced with the cloud.");
-        location.reload();
-    } catch (e) { alert("Load failed: " + e.message); }
+    await restoreMockTests(data.mockTests, mergedTombstones);
+    await restoreMistakeChapters(data.mistakeChapters, mergedTombstones);
 }
 
 // Runs once right after sign-in. If this device has never synced before
@@ -1013,14 +1302,14 @@ async function autoLoadCloudDataIfNeeded() {
 // on this device. Without the guard, signing in for the first time on a
 // second device would immediately prompt to overwrite fresh local data with
 // old cloud data (or vice versa) before the user has decided what they
-// actually want — pushToCloud/pullFromCloud remain the explicit, safe way to
+// actually want — the manual "Sync Now" button (syncNow above) remains the explicit, safe way to
 // resolve that first sync. After that first manual sync, jee_last_sync is
 // set and this listener can safely react to later changes.
 function startCloudListener() {
     if (!fbDb || !currentUser || cloudUnsubscribe) return;
     cloudUnsubscribe = fbDb.collection("users").doc(currentUser.uid).onSnapshot(async (doc) => {
         if (!doc.exists) return;
-        // BUG FIX: pushToCloud() now writes via a Firestore TRANSACTION
+        // BUG FIX: syncNow() now writes via a Firestore TRANSACTION
         // (see its own comment), not a plain set() — and transactions never
         // set hasPendingWrites the way a plain write does (they only
         // resolve once genuinely committed server-side), so this guard
@@ -1030,7 +1319,7 @@ function startCloudListener() {
         // the middle of that same push and racing its jee_last_sync update
         // — reported as "Save failed: Write did not verify on the server."
         // pushInFlight is the explicit fix: set for the exact duration of
-        // pushToCloud(), so every snapshot arriving during that window is
+        // syncNow(), so every snapshot arriving during that window is
         // skipped outright, no timing assumptions needed. hasPendingWrites
         // stays as a second filter alongside it — still correct and useful
         // for any other plain (non-transactional) write this document might
@@ -1041,7 +1330,7 @@ function startCloudListener() {
         let data = doc.data();
         let remoteUpdatedAt = data.updatedAt || 0;
         // Only react to a genuinely newer write from elsewhere — otherwise
-        // this fires as an echo of our own pushToCloud() on this same tab.
+        // this fires as an echo of our own syncNow() on this same tab.
         if (remoteUpdatedAt <= lastLocalSync) return;
         // BUG FIX (re-restored per explicit request): this used to confirm()
         // "New data was saved to the cloud from another device. Load it
@@ -1124,11 +1413,21 @@ export function startAutoServices() {
     let msPastHalfHour = (now.getMinutes() % 30) * 60000 + now.getSeconds() * 1000 + now.getMilliseconds();
     let msUntilNextHalfHour = (30 * 60000) - msPastHalfHour;
     autoSyncTimeout = setTimeout(() => {
-        if (currentUser) pushToCloud(true);
+        if (currentUser) syncNow(true);
         autoSyncInterval = setInterval(() => {
-            if (currentUser) pushToCloud(true);
+            if (currentUser) syncNow(true);
         }, 30 * 60000);
     }, msUntilNextHalfHour);
+
+    // REFORM (reliability hardening): the half-hour-aligned schedule above
+    // means a device that already synced once before (so
+    // autoLoadCloudDataIfNeeded has nothing to do) could otherwise sit for
+    // up to 30 minutes after opening the app before checking in with the
+    // cloud at all — exactly the "just opened my laptop, nothing from my
+    // phone shows up yet" gap. This fires one extra silent sync shortly
+    // after sign-in/app-open; the short delay lets the initial auto-load
+    // and real-time listener attach first so this doesn't race them.
+    setTimeout(() => { if (currentUser) syncNow(true); }, 6000);
 
     // BUG FIX: this used to only check on a 2-hour setInterval tick, and
     // guarded with a flag keyed to *today's* date only

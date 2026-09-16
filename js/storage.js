@@ -167,8 +167,68 @@ export function getSleepPending() {
     try { return JSON.parse(localStorage.getItem("jee_sleep_pending") || "null"); } catch (e) { return null; }
 }
 
+// BUG FIX (root cause of "sleep data logged on one device doesn't come
+// through when I finish it on the other"): the pending-bedtime flag used
+// to be synced by blindly overwriting it in both directions (whichever
+// device pushed/pulled last won, no matter how stale), unlike every other
+// synced field which properly merges. Every local mutation of this flag —
+// setting a fresh bedtime OR clearing it once a wake time completes it —
+// is now stamped with "now", so firebase-sync.js's merge can tell which
+// device's most recent real action (set OR clear) should win, instead of
+// one side's stale pending silently resurrecting after the other device
+// already resolved it. UI code (sleep.js) always calls setSleepPending()
+// below; setSleepPendingRaw() is for sync code only, which needs to apply
+// an already-decided merge result without stamping a brand-new "now" over
+// the real decision time that was actually used to pick a winner.
 export function setSleepPending(pending) {
+    setSleepPendingRaw(pending, Date.now());
+}
+export function setSleepPendingRaw(pending, updatedAt) {
     localStorage.setItem("jee_sleep_pending", JSON.stringify(pending));
+    localStorage.setItem("jee_sleep_pending_updated_at", String(updatedAt || Date.now()));
+}
+export function getSleepPendingUpdatedAt() {
+    let v = parseInt(localStorage.getItem("jee_sleep_pending_updated_at") || "0", 10);
+    return isNaN(v) ? 0 : v;
+}
+
+// ----------------- SYNC DELETION TOMBSTONES -----------------
+// Every merge function in firebase-sync.js is add-only/union-based by
+// design (a task/entry that exists on only one side always survives a
+// merge) — which is exactly what makes a real DELETE on one device
+// invisible to that logic: the deleted row simply still exists on the
+// other side (or in an older cloud snapshot that hasn't caught up yet), so
+// the very next merge adds it right back in — looking like data
+// "duplicating" or a delete that "didn't stick." A tombstone records that
+// an id was deliberately removed on THIS device, and when — every merge
+// function checks these before deciding whether a matching id surviving on
+// the other side should really be kept. Kept as one small JSON blob (not
+// one localStorage key per deleted id) since the whole thing needs to be
+// read/merged/written together on every sync anyway; old entries are
+// pruned by firebase-sync.js after merging so this never grows forever.
+const TOMBSTONES_KEY = "jee_tombstones";
+// One sub-object per synced category that supports a user-initiated
+// delete. "study" covers both studySessions and breaks — their ids are
+// already globally unique (see generateId() in utils.js), so one shared
+// bucket is enough; no need to separate them.
+function blankTombstones() { return { planner: {}, sleep: {}, mocktest: {}, mistake: {}, study: {} }; }
+export function getTombstones() {
+    try { return { ...blankTombstones(), ...JSON.parse(localStorage.getItem(TOMBSTONES_KEY) || "{}") }; }
+    catch (e) { return blankTombstones(); }
+}
+export function saveTombstones(t) { localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(t)); }
+// Called from every delete action across the app (planner.js, sleep.js,
+// history.js, mocktest.js, mistakes.js) right when something is actually
+// removed — id is whatever that category already uses to identify a row
+// (a task's id, a sleep log's date-key, a study/break entry's id, etc.).
+export function recordTombstone(category, id) { recordTombstones(category, [id]); }
+export function recordTombstones(category, ids) {
+    if (!ids || !ids.length) return;
+    let t = getTombstones();
+    if (!t[category]) t[category] = {};
+    let now = Date.now();
+    ids.forEach(id => { t[category][String(id)] = now; });
+    saveTombstones(t);
 }
 
 // ----------------- SYLLABUS -----------------
@@ -196,7 +256,7 @@ export const YT_HISTORY_MAX_ENTRIES = YT_HISTORY_MAX;
 // is where the store gets created — when the requested version is HIGHER
 // than what's already stored. Reopening at the same version 1 forever never
 // re-ran that check, so the store was permanently missing and every
-// transaction() call (including the one inside pushToCloud()) threw
+// transaction() call (including the one inside syncNow()) threw
 // "One of the specified object stores was not found." Requesting version 2
 // forces onupgradeneeded to run once more; the existing
 // `if (!contains(MOCK_STORE))` guard then creates the missing store without

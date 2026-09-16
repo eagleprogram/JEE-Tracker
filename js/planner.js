@@ -1,11 +1,20 @@
 import { getTodayKey, dateKey, escapeHtml, generateId } from './utils.js';
-import { getPlannerDB, savePlannerDB } from './storage.js';
+import { getPlannerDB, savePlannerDB, recordTombstone } from './storage.js';
 // Forward reference — ui.js imports FROM this module (carryOverIncompleteTodos,
 // renderSidebarTools, renderPlannerCalendar), so this is a circular import.
 // Same pattern already used by notifications.js: only called inside function
 // bodies at runtime, never at module top-level, so it's safe once main.js
 // has wired the full module graph.
 import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
+// Forward reference — firebase-sync.js imports FROM this module too
+// (renderSidebarTools/renderPlannerCalendar, so a silent background sync
+// can repaint these right after merging in something new — see its own
+// comment). Same safe circular pattern: only called inside function bodies
+// below, never at module top-level. scheduleDebouncedSync() fires a
+// silent sync a few seconds after a real change here, instead of leaving
+// it to sit local-only until the next 30-minute auto-sync tick or a
+// manual "Sync Now" tap.
+import { scheduleDebouncedSync } from './firebase-sync.js';
 
 let calViewYear, calViewMonth;
 let plannerActiveDateKey = null;
@@ -58,6 +67,7 @@ export function addTodo() {
     let now = Date.now();
     db[todayKey].push({ id: generateId(), text, done: false, priority, createdAt: now, updatedAt: now });
     savePlannerDB(db); inp.value = ""; renderSidebarTools(); renderPlannerCalendar();
+    scheduleDebouncedSync();
 }
 
 export function renderSidebarTools() {
@@ -85,12 +95,21 @@ export function toggleTodo(idx) {
     // of guessing. See mergePlannerDB() in firebase-sync.js.
     db[todayKey][idx].updatedAt = Date.now();
     savePlannerDB(db); renderSidebarTools(); renderPlannerCalendar();
+    scheduleDebouncedSync();
 }
 
 export function deleteTodo(idx) {
     let todayKey = getTodayKey(); let db = getPlannerDB();
     if (!db[todayKey]) return;
+    // Record the tombstone BEFORE removing it locally — see recordTombstone's
+    // own comment in storage.js. Without this, a still-un-synced copy from
+    // the cloud (or another device) can merge right back in on the next
+    // sync, which is exactly the "deleted tasks keep coming back /
+    // duplicating" bug this closes.
+    let deletedTask = db[todayKey][idx];
+    if (deletedTask && deletedTask.id) recordTombstone("planner", deletedTask.id);
     db[todayKey].splice(idx, 1); savePlannerDB(db); renderSidebarTools(); renderPlannerCalendar();
+    scheduleDebouncedSync();
 }
 
 // Called once from checkDayRollover() (ui.js) whenever local midnight is
@@ -177,6 +196,7 @@ export function confirmCarryOverTodos() {
     closeCarryOverModal();
     renderSidebarTools(); renderPlannerCalendar();
     showToast(`Moved ${count} ${count === 1 ? "Task" : "Tasks"} to Today.`);
+    scheduleDebouncedSync();
 }
 
 // "Not now" button on the carryover modal — leaves the old tasks exactly
@@ -242,6 +262,7 @@ export function addPlannerTask() {
     let now = Date.now();
     db[plannerActiveDateKey].push({ id: generateId(), text, done: false, priority, createdAt: now, updatedAt: now });
     savePlannerDB(db); inp.value = ""; renderPlannerTasks();
+    scheduleDebouncedSync();
 }
 
 export function togglePlannerTask(idx) {
@@ -250,12 +271,16 @@ export function togglePlannerTask(idx) {
     db[plannerActiveDateKey][idx].done = !db[plannerActiveDateKey][idx].done;
     db[plannerActiveDateKey][idx].updatedAt = Date.now();
     savePlannerDB(db); renderPlannerTasks();
+    scheduleDebouncedSync();
 }
 
 export function deletePlannerTask(idx) {
     let db = getPlannerDB();
     if (!db[plannerActiveDateKey]) return;
+    let deletedTask = db[plannerActiveDateKey][idx];
+    if (deletedTask && deletedTask.id) recordTombstone("planner", deletedTask.id);
     db[plannerActiveDateKey].splice(idx, 1); savePlannerDB(db); renderPlannerTasks();
+    scheduleDebouncedSync();
 }
 
 export function renderPlannerTasks() {

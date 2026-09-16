@@ -9,7 +9,7 @@
 // the browser fully closed, something has to run on a schedule OUTSIDE the
 // browser and push the alert in. This script is that "something" — it reads
 // every signed-in user's notification settings + relevant data from
-// Firestore (synced there already by js/firebase-sync.js's pushToCloud, on
+// Firestore (synced there already by js/firebase-sync.js's syncNow(), on
 // a ~30-minute auto-sync), decides which reminders are due right now, and
 // sends them as FCM data-only push messages to that user's registered
 // device(s) (js/push-notifications.js registers those tokens).

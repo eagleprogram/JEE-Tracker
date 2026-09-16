@@ -1,7 +1,14 @@
 import { formatReadable, formatTime12Hour, timeToMinutes, getTodayKey, escapeHtml, formatDateDDMMYY, generateId, stampTime12Hour } from './utils.js';
-import { getDB, saveDB, ensureDayShape, blankDay, getSleepLog, getSleepPending } from './storage.js';
+import { getDB, saveDB, ensureDayShape, blankDay, getSleepLog, getSleepPending, recordTombstones } from './storage.js';
 import { updateLiveSummary, resetOpenEntryRefs } from './timer.js';
 import { renderGarden, renderHeatmap, renderTrendChart } from './charts.js';
+// Forward reference — firebase-sync.js does not import from this module,
+// so this one is NOT circular (unlike the planner.js/sleep.js ones) — just
+// a normal import. scheduleDebouncedSync() fires a silent sync a few
+// seconds after a real study/break-log delete instead of leaving the
+// deletion sitting local-only until the next 30-minute auto-sync tick or a
+// manual "Sync Now" tap.
+import { scheduleDebouncedSync } from './firebase-sync.js';
 
 // Missed-break start/end times should only be loggable within the day's
 // actual awake window: no earlier than that date's logged wake time (a
@@ -129,8 +136,11 @@ export function deleteSubjectEntry(dt, subject) {
     let sec = db[dt].subjects[subject] || 0; if (sec <= 0) { alert("No time logged."); return; }
     if (!confirm(`Delete ${formatReadable(sec)} logged for ${subject} on ${formatDateDDMMYY(dt)}?`)) return;
     db[dt].totalStudy = Math.max(0, db[dt].totalStudy - sec);
+    let removedIds = (db[dt].studySessions || []).filter(s => s.subject === subject).map(s => s.id).filter(Boolean);
     db[dt].subjects[subject] = 0; if (db[dt].studySessions) db[dt].studySessions = db[dt].studySessions.filter(s => s.subject !== subject);
+    recordTombstones("study", removedIds);
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
+    scheduleDebouncedSync();
 }
 
 export function deleteStudySessionEntry(dt, id) {
@@ -142,7 +152,9 @@ export function deleteStudySessionEntry(dt, id) {
     db[dt].totalStudy = Math.max(0, db[dt].totalStudy - entry.duration);
     db[dt].subjects[entry.subject] = Math.max(0, (db[dt].subjects[entry.subject] || 0) - entry.duration);
     db[dt].studySessions.splice(idx, 1); resetOpenEntryRefs();
+    if (entry.id) recordTombstones("study", [entry.id]);
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
+    scheduleDebouncedSync();
 }
 
 export function deleteBreakEntry(dt, id) {
@@ -153,16 +165,21 @@ export function deleteBreakEntry(dt, id) {
     if (!confirm(`Delete this ${formatReadable(entry.duration)} break?`)) return;
     db[dt].totalBreak = Math.max(0, db[dt].totalBreak - entry.duration);
     db[dt].breaks.splice(idx, 1); resetOpenEntryRefs();
+    if (entry.id) recordTombstones("study", [entry.id]);
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
+    scheduleDebouncedSync();
 }
 
 export function deleteStudyLog() {
     let dt = document.getElementById("history-picker").value; if (!dt) return;
     let db = getDB(); if (!db[dt]) { alert("No data."); return; }
     if (!confirm(`Delete all study logs for ${formatDateDDMMYY(dt)}?`)) return;
+    let removedIds = (db[dt].studySessions || []).map(s => s.id).filter(Boolean);
     db[dt].subjects = { ...blankDay().subjects };
     db[dt].totalStudy = 0; db[dt].studySessions = [];
+    recordTombstones("study", removedIds);
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
+    scheduleDebouncedSync();
 }
 
 // Manually add a break entry for a time range that was never tracked live
@@ -289,6 +306,9 @@ export function deleteBreakLog() {
     let dt = document.getElementById("history-picker").value; if (!dt) return;
     let db = getDB(); if (!db[dt]) { alert("No data."); return; }
     if (!confirm(`Delete all break logs for ${formatDateDDMMYY(dt)}?`)) return;
+    let removedIds = (db[dt].breaks || []).map(b => b.id).filter(Boolean);
     db[dt].breaks = []; db[dt].totalBreak = 0;
+    recordTombstones("study", removedIds);
     saveDB(db); loadHistoryData(); if (dt === getTodayKey()) updateLiveSummary(); renderGarden(); renderHeatmap(); renderTrendChart();
+    scheduleDebouncedSync();
 }

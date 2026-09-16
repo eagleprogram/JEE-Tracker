@@ -25,7 +25,7 @@ import { wipeLocalData } from './storage.js';
 // is safe here: signOutOfGoogle/getCurrentUser are only ever called from
 // inside deleteCookiesAndReload()'s function body, well after both modules
 // have finished evaluating — never at module-eval time.
-import { signOutOfGoogle, signInWithGoogle, getCurrentUser, pushToCloud, catchUpPlannerFromCloud } from './firebase-sync.js';
+import { signOutOfGoogle, signInWithGoogle, getCurrentUser, syncNow, catchUpPlannerFromCloud } from './firebase-sync.js';
 
 // ----------------- MOBILE "ZOOMED OUT" DEFAULT DENSITY (reflow fix) -----------------
 // css/base.css sets `.main-wrapper { zoom: 0.85; }` under its mobile
@@ -190,10 +190,10 @@ export async function deleteCookiesAndReload() {
         "If signed in, you won't lose data — just sign in again after reload."
     )) return;
     try {
-        if (getCurrentUser()) await pushToCloud(true);
+        if (getCurrentUser()) await syncNow(true);
     } catch (e) {
         // Best-effort — a failed auto-sync shouldn't block the reset the
-        // user already confirmed; pushToCloud's own silent-mode toast has
+        // user already confirmed; syncNow's own silent-mode toast has
         // already surfaced the failure to them.
     }
     try {

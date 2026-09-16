@@ -1,9 +1,15 @@
 import { escapeHtml, fileToDataURL, getTodayKey, downloadBlob } from './utils.js';
-import { getAllMistakeChapters, saveMistakeEntry } from './storage.js';
+import { getAllMistakeChapters, saveMistakeEntry, recordTombstone, recordTombstones } from './storage.js';
 import { SYLLABUS_SUBJECTS } from './syllabus.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast } from './ui.js';
+// Forward reference — firebase-sync.js does not import from this module,
+// so this is a normal (non-circular) import. scheduleDebouncedSync() fires
+// a silent sync a few seconds after a real add/delete instead of leaving
+// it sitting local-only until the next 30-minute auto-sync tick or a
+// manual "Sync Now" tap.
+import { scheduleDebouncedSync } from './firebase-sync.js';
 
 // ----------------- STATE -----------------
 let activeMistakeView = "add";              // "add" | "view"
@@ -154,6 +160,7 @@ export async function saveAddMistake() {
     if (filesInput) filesInput.value = "";
     showToast(`Mistake Logged for ${addFormChapter}.`);
     renderMistakesTracker();
+    scheduleDebouncedSync();
 }
 
 // ----------------- VIEW LIST: per-entry actions -----------------
@@ -276,10 +283,15 @@ async function doDeleteEntry(subject, chapter, entryId) {
     if (!confirm("Delete this mistake entry?")) return;
     record.entries = record.entries.filter(e => String(e.id) !== String(entryId));
     record.updatedAt = Date.now();
+    // Record the tombstone so a still-un-synced copy of this entry from
+    // the cloud (or another device) can't merge right back in on the next
+    // sync — see recordTombstone's own comment in storage.js.
+    recordTombstone("mistake", entryId);
     await saveMistakeEntry(record);
     mistakeCache[key] = record;
     delete editingEntries[entryKey(key, entryId)];
     renderMistakesTracker();
+    scheduleDebouncedSync();
 }
 
 async function doDeleteChapterLog(subject, chapter) {
@@ -294,11 +306,14 @@ async function doDeleteChapterLog(subject, chapter) {
         return;
     }
     if (!confirm("Clear ALL mistake entries logged for this chapter?")) return;
+    let removedIds = (record.entries || []).map(e => e.id).filter(id => id !== undefined && id !== null);
     let cleared = blankRecord(subject, chapter);
     cleared.updatedAt = Date.now();
+    recordTombstones("mistake", removedIds);
     await saveMistakeEntry(cleared);
     mistakeCache[key] = cleared;
     renderMistakesTracker();
+    scheduleDebouncedSync();
 }
 
 // ----------------- EVENT DELEGATION -----------------

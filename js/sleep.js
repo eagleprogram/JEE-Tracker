@@ -1,5 +1,5 @@
 import { formatDateDDMMYY, formatTime12Hour, fmtTime, fmtDuration, dateKeyFromWall, getTodayKey, isBeforeDayCutoff, timeToMinutes } from './utils.js';
-import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getNotifSettings, getDB } from './storage.js';
+import { getSleepLog, writeSleepLog, getSleepPending, setSleepPending, getNotifSettings, getDB, recordTombstone } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
@@ -21,6 +21,16 @@ import { openPlannerModal } from './planner.js';
 // Studying's water-break reminder (see startWaterReminder() in timer.js)
 // runs until the night's sleep log is actually saved.
 import { stopWaterReminder } from './notifications.js';
+// Forward reference — firebase-sync.js imports FROM this module too
+// (renderSleepPendingBanner/renderSleepLog for its own post-merge repaint —
+// see that file's comment). Same safe circular pattern already used by the
+// imports above: only called inside function bodies, never at module
+// top-level. scheduleDebouncedSync() fires a silent sync a few seconds
+// after a real sleep-log change instead of leaving it sitting local-only
+// until the next 30-minute auto-sync tick or a manual "Sync Now" tap —
+// this is what actually closes the "logged on mobile, checked laptop 5
+// minutes later, nothing there" gap for the sleep log specifically.
+import { scheduleDebouncedSync } from './firebase-sync.js';
 
 // A "pending" entry is always type 'sleep' now (bedtime logged, wake still
 // to come). Older saved data may still have a leftover type:'wake' pending
@@ -108,7 +118,7 @@ export function saveSleepLog() {
     // pending entry.
     if (pending && pendingType(pending) === 'wake') {
         if (!log[pending.date]) {
-            log[pending.date] = { sleepDate: null, sleepTime: null, wakeDate: pending.date, wakeTime: pending.time, durationMin: null };
+            log[pending.date] = { sleepDate: null, sleepTime: null, wakeDate: pending.date, wakeTime: pending.time, durationMin: null, loggedAt: Date.now() };
             writeSleepLog(log);
         }
         setSleepPending(null);
@@ -185,6 +195,7 @@ export function saveSleepLog() {
         // reminder is scoped to stop at — no point nudging someone to drink
         // water while they're asleep.
         stopWaterReminder();
+        scheduleDebouncedSync();
         return;
     }
 
@@ -209,7 +220,8 @@ export function saveSleepLog() {
                 sleepTime: pending.time,
                 wakeDate: expectedWakeDate,
                 wakeTime: wakeVal,
-                durationMin: diffMin
+                durationMin: diffMin,
+                loggedAt: Date.now()
             };
             writeSleepLog(log);
             setSleepPending(null);
@@ -222,7 +234,7 @@ export function saveSleepLog() {
             // sleep side, instead of leaving it "pending" — that way a
             // bedtime logged later today is never mistaken for this
             // morning's counterpart, and always starts fresh (CASE 1).
-            log[today] = { sleepDate: null, sleepTime: null, wakeDate: today, wakeTime: wakeVal, durationMin: null };
+            log[today] = { sleepDate: null, sleepTime: null, wakeDate: today, wakeTime: wakeVal, durationMin: null, loggedAt: Date.now() };
             writeSleepLog(log);
             refreshMissedBreakConstraints();
             showToast("Wake Time Logged (No Bedtime on Record for Last Night).");
@@ -231,6 +243,7 @@ export function saveSleepLog() {
         document.getElementById("sleep-time-input").value = "";
         renderSleepLog();
         renderSleepPendingBanner();
+        scheduleDebouncedSync();
         // A wake-up log (either sub-case above) is the trigger for the
         // morning attendance reminder — see openAttendanceReminderModal()
         // below. The day's to-do planner no longer opens from here; it now
@@ -277,7 +290,7 @@ export function saveSleepLog() {
             return;
         }
 
-        log[wakeDate] = { sleepDate, sleepTime: sleepVal, wakeDate, wakeTime: wakeVal, durationMin };
+        log[wakeDate] = { sleepDate, sleepTime: sleepVal, wakeDate, wakeTime: wakeVal, durationMin, loggedAt: Date.now() };
         writeSleepLog(log);
         refreshMissedBreakConstraints();
         if (pending) setSleepPending(null);
@@ -294,6 +307,7 @@ export function saveSleepLog() {
         // log for the night (same as CASE 1's bedtime-only save) — stop the
         // water reminder here too.
         stopWaterReminder();
+        scheduleDebouncedSync();
     }
 }
 
@@ -438,6 +452,7 @@ export function cancelPendingSleepLog() {
     setSleepPending(null);
     renderSleepPendingBanner();
     showToast("Pending Log Cancelled.");
+    scheduleDebouncedSync();
 }
 
 // Render today's log status (simple update of history if open)
@@ -522,8 +537,15 @@ export function deleteSleepLogEntry(wakeDate) {
     if (!confirm(`Delete the sleep log for ${wakeDate}?`)) return;
     let log = getSleepLog();
     if (!log[wakeDate]) return;
+    // Record the tombstone BEFORE removing it — see recordTombstone's own
+    // comment in storage.js. Without this, a still-un-synced copy of this
+    // exact date-key from the cloud (or another device) merges right back
+    // in on the next sync — exactly the "sleep entry keeps coming back"
+    // symptom this closes.
+    recordTombstone("sleep", wakeDate);
     delete log[wakeDate];
     writeSleepLog(log);
     renderSleepHistory();
     showToast("Sleep Log Entry Deleted.");
+    scheduleDebouncedSync();
 }

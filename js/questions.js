@@ -19,6 +19,17 @@ import { getDB, saveDB, initDay, ensureDayShape } from './storage.js';
 import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
 import { renderHeatmap } from './charts.js';
 import { getWeekOffset, mondayForOffset } from './week-nav.js';
+// Forward reference — firebase-sync.js does not import from this module,
+// so this is a normal (non-circular) import. scheduleDebouncedSync() fires
+// a silent sync a few seconds after a real change instead of leaving it
+// sitting local-only until the next 30-minute auto-sync tick or a manual
+// "Sync Now" tap. (Note: a cleared/reset count has no tombstone protection
+// yet — an older un-synced snapshot from another device can still OR its
+// questionsAsked flag back on. Flagging this as a known residual gap, same
+// as this codebase's other documented no-tombstone trade-offs, rather than
+// leaving it silent — closing it needs a per-day timestamp this field
+// doesn't have yet.)
+import { scheduleDebouncedSync } from './firebase-sync.js';
 
 let activeQuestionsDateKey = null;
 // Optional "what happens after this modal closes" hook — set only by the
@@ -102,6 +113,7 @@ export function saveQuestionsSolved() {
     renderQuestionsWidget();
     renderHeatmap();
     showToast(`✅ ${val} Question${val === 1 ? '' : 's'} Solved Logged for ${formatDateDDMMYY(dateKey)}.`);
+    scheduleDebouncedSync();
 }
 
 // "Back" just closes the modal without saving anything — unlike the old
@@ -128,6 +140,7 @@ export function deleteQuestionsSolved() {
     renderQuestionsWidget();
     renderHeatmap();
     showToast(`Questions Log Deleted for ${formatDateDDMMYY(dateKey)}.`);
+    scheduleDebouncedSync();
 }
 
 // ---------------- WEEKLY QUESTION-PRACTICE RING WIDGET ----------------

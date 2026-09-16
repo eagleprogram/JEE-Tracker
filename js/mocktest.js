@@ -1,8 +1,14 @@
 import { escapeHtml, fileToDataURL, getTodayKey, formatDateDDMMYY, downloadBlob } from './utils.js';
-import { openMockDB, getAllMockTests, MOCK_STORE } from './storage.js';
+import { openMockDB, getAllMockTests, MOCK_STORE, recordTombstone } from './storage.js';
 // Forward reference — ui.js lands in Step 7. Only called inside function
 // bodies, safe once the full module graph is wired in main.js.
 import { showToast, lockBodyScroll, unlockBodyScroll } from './ui.js';
+// Forward reference — firebase-sync.js does not import from this module,
+// so this is a normal (non-circular) import. scheduleDebouncedSync() fires
+// a silent sync a few seconds after a real mock-test delete instead of
+// leaving it sitting local-only until the next 30-minute auto-sync tick or
+// a manual "Sync Now" tap.
+import { scheduleDebouncedSync } from './firebase-sync.js';
 
 export const MISTAKE_TAGS = ["Silly Mistake", "Concept Gap", "Time Pressure", "Calculation Error", "Misread Question", "Not Revised", "Panic/Anxiety", "Guessed Wrong", "Formula Error", "Skipped Step", "Over Confidence", "Other"];
 let selectedMistakeTags = [];
@@ -98,6 +104,7 @@ export async function addMockTestEntry() {
         selectedMistakeTags = [];
         renderMistakeTagPicker();
         renderMockTestList();
+        scheduleDebouncedSync();
     };
 }
 
@@ -119,7 +126,11 @@ export async function deleteMockTestEntry(id) {
     let db = await openMockDB();
     let tx = db.transaction(MOCK_STORE, "readwrite");
     tx.objectStore(MOCK_STORE).delete(id);
-    tx.oncomplete = () => renderMockTestList();
+    // Record the tombstone so a still-un-synced copy of this entry from
+    // the cloud (or another device) can't merge right back in on the next
+    // sync — see recordTombstone's own comment in storage.js.
+    recordTombstone("mocktest", id);
+    tx.oncomplete = () => { renderMockTestList(); scheduleDebouncedSync(); };
 }
 
 export async function renderMockTestList() {

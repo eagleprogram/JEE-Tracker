@@ -82,7 +82,7 @@ import {
 import { exportDataJSON, importDataJSON } from './backup.js';
 
 import {
-    signInWithGoogle, signOutOfGoogle, pushToCloud, pullFromCloud,
+    signInWithGoogle, signOutOfGoogle, syncNow,
     deleteCloudData, forcePushToCloud, renderSyncUI, showPendingToastIfAny, resolveInitialAuthAndSync
 } from './firebase-sync.js';
 
@@ -172,7 +172,7 @@ Object.assign(window, {
     // backup.js
     exportDataJSON, importDataJSON,
     // firebase-sync.js
-    signInWithGoogle, signOutOfGoogle, pushToCloud, pullFromCloud,
+    signInWithGoogle, signOutOfGoogle, syncNow,
     deleteCloudData, forcePushToCloud,
     // notifications.js
     enableNotifications, saveNotifSettingsFromUI, stopAlarmLoop,
