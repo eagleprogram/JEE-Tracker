@@ -541,44 +541,22 @@ export async function syncNow(silent = false) {
     }
 }
 
-// ----------------- EVENT-TRIGGERED SYNC (reliability hardening) -----------------
-// REFORM: syncing used to only ever happen on a clock-aligned 30-minute
-// interval (startAutoServices below) or an explicit button tap — meaning a
-// change logged seconds ago could sit local-only for up to half an hour
-// before the cloud (and every other device) even knew about it. That gap
-// is exactly the window "I logged it on my phone, checked my laptop 5
-// minutes later, nothing there" lives in — not a merge bug, just nothing
-// had told the cloud yet. These two triggers close that gap without
-// spamming Firestore on every keystroke:
-//
-// 1) scheduleDebouncedSync() — called from planner.js/sleep.js right after
-//    a real change (add/toggle/delete a task, save/cancel/delete a sleep
-//    log entry). Fires a silent sync a few seconds after the user stops
-//    interacting, not on every single keystroke/tap.
-let debouncedSyncTimeout = null;
-const DEBOUNCED_SYNC_DELAY_MS = 8000;
+// ----------------- BACKGROUND SYNC TRIGGER (scoped back to interval-only) -----------------
+// REFORM, then REVERTED by request: a debounced-after-edit sync and a
+// tab-focus sync were added here to close the "logged on phone, nothing on
+// laptop for up to 30 minutes" gap — but every sync (silent or manual) is
+// one Firestore read + one write, and multiplying that across every edit
+// and every tab-focus meaningfully eats into the free-tier Firestore quota
+// during a normal active study session. Reverted to exactly what it was
+// before that reform: sync ONLY on the clock-aligned 30-minute interval
+// (startAutoServices below) or an explicit "Sync Now" tap — nothing else.
+// scheduleDebouncedSync() is kept as a no-op (rather than removed) so
+// planner.js/sleep.js/history.js/mocktest.js/mistakes.js/questions.js —
+// which all call it after a real edit — don't need to be touched again;
+// it simply does nothing now.
 export function scheduleDebouncedSync() {
-    if (!currentUser) return; // guest/offline — nothing to sync yet
-    if (debouncedSyncTimeout) clearTimeout(debouncedSyncTimeout);
-    debouncedSyncTimeout = setTimeout(() => {
-        debouncedSyncTimeout = null;
-        if (currentUser) syncNow(true);
-    }, DEBOUNCED_SYNC_DELAY_MS);
+    // Intentionally a no-op — see the comment above.
 }
-// 2) a sync the moment the tab regains focus (phone screen turns back on,
-//    switching back from another app/tab) — catches up immediately instead
-//    of waiting for the next half-hour mark on the interval below.
-//    Throttled to once every 2 minutes so rapidly flicking between tabs
-//    can't spam Firestore.
-const FOCUS_SYNC_MIN_GAP_MS = 2 * 60 * 1000;
-let lastFocusSyncAt = 0;
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden || !currentUser) return;
-    let now = Date.now();
-    if (now - lastFocusSyncAt < FOCUS_SYNC_MIN_GAP_MS) return;
-    lastFocusSyncAt = now;
-    syncNow(true);
-});
 
 // Small helper for the live "Syncing…" status text — separate from
 // renderSyncUI() (which repaints the whole Account & Sync panel) since this
@@ -1412,22 +1390,20 @@ export function startAutoServices() {
     let now = new Date();
     let msPastHalfHour = (now.getMinutes() % 30) * 60000 + now.getSeconds() * 1000 + now.getMilliseconds();
     let msUntilNextHalfHour = (30 * 60000) - msPastHalfHour;
+    // REVERTED BY REQUEST: this used to also fire one extra silent sync ~6s
+    // after sign-in/app-open (on top of this clock-aligned schedule), to
+    // close the "just opened my laptop, nothing from my phone shows up yet"
+    // gap. Every sync is a Firestore read+write, and the extra trigger
+    // meaningfully added to free-tier quota usage across active devices —
+    // reverted so syncing happens ONLY on this exact half-hour mark
+    // (12:00, 12:30, 1:00, …) or an explicit "Sync Now" tap, same as
+    // before that change.
     autoSyncTimeout = setTimeout(() => {
         if (currentUser) syncNow(true);
         autoSyncInterval = setInterval(() => {
             if (currentUser) syncNow(true);
         }, 30 * 60000);
     }, msUntilNextHalfHour);
-
-    // REFORM (reliability hardening): the half-hour-aligned schedule above
-    // means a device that already synced once before (so
-    // autoLoadCloudDataIfNeeded has nothing to do) could otherwise sit for
-    // up to 30 minutes after opening the app before checking in with the
-    // cloud at all — exactly the "just opened my laptop, nothing from my
-    // phone shows up yet" gap. This fires one extra silent sync shortly
-    // after sign-in/app-open; the short delay lets the initial auto-load
-    // and real-time listener attach first so this doesn't race them.
-    setTimeout(() => { if (currentUser) syncNow(true); }, 6000);
 
     // BUG FIX: this used to only check on a 2-hour setInterval tick, and
     // guarded with a flag keyed to *today's* date only

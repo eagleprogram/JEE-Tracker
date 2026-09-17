@@ -657,6 +657,32 @@ button.del:hover { color: #fca5a5; }
 }
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+/* ===== Update Available Banner ===== */
+/* Bottom-center, above the toast stack's z-index so an update notice never
+   gets buried under a run of ordinary toasts — this one is meant to persist
+   until the user acts on it or dismisses it, not fade out on its own like a
+   toast does. Kept visually calm (card background, thin border) rather than
+   warning-colored — a new version being available isn't an error. Shown/
+   hidden by JS setting element.style.display directly (see
+   showAppUpdateBanner()/dismissAppUpdateBanner() in main.js) — same pattern
+   already used elsewhere in this codebase (renderSyncUI() in
+   firebase-sync.js does the same for signed-in-block/signed-out-block)
+   rather than a CSS class, since a class-based rule can't override the
+   inline display:none this element starts with in index.html. */
+#update-available-banner {
+    position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+    z-index: 600; align-items: center; gap: 12px;
+    background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    color: var(--text); padding: 10px 12px 10px 16px; border-radius: 10px;
+    font-size: 13px; box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+    max-width: calc(100vw - 24px); animation: toast-in 0.25s ease-out;
+}
+.btn-update-dismiss {
+    background: none; border: none; color: var(--muted); font-size: 14px; line-height: 1;
+    cursor: pointer; padding: 4px 6px; border-radius: 6px;
+}
+.btn-update-dismiss:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
 /* ===== YouTube player + history ===== */
 .yt-player-wrap { margin-top: 8px; }
 /* "▶ Now Playing: <title>" — replaces the raw pasted link once a video is

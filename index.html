@@ -862,5 +862,19 @@
         <button class="btn btn-stop" onclick="stopAlarmLoop()" style="font-size: 18px; padding: 14px 20px; width: 100%; border-radius: 10px;">STOP ALARM</button>
     </div>
 </div>
+    <!-- Update Available Banner — a light, non-blocking alternative to
+         "Delete Cookies & Reload" for the common case (a new deploy is
+         live). Shown/hidden purely by JS (see checkForAppUpdate() in
+         main.js) — starts hidden via inline display:none, toggled with
+         .show (see components.css) once a real update is actually
+         detected. Deliberately NOT a .modal — doesn't block the rest of
+         the page, doesn't need a backdrop, and can sit there indefinitely
+         without forcing an immediate decision the way the alarm/guest
+         modals above do. -->
+    <div id="update-available-banner" style="display:none;">
+        <span>🔄 A new version of the app is available.</span>
+        <button class="btn btn-start btn-small" onclick="applyAppUpdate()">Update Now</button>
+        <button class="btn-update-dismiss" onclick="dismissAppUpdateBanner()" aria-label="Dismiss">✕</button>
+    </div>
 </body>
 </html>

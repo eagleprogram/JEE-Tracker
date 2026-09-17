@@ -179,7 +179,75 @@ Object.assign(window, {
     // push-notifications.js
     enableBackgroundPush, disableBackgroundPush,
     // google-calendar.js
-    connectAndSyncGoogleCalendar
+    connectAndSyncGoogleCalendar,
+    // update-check (this file, below)
+    applyAppUpdate, dismissAppUpdateBanner
+});
+
+// ----------------- APP UPDATE DETECTION -----------------
+// REFORM: previously the only way to actually get a fresh deploy onto a
+// device that already had the app installed/cached was the "Delete Cookies
+// & Reload Website" button — a correct but heavy hammer (wipes local data,
+// requires the user to remember to click it, and gives no indication a new
+// version even exists). This is the lighter, standard PWA pattern instead:
+// detect a genuine update in the background and surface a small, calm
+// banner — see #update-available-banner in index.html — so a returning
+// user who's never touched Reset can still pick up fixes within moments of
+// a deploy landing, with one click, no data wiped.
+let updateBannerShown = false;
+function checkForAppUpdate(reg) {
+    // Ask the browser to check sw.js against the network RIGHT NOW —
+    // otherwise it only checks on its own schedule (roughly once every 24
+    // hours), which could leave a fix invisible for a full day even though
+    // it's already live.
+    reg.update().catch(() => { /* offline — the periodic/focus checks below will retry */ });
+
+    // "updatefound" fires the moment the browser notices sw.js's bytes
+    // differ from what it has — including on this very first registration.
+    // navigator.serviceWorker.controller only exists once a service worker
+    // has ALREADY taken control of an earlier load of this page, so
+    // checking for it here is what tells a genuine "a newer version just
+    // showed up" apart from the ordinary first-ever install (which has
+    // nothing to update FROM, and shouldn't show an update banner).
+    reg.addEventListener("updatefound", () => {
+        let installingWorker = reg.installing;
+        if (!installingWorker) return;
+        installingWorker.addEventListener("statechange", () => {
+            if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
+                // sw.js's own install handler already calls self.skipWaiting()
+                // and its activate handler calls self.clients.claim() — so by
+                // the time this fires, the new worker has already taken over
+                // control in the background on its own. Nothing further needs
+                // sending to it; a plain reload (applyAppUpdate() below) is
+                // enough to start actually running the new files.
+                if (!updateBannerShown) { updateBannerShown = true; showAppUpdateBanner(); }
+            }
+        });
+    });
+}
+function showAppUpdateBanner() {
+    let el = document.getElementById("update-available-banner");
+    if (el) el.style.display = "flex";
+}
+function dismissAppUpdateBanner() {
+    let el = document.getElementById("update-available-banner");
+    if (el) el.style.display = "none";
+}
+function applyAppUpdate() {
+    // No message-passing needed — see the comment above; the new worker is
+    // already active and controlling this page, a reload just starts
+    // actually loading through it instead of the in-memory old version.
+    location.reload();
+}
+// Re-check whenever the tab regains focus (screen turns back on, switching
+// back from another app/tab) — catches a deploy that happened while this
+// tab sat in the background, without waiting for the next natural page
+// load. This is a plain HTTP check against sw.js itself, not a Firestore
+// operation, so it has no bearing on the cloud-sync quota concern that
+// scoped syncNow's own background triggers back to interval-only.
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update().catch(() => {}); });
 });
 
 // -----------------------------------------------------------------------
@@ -319,9 +387,11 @@ async function initApp() {
     updatePushPermissionStatusUI();
     reregisterPushIfEnabled();
 
-    // PWA offline support.
+    // PWA offline support + update detection.
     if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./sw.js").catch(err => {
+        navigator.serviceWorker.register("./sw.js").then(reg => {
+            checkForAppUpdate(reg);
+        }).catch(err => {
             console.error("Service worker registration failed:", err);
         });
     }
