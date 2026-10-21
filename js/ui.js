@@ -2,7 +2,7 @@ import { shiftDateByYears, getTodayKey } from './utils.js';
 import { getExamYear, setStoredExamYear, BASE_EXAM_YEAR, BASE_EXAM_DATES, getRawFlag, setRawFlag } from './storage.js';
 import { getCurrentDayKey, setCurrentDayKey, flushAndRestartSegment, updateLiveSummary } from './timer.js';
 import { initToday } from './storage.js';
-import { renderSidebarTools, renderPlannerCalendar, carryOverIncompleteTodos } from './planner.js';
+import { renderSidebarTools, renderPlannerCalendar, carryOverIncompleteTodos, shouldPromptCarryOver } from './planner.js';
 // Forward reference — history.js/charts.js were built in earlier steps and
 // have no dependency back on ui.js, so this is a normal (non-circular) import.
 import { loadHistoryData } from './history.js';
@@ -666,6 +666,23 @@ export async function checkDayRollover() {
     } finally {
         rolloverInProgress = false;
     }
+}
+
+// Called on app open and whenever the tab regains focus. Handles a real
+// midnight flip via checkDayRollover() (which prompts itself), then — for
+// the case where NO flip happened but undone tasks from an earlier day are
+// still waiting because the prompt was never answered last time — raises
+// the prompt again. See the CARRYOVER_ACK_FLAG comment in planner.js.
+export async function ensureCarryOverPrompt() {
+    if (rolloverInProgress) return;
+    await checkDayRollover();
+    if (rolloverInProgress) return;
+    let todayKey = getTodayKey();
+    if (!shouldPromptCarryOver(todayKey)) return;
+    // Same reasoning as checkDayRollover(): merge in anything newer from
+    // another device (bounded fetch) before deciding what's "incomplete".
+    await catchUpPlannerFromCloud();
+    carryOverIncompleteTodos(todayKey);
 }
 
 // ----------------- QUOTE OF THE DAY -----------------

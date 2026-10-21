@@ -1,5 +1,5 @@
 import { getTodayKey, dateKey, escapeHtml, generateId } from './utils.js';
-import { getPlannerDB, savePlannerDB, recordTombstone } from './storage.js';
+import { getPlannerDB, savePlannerDB, recordTombstone, getRawFlag, setRawFlag } from './storage.js';
 // Forward reference — ui.js imports FROM this module (carryOverIncompleteTodos,
 // renderSidebarTools, renderPlannerCalendar), so this is a circular import.
 // Same pattern already used by notifications.js: only called inside function
@@ -145,16 +145,47 @@ export function deleteTodo(idx) {
 // several days). That list is re-offered every single rollover until the
 // user actually accepts it or clears those tasks themselves — so nothing
 // ends up permanently stuck no matter what happened on any earlier attempt.
+// BUG FIX (carryover prompt never came back after being ignored): the
+// scan above was only ever TRIGGERED by the midnight day-flip in
+// checkDayRollover(). That flip happens exactly once per day, and the
+// "current day" pointer is persisted the moment it does. So if the prompt
+// appeared and the tab was closed without answering it, the next open saw
+// "same day as last time" → no flip → no scan → no prompt, ever, even
+// though the undone tasks were still sitting on the old day.
+//
+// Now the prompt is STATE-driven instead of event-driven: whenever the app
+// opens or regains focus (see ensureCarryOverPrompt() in ui.js) it asks
+// "are there undone tasks on any earlier day, and has the user already
+// answered today's prompt?". Answering = tapping "Transfer to Today" OR
+// "Not Now"; that choice is stored per calendar day in CARRYOVER_ACK_FLAG.
+// Closing the tab / dismissing nothing stores nothing, so the prompt simply
+// returns on the next open until it is answered. A "Not Now" silences it
+// for the rest of that day only — tomorrow it asks again (the tasks are
+// still stale), and the new calendar button below lets the user move them
+// at any time in between.
+const CARRYOVER_ACK_FLAG = "jee_carryover_ack_day";
 let pendingCarryOver = null;
-export function carryOverIncompleteTodos(newDayKey) {
-    let db = getPlannerDB();
-    let staleDayKeys = Object.keys(db)
-        .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && k < newDayKey && (db[k] || []).some(t => !t.done))
-        .sort();
-    if (staleDayKeys.length === 0) return;
 
+function findStaleIncomplete(db, todayKey) {
+    let staleDayKeys = Object.keys(db)
+        .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && k < todayKey && (db[k] || []).some(t => !t.done))
+        .sort();
     let incomplete = [];
     staleDayKeys.forEach(k => (db[k] || []).filter(t => !t.done).forEach(t => incomplete.push(t)));
+    return { staleDayKeys, incomplete };
+}
+
+// Cheap pre-check used by ui.js before it bothers fetching from the cloud.
+export function shouldPromptCarryOver(todayKey) {
+    if (pendingCarryOver) return false;
+    if (getRawFlag(CARRYOVER_ACK_FLAG) === todayKey) return false;
+    return findStaleIncomplete(getPlannerDB(), todayKey).incomplete.length > 0;
+}
+
+export function carryOverIncompleteTodos(newDayKey) {
+    if (pendingCarryOver) return;                                   // already showing
+    if (getRawFlag(CARRYOVER_ACK_FLAG) === newDayKey) return;       // answered today
+    let { staleDayKeys, incomplete } = findStaleIncomplete(getPlannerDB(), newDayKey);
     if (incomplete.length === 0) return;
 
     pendingCarryOver = { staleDayKeys, newDayKey, incomplete };
@@ -172,44 +203,74 @@ function renderCarryOverModal(incomplete) {
         .join("");
 }
 
-// "Yes, transfer" button on the carryover modal.
-export function confirmCarryOverTodos() {
-    if (!pendingCarryOver) { closeCarryOverModal(); return; }
-    let { staleDayKeys, newDayKey, incomplete } = pendingCarryOver;
+// Shared by the modal's "Transfer to Today" and the calendar's one-tap
+// button. Returns how many tasks left their old day.
+function moveStaleIncompleteToToday(todayKey) {
     let db = getPlannerDB();
+    let { staleDayKeys, incomplete } = findStaleIncomplete(db, todayKey);
+    if (incomplete.length === 0) return 0;
     // Bump updatedAt on every moved task. A task can end up listed under
-    // BOTH the old and new day-key after a merge — e.g. this device carries
-    // it over locally at the same moment a cloud snapshot (from before this
-    // carryover, or from another device that hasn't carried it over yet)
-    // still has it sitting under the old day. Both copies share the same
-    // id but live under different day-keys, and a per-day-key merge alone
-    // can't tell which one is "real". mergePlannerDB()'s second pass (in
-    // firebase-sync.js) resolves that by id, always keeping whichever copy
-    // was updated most recently and dropping the stale duplicate — which
-    // only works if "moved to a new day" itself counts as an update.
+    // BOTH the old and new day-key after a merge (this device carries it
+    // over while a cloud snapshot still has it under the old day).
+    // mergePlannerDB()'s second pass (firebase-sync.js) resolves that by id,
+    // keeping whichever copy was updated most recently — which only works
+    // if "moved to a new day" itself counts as an update.
     let now = Date.now();
+    let todayList = db[todayKey] || [];
+    // Same exact-text duplicate rule as addTodo(): a stale task whose text
+    // is already on today's list is dropped (tombstoned so a cloud copy
+    // can't resurrect it) instead of creating a second identical entry.
+    let existing = new Set(todayList.map(t => t.text));
+    let moved = [];
+    incomplete.forEach(t => {
+        if (existing.has(t.text)) { if (t.id) recordTombstone("planner", t.id); return; }
+        existing.add(t.text);
+        moved.push({ ...t, updatedAt: now });
+    });
     staleDayKeys.forEach(k => { db[k] = (db[k] || []).filter(t => t.done); });
-    let moved = incomplete.map(t => ({ ...t, updatedAt: now }));
-    db[newDayKey] = (db[newDayKey] || []).concat(moved);
+    db[todayKey] = todayList.concat(moved);
     savePlannerDB(db);
-    let count = moved.length;
-    closeCarryOverModal();
-    renderSidebarTools(); renderPlannerCalendar();
-    showToast(`Moved ${count} ${count === 1 ? "Task" : "Tasks"} to Today.`);
-    scheduleDebouncedSync();
+    return incomplete.length;
 }
 
-// "Not now" button on the carryover modal — leaves the old tasks exactly
-// where they are (still on their original day, still undone), so they get
-// offered again on the next rollover instead of being lost.
-export function declineCarryOverTodos() {
+// "Transfer to Today" button on the carryover modal.
+export function confirmCarryOverTodos() {
+    let todayKey = getTodayKey();
+    let count = pendingCarryOver ? moveStaleIncompleteToToday(todayKey) : 0;
+    setRawFlag(CARRYOVER_ACK_FLAG, todayKey);
     closeCarryOverModal();
+    renderSidebarTools(); renderPlannerCalendar();
+    if (count) {
+        showToast(`Moved ${count} ${count === 1 ? "Task" : "Tasks"} to Today.`);
+        scheduleDebouncedSync();
+    }
+}
+
+// "Not Now" — leaves the old tasks exactly where they are and counts as an
+// answer for today (see the comment above); asks again tomorrow.
+export function declineCarryOverTodos() {
+    setRawFlag(CARRYOVER_ACK_FLAG, getTodayKey());
+    closeCarryOverModal();
+    renderPlannerCalendar();
+}
+
+// Minimal button under the planner calendar: moves every undone task from
+// any earlier day onto today, no modal. Also counts as answering the prompt.
+export function transferAllIncompleteToToday() {
+    let todayKey = getTodayKey();
+    let count = moveStaleIncompleteToToday(todayKey);
+    setRawFlag(CARRYOVER_ACK_FLAG, todayKey);
+    if (pendingCarryOver) closeCarryOverModal();
+    renderSidebarTools(); renderPlannerCalendar();
+    if (count) { showToast(`Moved ${count} ${count === 1 ? "Task" : "Tasks"} to Today.`); scheduleDebouncedSync(); }
+    else showToast("No Incomplete Tasks to Transfer.");
 }
 
 function closeCarryOverModal() {
+    let wasOpen = pendingCarryOver !== null;
     pendingCarryOver = null;
     document.getElementById("carryover-modal").style.display = "none";
-    unlockBodyScroll();
+    if (wasOpen) unlockBodyScroll();
 }
 
 // ----------------- CALENDAR + PER-DAY PLANNER MODAL -----------------
@@ -229,6 +290,14 @@ export function renderPlannerCalendar() {
     let today = new Date(); let todayKey = dateKey(today.getFullYear(), today.getMonth(), today.getDate()); let plannerDB = getPlannerDB();
     for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div class="cal-day empty"></div>`;
     for (let d = 1; d <= daysInMonth; d++) { let key = dateKey(calViewYear, calViewMonth, d); let hasTasks = plannerDB[key] && plannerDB[key].length > 0; let isToday = key === todayKey; grid.innerHTML += `<div class="cal-day ${isToday ? 'today' : ''}" onclick="openPlannerModal('${key}')">${d}${hasTasks ? '<div class="dot"></div>' : ''}</div>`; }
+    // One-tap transfer button: only visible while some earlier day still
+    // has undone tasks, so it never clutters the calendar otherwise.
+    let xferBtn = document.getElementById("cal-transfer-btn");
+    if (xferBtn) {
+        let n = findStaleIncomplete(plannerDB, todayKey).incomplete.length;
+        xferBtn.style.display = n > 0 ? "" : "none";
+        xferBtn.textContent = `↪ Move ${n} undone to today`;
+    }
 }
 
 export function openPlannerModal(key) {

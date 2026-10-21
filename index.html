@@ -134,7 +134,10 @@
             </div>
             <div class="cal-grid" id="cal-dow-row"></div>
             <div class="cal-grid" id="cal-grid" style="margin-top:4px;"></div>
-            <div style="font-size:11px; color:var(--muted); margin-top:6px;">Click a date to view/add tasks.</div>
+            <div class="cal-footer">
+                <div style="font-size:11px; color:var(--muted);">Click a date to view/add tasks.</div>
+                <button class="cal-transfer-btn" id="cal-transfer-btn" style="display:none;" onclick="transferAllIncompleteToToday()" title="Move every undone task from earlier days onto today"></button>
+            </div>
         </div>
 
         <div class="card" style="padding: 12px;">

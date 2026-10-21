@@ -22,14 +22,15 @@ import {
     deleteCookiesAndReload, toggleZenMode, exitZenMode,
     hideGuestSignInReminder, guestReminderIgnore, guestReminderSnooze,
     guestReminderSignInClicked, runBootSignInGate, forceMobileZoomReflow,
-    initHolidayReference
+    initHolidayReference, ensureCarryOverPrompt
 } from './ui.js';
 
 import {
     initPlannerCalendar, addTodo, renderSidebarTools, toggleTodo, deleteTodo,
     calShiftMonth, renderPlannerCalendar, openPlannerModal, closePlannerModal,
     addPlannerTask, togglePlannerTask, deletePlannerTask, renderPlannerTasks,
-    openDatePicker, confirmCarryOverTodos, declineCarryOverTodos
+    openDatePicker, confirmCarryOverTodos, declineCarryOverTodos,
+    transferAllIncompleteToToday
 } from './planner.js';
 
 import {
@@ -140,6 +141,7 @@ Object.assign(window, {
     renderPlannerCalendar, openPlannerModal, closePlannerModal,
     addPlannerTask, togglePlannerTask, deletePlannerTask, renderPlannerTasks,
     openDatePicker, confirmCarryOverTodos, declineCarryOverTodos,
+    transferAllIncompleteToToday,
     // charts.js
     renderGarden, renderHeatmap, renderTrendChart,
     // questions.js
@@ -350,6 +352,7 @@ async function initApp() {
     renderQuoteOfDay();
     renderExamYearUI();
     tickCountdowns();                 // also runs checkDayRollover + notif checks + renderGarden
+    ensureCarryOverPrompt();          // re-raise the carryover prompt if it was never answered
     setInterval(tickCountdowns, 1000);
     // Catch-up on visibility regain: background/hidden tabs get their
     // setInterval throttled by the browser (Chrome limits hidden tabs to
@@ -360,7 +363,7 @@ async function initApp() {
     // tick the instant the tab becomes visible again closes that gap
     // immediately instead of waiting up to a minute (or more) for it.
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") tickCountdowns();
+        if (document.visibilityState === "visible") { tickCountdowns(); ensureCarryOverPrompt(); }
     });
 
     // Charts.
