@@ -19,7 +19,7 @@ export const MOCK_DB_NAME = "jee_mocktest_db";
 export const MOCK_STORE = "tests";
 export const EXAM_YEAR_KEY = "jee_exam_year";
 export const BASE_EXAM_YEAR = 2027;
-export const BASE_EXAM_DATES = { mains1: "2027-01-21T00:00:00+05:30", mains2: "2027-04-02T00:00:00+05:30", adv: "2027-05-17T00:00:00+05:30" };
+export const BASE_EXAM_DATES = { mains1: "2027-01-19T00:00:00+05:30", mains2: "2027-04-02T00:00:00+05:30", adv: "2027-05-17T00:00:00+05:30" };
 
 // ----------------- STUDY DAY DB -----------------
 export function blankDay() {

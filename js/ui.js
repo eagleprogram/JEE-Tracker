@@ -977,7 +977,11 @@ export function renderExamYearUI() {
     // this dynamically-rebuilt span) — this only ever needs to update the
     // "JEE <year>" text itself when the exam year changes.
     document.getElementById("app-title-main").textContent = `JEE ${year}`;
-    document.getElementById("chip-mains1").title = `JEE Main ${year} (Session 1) — ${fmtExamDate(JEE_MAINS_DATE)}`;
+    // Countdown target is deliberately the day BEFORE the first Jan-session
+    // exam day (base: 19 Jan -> exam starts 20 Jan), so the timer reaches
+    // zero the day before the exam instead of rolling over on exam day.
+    let mainsExamStart = new Date(JEE_MAINS_DATE.getTime() + 86400000);
+    document.getElementById("chip-mains1").title = `JEE Main ${year} (Session 1) — exam starts ${fmtExamDate(mainsExamStart)}, countdown ends ${fmtExamDate(JEE_MAINS_DATE)}`;
     document.getElementById("chip-mains2").title = `JEE Main ${year} (Session 2) — ${fmtExamDate(JEE_MAINS2_DATE)}`;
     document.getElementById("chip-adv").title = `JEE Advanced ${year} — ${fmtExamDate(JEE_ADV_DATE)}`;
     let sel = document.getElementById("exam-year-select");
