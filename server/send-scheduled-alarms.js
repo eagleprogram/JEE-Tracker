@@ -85,7 +85,7 @@ function parseHHMM(hhmm, fallback) {
 
 // ----------------- EXAM MILESTONE DATES (mirrors js/storage.js) -----------------
 const BASE_EXAM_YEAR = 2027;
-const BASE_EXAM_DATES = { mains1: "2027-01-21T00:00:00+05:30", mains2: "2027-04-02T00:00:00+05:30", adv: "2027-05-17T00:00:00+05:30" };
+const BASE_EXAM_DATES = { mains1: "2027-01-19T00:00:00+05:30", mains2: "2027-04-02T00:00:00+05:30", adv: "2027-05-17T00:00:00+05:30" };
 const EXAM_MILESTONE_DAYS = [30, 7, 1];
 function shiftDateByYears(iso, years) {
     let d = new Date(iso);
